@@ -14,7 +14,309 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      expenses: {
+        Row: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string | null
+          date: string
+          id: string
+          memo: string | null
+          property_id: string | null
+          receipt_url: string | null
+          unit_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at?: string | null
+          date: string
+          id?: string
+          memo?: string | null
+          property_id?: string | null
+          receipt_url?: string | null
+          unit_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string | null
+          date?: string
+          id?: string
+          memo?: string | null
+          property_id?: string | null
+          receipt_url?: string | null
+          unit_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leases: {
+        Row: {
+          confidence_scores: Json | null
+          created_at: string | null
+          deposit: number | null
+          doc_url: string | null
+          end_date: string
+          grace_period_days: number | null
+          id: string
+          late_fee_amount: number | null
+          monthly_rent: number
+          notice_days: number | null
+          parsed_json: Json | null
+          start_date: string
+          status: Database["public"]["Enums"]["lease_status"] | null
+          tenant_id: string
+          unit_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          confidence_scores?: Json | null
+          created_at?: string | null
+          deposit?: number | null
+          doc_url?: string | null
+          end_date: string
+          grace_period_days?: number | null
+          id?: string
+          late_fee_amount?: number | null
+          monthly_rent: number
+          notice_days?: number | null
+          parsed_json?: Json | null
+          start_date: string
+          status?: Database["public"]["Enums"]["lease_status"] | null
+          tenant_id: string
+          unit_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          confidence_scores?: Json | null
+          created_at?: string | null
+          deposit?: number | null
+          doc_url?: string | null
+          end_date?: string
+          grace_period_days?: number | null
+          id?: string
+          late_fee_amount?: number | null
+          monthly_rent?: number
+          notice_days?: number | null
+          parsed_json?: Json | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["lease_status"] | null
+          tenant_id?: string
+          unit_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leases_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leases_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          images: string[] | null
+          status: Database["public"]["Enums"]["maintenance_status"] | null
+          title: string
+          unit_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          status?: Database["public"]["Enums"]["maintenance_status"] | null
+          title: string
+          unit_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          status?: Database["public"]["Enums"]["maintenance_status"] | null
+          title?: string
+          unit_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount_due: number
+          created_at: string | null
+          due_date: string
+          id: string
+          lease_id: string
+          paid_amount: number | null
+          paid_date: string | null
+          payment_method: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_due: number
+          created_at?: string | null
+          due_date: string
+          id?: string
+          lease_id: string
+          paid_amount?: number | null
+          paid_date?: string | null
+          payment_method?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_due?: number
+          created_at?: string | null
+          due_date?: string
+          id?: string
+          lease_id?: string
+          paid_amount?: number | null
+          paid_date?: string | null
+          payment_method?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "leases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      properties: {
+        Row: {
+          address: string
+          created_at: string | null
+          id: string
+          mortgage_payment: number | null
+          total_units: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          address: string
+          created_at?: string | null
+          id?: string
+          mortgage_payment?: number | null
+          total_units?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string
+          created_at?: string | null
+          id?: string
+          mortgage_payment?: number | null
+          total_units?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tenants: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      units: {
+        Row: {
+          created_at: string | null
+          id: string
+          property_id: string
+          unit_label: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          property_id: string
+          unit_label: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          property_id?: string
+          unit_label?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "units_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +325,19 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      expense_category:
+        | "repairs"
+        | "pm"
+        | "tax"
+        | "insurance"
+        | "capex"
+        | "utilities"
+        | "hoa"
+        | "advertising"
+        | "other"
+      lease_status: "active" | "expiring" | "expired" | "vacant"
+      maintenance_status: "pending" | "in_progress" | "completed"
+      payment_status: "paid" | "overdue" | "pending"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +464,21 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      expense_category: [
+        "repairs",
+        "pm",
+        "tax",
+        "insurance",
+        "capex",
+        "utilities",
+        "hoa",
+        "advertising",
+        "other",
+      ],
+      lease_status: ["active", "expiring", "expired", "vacant"],
+      maintenance_status: ["pending", "in_progress", "completed"],
+      payment_status: ["paid", "overdue", "pending"],
+    },
   },
 } as const
