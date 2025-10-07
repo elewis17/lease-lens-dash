@@ -237,6 +237,8 @@ export type Database = {
           created_at: string | null
           id: string
           mortgage_payment: number | null
+          purchase_price: number | null
+          rent_growth_rate: number | null
           total_units: number | null
           updated_at: string | null
         }
@@ -245,6 +247,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           mortgage_payment?: number | null
+          purchase_price?: number | null
+          rent_growth_rate?: number | null
           total_units?: number | null
           updated_at?: string | null
         }
@@ -253,6 +257,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           mortgage_payment?: number | null
+          purchase_price?: number | null
+          rent_growth_rate?: number | null
           total_units?: number | null
           updated_at?: string | null
         }
