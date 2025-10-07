@@ -16,16 +16,28 @@ export const MetricCard = ({ title, value, subtitle, icon: Icon, variant = "defa
     warning: "bg-warning-gradient",
   }[variant];
 
+  const iconBgClass = {
+    default: "bg-primary/10",
+    success: "bg-success/10",
+    warning: "bg-warning/10",
+  }[variant];
+
+  const iconColorClass = {
+    default: "text-primary",
+    success: "text-success",
+    warning: "text-warning",
+  }[variant];
+
   return (
-    <Card className={`p-6 ${gradientClass} border-border transition-all hover:shadow-md`}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <h3 className="text-2xl font-bold text-foreground">{value}</h3>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+    <Card className={`p-6 ${gradientClass} border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-200 animate-fade-in`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-2 flex-1 min-w-0">
+          <p className="text-sm font-medium text-muted-foreground leading-snug">{title}</p>
+          <h3 className="text-3xl font-extrabold text-foreground leading-tight">{value}</h3>
+          {subtitle && <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>}
         </div>
-        <div className="rounded-lg bg-background/50 p-3">
-          <Icon className="h-5 w-5 text-primary" />
+        <div className={`rounded-md ${iconBgClass} p-2 flex-shrink-0`}>
+          <Icon className={`h-5 w-5 ${iconColorClass}`} />
         </div>
       </div>
     </Card>

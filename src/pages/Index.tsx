@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DollarSign, Home, TrendingUp, Wallet, Activity, PieChart } from "lucide-react";
+import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator } from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { PropertyFilter } from "@/components/PropertyFilter";
 import { LeaseTable } from "@/components/LeaseTable";
@@ -23,8 +23,9 @@ const Index = () => {
     misc: 0,
   });
   const [metrics, setMetrics] = useState({
-    expected: 0,
-    occupancy: "0/0",
+    expectedRent: 0,
+    occupancyRate: 0,
+    activeLeases: 0,
     arr: 0,
     mrr: 0,
     noi: 0,
@@ -145,11 +146,13 @@ const Index = () => {
     const annualDebt = expenses.mortgage * 12;
     const dcr = annualDebt > 0 ? noi / annualDebt : 0;
     const totalUnits = propertyData?.total_units || 1;
+    const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
 
     setLeases(processedLeases);
     setMetrics({
-      expected: totalExpected,
-      occupancy: `${activeLeases}/${totalUnits}`,
+      expectedRent: totalExpected,
+      occupancyRate,
+      activeLeases,
       arr: totalMRR * 12,
       mrr: totalMRR,
       noi: noi / 12,
@@ -290,14 +293,12 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
+      <header className="sticky top-0 z-50 border-b border-border backdrop-blur-sm bg-background/80">
+        <div className="container mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-              Owner One-Pager
-            </h1>
-            <p className="text-sm text-muted-foreground">Your portfolio at a glance</p>
+            <h1 className="text-2xl font-bold leading-snug">Landlord Dashboard</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">Instant lease insights, zero tabs.</p>
           </div>
           {properties.length > 0 && (
             <PropertyFilter
@@ -309,87 +310,105 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8 pb-24">
-        {/* Metrics Header */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <MetricCard
             title="Expected Rent"
-            value={`$${metrics.expected.toLocaleString()}`}
-            subtitle="Monthly"
+            value={`$${metrics.expectedRent.toLocaleString()}`}
+            subtitle="Per month"
             icon={DollarSign}
             variant="default"
           />
           <MetricCard
-            title="Occupancy"
-            value={metrics.occupancy}
-            subtitle="Units filled"
+            title="Occupancy Rate"
+            value={`${metrics.occupancyRate.toFixed(1)}%`}
+            subtitle={`${metrics.activeLeases} of ${currentProperty?.total_units || 0} units filled`}
             icon={Home}
             variant="success"
           />
           <MetricCard
-            title="ARR / MRR"
-            value={`$${(metrics.arr / 1000).toFixed(0)}k`}
-            subtitle={`$${metrics.mrr.toLocaleString()} monthly`}
+            title="ARR"
+            value={`$${metrics.arr.toLocaleString()}`}
+            subtitle={`MRR: $${metrics.mrr.toLocaleString()}`}
             icon={TrendingUp}
             variant="default"
           />
           <MetricCard
-            title="Cash Flow"
-            value={`$${metrics.cashFlow.toLocaleString()}`}
-            subtitle="Monthly"
-            icon={Wallet}
-            variant={metrics.cashFlow > 0 ? "success" : "warning"}
-          />
-        </div>
-
-        {/* Advanced Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricCard
             title="NOI"
             value={`$${metrics.noi.toLocaleString()}`}
-            subtitle="Net Operating Income (monthly)"
-            icon={Activity}
-            variant="default"
+            subtitle="Net Operating Income"
+            icon={Wallet}
+            variant="success"
+          />
+          <MetricCard
+            title="Cash Flow"
+            value={`$${metrics.cashFlow.toLocaleString()}`}
+            subtitle={metrics.cashFlow >= 0 ? "Positive monthly flow" : "Negative monthly flow"}
+            icon={LineChart}
+            variant={metrics.cashFlow >= 0 ? "success" : "warning"}
           />
           <MetricCard
             title="Cap Rate"
             value={`${metrics.capRate.toFixed(2)}%`}
             subtitle="Return on investment"
-            icon={PieChart}
+            icon={Percent}
             variant="default"
           />
           <MetricCard
             title="DCR"
             value={metrics.dcr.toFixed(2)}
-            subtitle="Debt Coverage Ratio"
-            icon={TrendingUp}
+            subtitle={metrics.dcr >= 1.25 ? "Healthy coverage" : "Low coverage"}
+            icon={Calculator}
             variant={metrics.dcr >= 1.25 ? "success" : "warning"}
           />
         </div>
 
-        {/* Lease Table */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Active Leases</h2>
-          <LeaseTable
-            leases={leases}
-            onUpdate={handleUpdateLease}
-            onDelete={handleDeleteLease}
-            onAdd={handleAddLease}
+        {/* Lease Table Card */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold leading-snug">
+            Active Leases <span className="text-muted-foreground text-base">({leases.length})</span>
+          </h2>
+          {leases.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4 shadow-sm animate-fade-in">
+              <div className="text-muted-foreground">
+                <p className="font-medium text-base mb-2">No leases yet</p>
+                <p className="text-sm leading-relaxed">Add your first lease to start tracking rent and occupancy</p>
+              </div>
+            </div>
+          ) : (
+            <LeaseTable
+              leases={leases}
+              onUpdate={handleUpdateLease}
+              onDelete={handleDeleteLease}
+              onAdd={handleAddLease}
+            />
+          )}
+        </div>
+
+        {/* Expenses Card */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold leading-snug">Property Expenses</h2>
+          <ExpensesForm
+            propertyId={selectedProperty}
+            initialData={expenses}
+            onSave={handleSaveExpenses}
           />
         </div>
 
-        {/* Expenses */}
-        <ExpensesForm
-          propertyId={selectedProperty}
-          initialData={expenses}
-          onSave={handleSaveExpenses}
-        />
-
-        {/* Projection Chart */}
-        <ProjectionChart
-          currentRent={metrics.mrr}
-          growthRate={currentProperty?.rent_growth_rate || 3}
-        />
+        {/* Projection Chart Card */}
+        <div className="space-y-2">
+          <div>
+            <h2 className="text-xl font-semibold leading-snug">10-Year Rent Projection</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+              Assumes {currentProperty?.rent_growth_rate || 3}% annual rent growth
+            </p>
+          </div>
+          <ProjectionChart
+            currentRent={metrics.expectedRent}
+            growthRate={currentProperty?.rent_growth_rate || 3}
+          />
+        </div>
       </main>
 
       <QuickActions onUploadClick={() => setShowUploader(true)} />

@@ -25,49 +25,43 @@ export const ProjectionChart = ({ currentRent, growthRate }: ProjectionChartProp
   const data = generateProjections();
 
   return (
-    <Card className="p-6">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">10-Year Rent Projection</h3>
-          <div className="text-sm text-muted-foreground">
-            Growth Rate: <span className="font-medium text-foreground">{growthRate}%/year</span>
-          </div>
-        </div>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="year" 
-                stroke="hsl(var(--muted-foreground))"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-              />
-              <YAxis 
-                stroke="hsl(var(--muted-foreground))"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  color: "hsl(var(--foreground))",
-                }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Projected Rent"]}
-                labelFormatter={(label) => `Year ${label}`}
-              />
-              <Line
-                type="monotone"
-                dataKey="rent"
-                stroke="hsl(var(--primary))"
-                strokeWidth={3}
-                dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+    <Card className="p-6 rounded-xl shadow-sm border-border">
+      <div className="h-[300px] sm:h-[400px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+            <XAxis 
+              dataKey="year" 
+              stroke="hsl(var(--muted-foreground))"
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            />
+            <YAxis 
+              stroke="hsl(var(--muted-foreground))"
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "8px",
+                color: "hsl(var(--foreground))",
+                fontSize: "14px",
+                padding: "8px 12px",
+              }}
+              formatter={(value: number) => [`$${value.toLocaleString()}`, "Projected Rent"]}
+              labelFormatter={(label) => `Year ${label}`}
+            />
+            <Line
+              type="monotone"
+              dataKey="rent"
+              stroke="hsl(var(--primary))"
+              strokeWidth={2}
+              dot={{ fill: "hsl(var(--primary))", r: 3, strokeWidth: 0 }}
+              activeDot={{ r: 5, strokeWidth: 2, stroke: "hsl(var(--background))" }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </Card>
   );
