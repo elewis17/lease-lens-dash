@@ -86,6 +86,7 @@ export type Database = {
           tenant_id: string
           unit_id: string
           updated_at: string | null
+          vacancy_rate: number | null
         }
         Insert: {
           confidence_scores?: Json | null
@@ -104,6 +105,7 @@ export type Database = {
           tenant_id: string
           unit_id: string
           updated_at?: string | null
+          vacancy_rate?: number | null
         }
         Update: {
           confidence_scores?: Json | null
@@ -122,6 +124,7 @@ export type Database = {
           tenant_id?: string
           unit_id?: string
           updated_at?: string | null
+          vacancy_rate?: number | null
         }
         Relationships: [
           {
@@ -184,6 +187,53 @@ export type Database = {
           },
         ]
       }
+      mortgages: {
+        Row: {
+          created_at: string | null
+          id: string
+          interest_rate: number
+          loan_name: string
+          monthly_payment: number
+          principal: number
+          property_id: string
+          start_date: string
+          term_months: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interest_rate: number
+          loan_name?: string
+          monthly_payment: number
+          principal: number
+          property_id: string
+          start_date: string
+          term_months: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interest_rate?: number
+          loan_name?: string
+          monthly_payment?: number
+          principal?: number
+          property_id?: string
+          start_date?: string
+          term_months?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mortgages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_due: number
@@ -237,6 +287,8 @@ export type Database = {
           created_at: string | null
           id: string
           mortgage_payment: number | null
+          opex_inflation_rate: number | null
+          property_value: number | null
           purchase_price: number | null
           rent_growth_rate: number | null
           total_units: number | null
@@ -247,6 +299,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           mortgage_payment?: number | null
+          opex_inflation_rate?: number | null
+          property_value?: number | null
           purchase_price?: number | null
           rent_growth_rate?: number | null
           total_units?: number | null
@@ -257,6 +311,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           mortgage_payment?: number | null
+          opex_inflation_rate?: number | null
+          property_value?: number | null
           purchase_price?: number | null
           rent_growth_rate?: number | null
           total_units?: number | null

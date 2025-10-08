@@ -5,7 +5,9 @@ import { PropertyFilter } from "@/components/PropertyFilter";
 import { LeaseTable } from "@/components/LeaseTable";
 import { LeaseUploader } from "@/components/LeaseUploader";
 import { ExpensesForm } from "@/components/ExpensesForm";
-import { ProjectionChart } from "@/components/ProjectionChart";
+import { IncomeAndSafetyChart } from "@/components/IncomeAndSafetyChart";
+import { WealthBuildChart } from "@/components/WealthBuildChart";
+import { MortgagesTable } from "@/components/MortgagesTable";
 import { QuickActions } from "@/components/QuickActions";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +16,9 @@ const Index = () => {
   const [showUploader, setShowUploader] = useState(false);
   const [properties, setProperties] = useState<any[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [selectedUnit, setSelectedUnit] = useState<string>("All");
   const [leases, setLeases] = useState<any[]>([]);
+  const [mortgages, setMortgages] = useState<any[]>([]);
   const [expenses, setExpenses] = useState({
     mortgage: 0,
     taxes: 0,
@@ -72,6 +76,12 @@ const Index = () => {
       `)
       .eq('unit.property_id', selectedProperty);
 
+    // Fetch mortgages for selected property
+    const { data: mortgagesData } = await supabase
+      .from('mortgages')
+      .select('*')
+      .eq('property_id', selectedProperty);
+
     if (leasesError) {
       console.error("Error loading leases:", leasesError);
     }
@@ -114,14 +124,34 @@ const Index = () => {
       setExpenses(expensesByCategory);
     }
 
+    // Process mortgages
+    const processedMortgages = mortgagesData?.map((mtg: any) => ({
+      id: mtg.id,
+      loan_name: mtg.loan_name,
+      principal: parseFloat(mtg.principal.toString()),
+      interest_rate: parseFloat(mtg.interest_rate.toString()),
+      term_months: mtg.term_months,
+      start_date: new Date(mtg.start_date),
+      monthly_payment: parseFloat(mtg.monthly_payment.toString()),
+    })) || [];
+
+    setMortgages(processedMortgages);
+
+    // Calculate total debt service from mortgages
+    const totalDebtService = processedMortgages.reduce((sum, mtg) => sum + mtg.monthly_payment, 0);
+
     // Calculate metrics
     let totalMRR = 0;
     let totalExpected = 0;
     let activeLeases = 0;
 
     const processedLeases = leasesData?.map((lease: any) => {
-      totalMRR += parseFloat(lease.monthly_rent.toString());
-      totalExpected += parseFloat(lease.monthly_rent.toString());
+      const monthlyRent = parseFloat(lease.monthly_rent.toString());
+      const vacancyRate = parseFloat((lease.vacancy_rate || 5).toString()) / 100;
+      const adjustedRent = monthlyRent * (1 - vacancyRate);
+      
+      totalMRR += adjustedRent;
+      totalExpected += monthlyRent;
 
       if (lease.status === 'active' || lease.status === 'expiring') {
         activeLeases++;
@@ -132,6 +162,7 @@ const Index = () => {
         tenant: lease.tenant?.name || "Unknown",
         unit: lease.unit?.unit_label || "Unknown",
         monthlyRent: parseFloat(lease.monthly_rent.toString()),
+        vacancyRate: parseFloat((lease.vacancy_rate || 5).toString()),
         deposit: parseFloat((lease.deposit || 0).toString()),
         startDate: new Date(lease.start_date),
         leaseEnd: new Date(lease.end_date),
@@ -140,10 +171,10 @@ const Index = () => {
 
     const totalOperatingExpenses = Object.values(expenses).reduce((sum, val) => sum + val, 0) - expenses.mortgage;
     const noi = (totalMRR * 12) - (totalOperatingExpenses * 12);
-    const cashFlow = noi - (expenses.mortgage * 12);
+    const cashFlow = noi - (totalDebtService * 12);
     const purchasePrice = parseFloat((propertyData?.purchase_price || 1).toString());
     const capRate = purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0;
-    const annualDebt = expenses.mortgage * 12;
+    const annualDebt = totalDebtService * 12;
     const dcr = annualDebt > 0 ? noi / annualDebt : 0;
     const totalUnits = propertyData?.total_units || 1;
     const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
@@ -167,6 +198,7 @@ const Index = () => {
       .from('leases')
       .update({
         monthly_rent: data.monthlyRent,
+        vacancy_rate: data.vacancyRate,
         deposit: data.deposit,
         start_date: data.startDate?.toISOString(),
         end_date: data.leaseEnd?.toISOString(),
@@ -222,6 +254,7 @@ const Index = () => {
       tenant_id: tenantData.id,
       unit_id: unitData.id,
       monthly_rent: data.monthlyRent,
+      vacancy_rate: data.vacancyRate ?? 5,
       deposit: data.deposit,
       start_date: data.startDate.toISOString(),
       end_date: data.leaseEnd.toISOString(),
@@ -237,17 +270,6 @@ const Index = () => {
   };
 
   const handleSaveExpenses = async (expensesData: any) => {
-    // Update property mortgage
-    const { error: propError } = await supabase
-      .from('properties')
-      .update({ mortgage_payment: expensesData.mortgage })
-      .eq('id', selectedProperty);
-
-    if (propError) {
-      toast({ title: "Error", description: "Failed to update expenses", variant: "destructive" });
-      return;
-    }
-
     // Delete existing expenses and create new ones
     await supabase.from('expenses').delete().eq('property_id', selectedProperty);
 
@@ -272,6 +294,62 @@ const Index = () => {
     toast({ title: "Success", description: "Expenses saved successfully" });
     loadData();
   };
+
+  const handleUpdateMortgage = async (id: string, data: any) => {
+    const { error } = await supabase
+      .from('mortgages')
+      .update({
+        loan_name: data.loan_name,
+        principal: data.principal,
+        interest_rate: data.interest_rate,
+        term_months: data.term_months,
+        start_date: data.start_date instanceof Date ? data.start_date.toISOString() : data.start_date,
+        monthly_payment: data.monthly_payment,
+      })
+      .eq('id', id);
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to update mortgage", variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Mortgage updated successfully" });
+      loadData();
+    }
+  };
+
+  const handleDeleteMortgage = async (id: string) => {
+    const { error } = await supabase.from('mortgages').delete().eq('id', id);
+    
+    if (error) {
+      toast({ title: "Error", description: "Failed to delete mortgage", variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Mortgage deleted successfully" });
+      loadData();
+    }
+  };
+
+  const handleAddMortgage = async (data: any) => {
+    const { error } = await supabase.from('mortgages').insert({
+      property_id: selectedProperty,
+      loan_name: data.loan_name,
+      principal: data.principal,
+      interest_rate: data.interest_rate,
+      term_months: data.term_months,
+      start_date: data.start_date instanceof Date ? data.start_date.toISOString() : data.start_date,
+      monthly_payment: data.monthly_payment,
+    });
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to add mortgage", variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Mortgage added successfully" });
+      loadData();
+    }
+  };
+
+  // Filter leases based on selected unit
+  const filteredLeases = selectedUnit === "All" 
+    ? leases 
+    : leases.filter(lease => lease.unit.toLowerCase() === selectedUnit.toLowerCase());
 
   if (showUploader) {
     return (
@@ -300,11 +378,11 @@ const Index = () => {
             <h1 className="text-2xl font-bold leading-snug">Landlord Dashboard</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">Instant lease insights, zero tabs.</p>
           </div>
-          {properties.length > 0 && (
+          {leases.length > 0 && (
             <PropertyFilter
-              properties={properties}
-              selectedProperty={selectedProperty}
-              onPropertyChange={setSelectedProperty}
+              units={[...new Set(leases.map(l => l.unit))]}
+              selectedUnit={selectedUnit}
+              onUnitChange={setSelectedUnit}
             />
           )}
         </div>
@@ -367,7 +445,7 @@ const Index = () => {
         {/* Lease Table Card */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold leading-snug">
-            Active Leases <span className="text-muted-foreground text-base">({leases.length})</span>
+            Active Leases <span className="text-muted-foreground text-base">({filteredLeases.length})</span>
           </h2>
           {leases.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4 shadow-sm animate-fade-in">
@@ -378,12 +456,25 @@ const Index = () => {
             </div>
           ) : (
             <LeaseTable
-              leases={leases}
+              leases={filteredLeases}
               onUpdate={handleUpdateLease}
               onDelete={handleDeleteLease}
               onAdd={handleAddLease}
             />
           )}
+        </div>
+
+        {/* Mortgages Card */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold leading-snug">
+            Mortgages <span className="text-muted-foreground text-base">({mortgages.length})</span>
+          </h2>
+          <MortgagesTable
+            mortgages={mortgages}
+            onUpdate={handleUpdateMortgage}
+            onDelete={handleDeleteMortgage}
+            onAdd={handleAddMortgage}
+          />
         </div>
 
         {/* Expenses Card */}
@@ -396,17 +487,36 @@ const Index = () => {
           />
         </div>
 
-        {/* Projection Chart Card */}
+        {/* Income & Safety Chart */}
         <div className="space-y-2">
           <div>
-            <h2 className="text-xl font-semibold leading-snug">10-Year Rent Projection</h2>
+            <h2 className="text-xl font-semibold leading-snug">Income & Safety View (10 Years)</h2>
             <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-              Assumes {currentProperty?.rent_growth_rate || 3}% annual rent growth
+              Projected rent at {currentProperty?.rent_growth_rate || 3}% growth vs. expenses at {currentProperty?.opex_inflation_rate || 2.5}% inflation
             </p>
           </div>
-          <ProjectionChart
-            currentRent={metrics.expectedRent}
-            growthRate={currentProperty?.rent_growth_rate || 3}
+          <IncomeAndSafetyChart
+            currentRent={metrics.mrr}
+            rentGrowthRate={currentProperty?.rent_growth_rate || 3}
+            noi={metrics.noi}
+            opex={metrics.mrr - metrics.noi}
+            opexInflationRate={currentProperty?.opex_inflation_rate || 2.5}
+            debtService={mortgages.reduce((sum, m) => sum + m.monthly_payment, 0)}
+          />
+        </div>
+
+        {/* Wealth Build Chart */}
+        <div className="space-y-2">
+          <div>
+            <h2 className="text-xl font-semibold leading-snug">Wealth Build View (10 Years)</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+              Long-term equity growth through appreciation and debt paydown
+            </p>
+          </div>
+          <WealthBuildChart
+            noi={metrics.noi}
+            capRate={metrics.capRate}
+            mortgages={mortgages}
           />
         </div>
       </main>
