@@ -22,22 +22,21 @@ export const IncomeAndSafetyChart = ({
     const data = [];
     const inflationRate = 2.5; // Standard inflation rate
     
-    for (let month = 0; month <= 120; month++) {
-      const years = month / 12;
-      
-      const projectedRent = currentRent * Math.pow(1 + rentGrowthRate / 100, years);
-      const projectedOpex = opex * Math.pow(1 + opexInflationRate / 100, years);
+    for (let year = 1; year <= 10; year++) {
+      const projectedRent = (currentRent * 12) * Math.pow(1 + rentGrowthRate / 100, year - 1);
+      const projectedOpex = (opex * 12) * Math.pow(1 + opexInflationRate / 100, year - 1);
       const projectedNOI = projectedRent - projectedOpex;
-      const cashFlowAfterDebt = projectedNOI - debtService;
-      const breakEvenRent = projectedOpex + debtService;
-      const inflationBenchmark = currentRent * Math.pow(1 + inflationRate / 100, years);
+      const annualDebtService = debtService * 12;
+      const cashFlowAfterDebt = projectedNOI - annualDebtService;
+      const breakEvenRent = projectedOpex + annualDebtService;
+      const inflationBenchmark = (currentRent * 12) * Math.pow(1 + inflationRate / 100, year - 1);
       
       data.push({
-        month,
+        year,
         rent: Math.round(projectedRent),
         opex: Math.round(projectedOpex),
         noi: Math.round(projectedNOI),
-        debtService: Math.round(debtService),
+        debtService: Math.round(annualDebtService),
         cashFlow: Math.round(cashFlowAfterDebt),
         breakEven: Math.round(breakEvenRent),
         inflation: Math.round(inflationBenchmark),
@@ -49,15 +48,18 @@ export const IncomeAndSafetyChart = ({
 
   const data = generateProjections();
   
-  const margin = data[data.length - 1].cashFlow / data[data.length - 1].debtService;
+  const lastYear = data[data.length - 1];
+  const marginAboveBreakEven = ((lastYear.cashFlow - lastYear.breakEven) / lastYear.breakEven) * 100;
   
   let safetyGuidance = "";
-  if (margin > 1.5) {
-    safetyGuidance = "✓ Safe to refinance (>50% margin)";
-  } else if (margin > 1.2) {
-    safetyGuidance = "✓ Safe to distribute profits (20-50% margin)";
+  if (marginAboveBreakEven >= 30) {
+    safetyGuidance = "✓ Safe to refinance (≥30% margin above break-even)";
+  } else if (marginAboveBreakEven >= 20) {
+    safetyGuidance = "✓ Safe to distribute profits (20-30% margin)";
+  } else if (marginAboveBreakEven >= 15) {
+    safetyGuidance = "⚠ Moderate risk (15-20% margin)";
   } else {
-    safetyGuidance = "⚠ Retain cash; low margin (<20%)";
+    safetyGuidance = "⚠ Retain cash; high risk (<15% margin)";
   }
 
   return (
@@ -70,16 +72,16 @@ export const IncomeAndSafetyChart = ({
           <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis 
-              dataKey="month" 
+              dataKey="year" 
               stroke="hsl(var(--muted-foreground))"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              label={{ value: "Months", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))" }}
+              label={{ value: "Years", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))" }}
             />
             <YAxis 
               stroke="hsl(var(--muted-foreground))"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
               tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-              label={{ value: "Monthly Dollars", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))" }}
+              label={{ value: "Annual Dollars", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))" }}
             />
             <Tooltip
               contentStyle={{
@@ -91,7 +93,7 @@ export const IncomeAndSafetyChart = ({
                 padding: "8px 12px",
               }}
               formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
-              labelFormatter={(label) => `Month ${label}`}
+              labelFormatter={(label) => `Year ${label}`}
             />
             <Legend 
               wrapperStyle={{ fontSize: "12px" }}

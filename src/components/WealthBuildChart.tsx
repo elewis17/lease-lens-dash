@@ -39,32 +39,30 @@ export const WealthBuildChart = ({ noi, capRate, mortgages }: WealthBuildChartPr
     const monthlyNOI = noi;
     const annualNOI = monthlyNOI * 12;
     
-    for (let month = 0; month <= 120; month++) {
-      const years = month / 12;
-      
+    for (let year = 1; year <= 10; year++) {
       // Project property value based on NOI and cap rate
-      const projectedNOI = annualNOI * Math.pow(1.03, years); // Assume 3% NOI growth
+      const projectedNOI = annualNOI * Math.pow(1.03, year - 1); // Assume 3% NOI growth
       const propertyValue = capRate > 0 ? projectedNOI / (capRate / 100) : 0;
       
       // Calculate total loan balance across all mortgages
       let totalLoanBalance = 0;
+      const monthsPassed = year * 12;
       mortgages.forEach(mortgage => {
-        const monthsSinceStart = month;
         totalLoanBalance += calculateLoanBalance(
           mortgage.principal,
           mortgage.interest_rate,
           mortgage.term_months,
-          monthsSinceStart
+          monthsPassed
         );
       });
       
       const equity = propertyValue - totalLoanBalance;
       
       data.push({
-        month,
-        propertyValue: Math.round(propertyValue),
-        loanBalance: Math.round(totalLoanBalance),
-        equity: Math.round(equity),
+        year,
+        propertyValue: Math.round(propertyValue / 1000), // Convert to thousands
+        loanBalance: Math.round(totalLoanBalance / 1000),
+        equity: Math.round(equity / 1000),
       });
     }
     
@@ -80,16 +78,16 @@ export const WealthBuildChart = ({ noi, capRate, mortgages }: WealthBuildChartPr
           <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis 
-              dataKey="month" 
+              dataKey="year" 
               stroke="hsl(var(--muted-foreground))"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              label={{ value: "Months", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))" }}
+              label={{ value: "Years", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))" }}
             />
             <YAxis 
               stroke="hsl(var(--muted-foreground))"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-              label={{ value: "Thousands of Dollars", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))" }}
+              tickFormatter={(value) => `$${value}k`}
+              label={{ value: "Thousands ($)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))" }}
             />
             <Tooltip
               contentStyle={{
@@ -100,8 +98,8 @@ export const WealthBuildChart = ({ noi, capRate, mortgages }: WealthBuildChartPr
                 fontSize: "14px",
                 padding: "8px 12px",
               }}
-              formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
-              labelFormatter={(label) => `Month ${label}`}
+              formatter={(value: number) => [`$${value}k`, ""]}
+              labelFormatter={(label) => `Year ${label}`}
             />
             <Legend 
               wrapperStyle={{ fontSize: "12px" }}

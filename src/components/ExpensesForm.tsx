@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 interface ExpensesData {
-  mortgage: number;
   taxes: number;
   insurance: number;
   maintenance: number;
+  management: number;
+  utilities: number;
+  hoa: number;
   misc: number;
 }
 
@@ -31,17 +33,6 @@ export const ExpensesForm = ({ initialData, onSave }: ExpensesFormProps) => {
     <Card className="p-6 space-y-6 rounded-xl shadow-sm border-border">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="mortgage" className="text-sm font-medium">Mortgage Payment</Label>
-          <Input
-            id="mortgage"
-            type="number"
-            value={expenses.mortgage}
-            onChange={(e) => handleChange("mortgage", e.target.value)}
-            placeholder="0.00"
-            className="text-sm"
-          />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="taxes" className="text-sm font-medium">Property Taxes</Label>
           <Input
             id="taxes"
@@ -51,6 +42,7 @@ export const ExpensesForm = ({ initialData, onSave }: ExpensesFormProps) => {
             placeholder="0.00"
             className="text-sm"
           />
+          <p className="text-xs text-muted-foreground">Include even if escrowed</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="insurance" className="text-sm font-medium">Insurance</Label>
@@ -62,9 +54,10 @@ export const ExpensesForm = ({ initialData, onSave }: ExpensesFormProps) => {
             placeholder="0.00"
             className="text-sm"
           />
+          <p className="text-xs text-muted-foreground">Include even if escrowed</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="maintenance" className="text-sm font-medium">Maintenance</Label>
+          <Label htmlFor="maintenance" className="text-sm font-medium">Repairs & Maintenance</Label>
           <Input
             id="maintenance"
             type="number"
@@ -75,7 +68,40 @@ export const ExpensesForm = ({ initialData, onSave }: ExpensesFormProps) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="misc" className="text-sm font-medium">Miscellaneous</Label>
+          <Label htmlFor="management" className="text-sm font-medium">Management</Label>
+          <Input
+            id="management"
+            type="number"
+            value={expenses.management}
+            onChange={(e) => handleChange("management", e.target.value)}
+            placeholder="0.00"
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="utilities" className="text-sm font-medium">Utilities</Label>
+          <Input
+            id="utilities"
+            type="number"
+            value={expenses.utilities}
+            onChange={(e) => handleChange("utilities", e.target.value)}
+            placeholder="0.00"
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="hoa" className="text-sm font-medium">HOA Fees</Label>
+          <Input
+            id="hoa"
+            type="number"
+            value={expenses.hoa}
+            onChange={(e) => handleChange("hoa", e.target.value)}
+            placeholder="0.00"
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="misc" className="text-sm font-medium">Admin & Other</Label>
           <Input
             id="misc"
             type="number"

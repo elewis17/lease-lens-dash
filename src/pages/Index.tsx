@@ -20,10 +20,12 @@ const Index = () => {
   const [leases, setLeases] = useState<any[]>([]);
   const [mortgages, setMortgages] = useState<any[]>([]);
   const [expenses, setExpenses] = useState({
-    mortgage: 0,
     taxes: 0,
     insurance: 0,
     maintenance: 0,
+    management: 0,
+    utilities: 0,
+    hoa: 0,
     misc: 0,
   });
   const [metrics, setMetrics] = useState({
@@ -102,13 +104,14 @@ const Index = () => {
     if (propertyData) {
       setCurrentProperty(propertyData);
       
-      // Calculate expenses breakdown
-      const mortgage = parseFloat((propertyData.mortgage_payment || 0).toString());
+      // Calculate expenses breakdown (OPEX only, excluding mortgage)
       const expensesByCategory = {
-        mortgage,
         taxes: 0,
         insurance: 0,
         maintenance: 0,
+        management: 0,
+        utilities: 0,
+        hoa: 0,
         misc: 0,
       };
 
@@ -118,6 +121,9 @@ const Index = () => {
         if (category === 'tax') expensesByCategory.taxes += amount;
         else if (category === 'insurance') expensesByCategory.insurance += amount;
         else if (category === 'repairs') expensesByCategory.maintenance += amount;
+        else if (category === 'management') expensesByCategory.management += amount;
+        else if (category === 'utilities') expensesByCategory.utilities += amount;
+        else if (category === 'hoa') expensesByCategory.hoa += amount;
         else expensesByCategory.misc += amount;
       });
 
@@ -169,8 +175,9 @@ const Index = () => {
       };
     }) || [];
 
-    const totalOperatingExpenses = Object.values(expenses).reduce((sum, val) => sum + val, 0) - expenses.mortgage;
-    const noi = (totalMRR * 12) - (totalOperatingExpenses * 12);
+    // Calculate total OPEX (excluding mortgage - that's debt service)
+    const totalMonthlyOpex = Object.values(expenses).reduce((sum, val) => sum + val, 0);
+    const noi = (totalMRR * 12) - (totalMonthlyOpex * 12);
     const cashFlow = noi - (totalDebtService * 12);
     const purchasePrice = parseFloat((propertyData?.purchase_price || 1).toString());
     const capRate = purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0;
@@ -282,6 +289,15 @@ const Index = () => {
     }
     if (expensesData.maintenance > 0) {
       expensesToInsert.push({ property_id: selectedProperty, category: 'repairs', amount: expensesData.maintenance, date: new Date().toISOString() });
+    }
+    if (expensesData.management > 0) {
+      expensesToInsert.push({ property_id: selectedProperty, category: 'management', amount: expensesData.management, date: new Date().toISOString() });
+    }
+    if (expensesData.utilities > 0) {
+      expensesToInsert.push({ property_id: selectedProperty, category: 'utilities', amount: expensesData.utilities, date: new Date().toISOString() });
+    }
+    if (expensesData.hoa > 0) {
+      expensesToInsert.push({ property_id: selectedProperty, category: 'hoa', amount: expensesData.hoa, date: new Date().toISOString() });
     }
     if (expensesData.misc > 0) {
       expensesToInsert.push({ property_id: selectedProperty, category: 'other', amount: expensesData.misc, date: new Date().toISOString() });
@@ -479,7 +495,10 @@ const Index = () => {
 
         {/* Expenses Card */}
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold leading-snug">Property Expenses</h2>
+          <h2 className="text-xl font-semibold leading-snug">Operating Expenses (OPEX)</h2>
+          <p className="text-xs text-muted-foreground">
+            Enter all operating expenses excluding mortgage principal & interest (debt service tracked separately)
+          </p>
           <ExpensesForm
             propertyId={selectedProperty}
             initialData={expenses}
@@ -492,14 +511,14 @@ const Index = () => {
           <div>
             <h2 className="text-xl font-semibold leading-snug">Income & Safety View (10 Years)</h2>
             <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-              Projected rent at {currentProperty?.rent_growth_rate || 3}% growth vs. expenses at {currentProperty?.opex_inflation_rate || 2.5}% inflation
+              Annualized projections: Rent at {currentProperty?.rent_growth_rate || 3}% growth vs. OPEX at {currentProperty?.opex_inflation_rate || 2.5}% inflation
             </p>
           </div>
           <IncomeAndSafetyChart
             currentRent={metrics.mrr}
             rentGrowthRate={currentProperty?.rent_growth_rate || 3}
             noi={metrics.noi}
-            opex={metrics.mrr - metrics.noi}
+            opex={Object.values(expenses).reduce((sum, val) => sum + val, 0)}
             opexInflationRate={currentProperty?.opex_inflation_rate || 2.5}
             debtService={mortgages.reduce((sum, m) => sum + m.monthly_payment, 0)}
           />
