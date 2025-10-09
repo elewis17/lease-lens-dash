@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
 
 interface ExpensesData {
   taxes: number;
@@ -22,9 +23,20 @@ interface ExpensesFormProps {
 
 export const ExpensesForm = ({ initialData, onSave }: ExpensesFormProps) => {
   const [expenses, setExpenses] = useState<ExpensesData>(initialData);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setExpenses(initialData);
+  }, [initialData]);
 
   const handleChange = (field: keyof ExpensesData, value: string) => {
     setExpenses({ ...expenses, [field]: parseFloat(value) || 0 });
+  };
+
+  const handleSave = () => {
+    onSave(expenses);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const totalExpenses = Object.values(expenses).reduce((sum, val) => sum + val, 0);
@@ -117,7 +129,10 @@ export const ExpensesForm = ({ initialData, onSave }: ExpensesFormProps) => {
           Total: <span className="text-primary text-lg">${totalExpenses.toLocaleString()}</span>
           <span className="text-xs text-muted-foreground ml-2 leading-relaxed">per month</span>
         </div>
-        <Button onClick={() => onSave(expenses)} className="hover:scale-105 transition-transform">Save Expenses</Button>
+        <Button onClick={handleSave} className="hover:scale-105 transition-transform relative">
+          {saved && <Check className="h-4 w-4 mr-2 animate-scale-in" />}
+          {saved ? "Saved!" : "Save Expenses"}
+        </Button>
       </div>
     </Card>
   );

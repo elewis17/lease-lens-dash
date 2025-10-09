@@ -7,52 +7,52 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 interface PropertyFilterProps {
-  units: string[];
-  selectedUnit: string;
-  onUnitChange: (unit: string) => void;
+  properties: Array<{ id: string; address: string }>;
+  selectedProperty: string;
+  onPropertyChange: (propertyId: string) => void;
 }
 
-export const PropertyFilter = ({ units, selectedUnit, onUnitChange }: PropertyFilterProps) => {
+export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange }: PropertyFilterProps) => {
   const [open, setOpen] = useState(false);
   
-  const options = ["All", ...units];
+  const currentProperty = properties.find(p => p.id === selectedProperty);
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-sm font-medium">Filter:</label>
+      <label className="text-sm font-medium">Property:</label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-[200px] justify-between"
+            className="w-[300px] justify-between"
           >
-            {selectedUnit || "All"}
+            {currentProperty?.address || "Select property..."}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[200px] p-0 bg-background z-50">
+        <PopoverContent className="w-[300px] p-0 bg-background z-50">
           <Command>
-            <CommandInput placeholder="Search unit..." />
-            <CommandEmpty>No unit found.</CommandEmpty>
+            <CommandInput placeholder="Search property..." />
+            <CommandEmpty>No property found.</CommandEmpty>
             <CommandGroup>
-              {options.map((option) => (
+              {properties.map((property) => (
                 <CommandItem
-                  key={option}
-                  value={option}
-                  onSelect={(currentValue) => {
-                    onUnitChange(currentValue === "all" ? "All" : currentValue);
+                  key={property.id}
+                  value={property.address}
+                  onSelect={() => {
+                    onPropertyChange(property.id);
                     setOpen(false);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      selectedUnit === option ? "opacity-100" : "opacity-0"
+                      selectedProperty === property.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {option}
+                  {property.address}
                 </CommandItem>
               ))}
             </CommandGroup>

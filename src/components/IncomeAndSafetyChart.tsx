@@ -62,6 +62,13 @@ export const IncomeAndSafetyChart = ({
     safetyGuidance = "⚠ Retain cash; high risk (<15% margin)";
   }
 
+  const getRiskZoneColor = (cashFlow: number, breakEven: number) => {
+    const margin = ((cashFlow - breakEven) / breakEven) * 100;
+    if (margin < 0) return "rgba(220, 38, 38, 0.1)"; // red
+    if (margin < 15) return "rgba(250, 204, 21, 0.1)"; // yellow
+    return "rgba(34, 197, 94, 0.1)"; // green
+  };
+
   return (
     <Card className="p-6 rounded-xl shadow-sm border-border">
       <div className="mb-4">
@@ -70,6 +77,12 @@ export const IncomeAndSafetyChart = ({
       <div className="h-[400px] sm:h-[500px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+            <defs>
+              <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={getRiskZoneColor(lastYear.cashFlow, lastYear.breakEven)} stopOpacity={0.8}/>
+                <stop offset="100%" stopColor={getRiskZoneColor(lastYear.cashFlow, lastYear.breakEven)} stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis 
               dataKey="year" 
@@ -102,8 +115,8 @@ export const IncomeAndSafetyChart = ({
             <Line
               type="monotone"
               dataKey="rent"
-              name="Projected Rent"
-              stroke="hsl(var(--primary))"
+              name="Earning Power"
+              stroke="hsl(221, 83%, 53%)"
               strokeWidth={2}
               dot={false}
             />
@@ -111,53 +124,27 @@ export const IncomeAndSafetyChart = ({
               type="monotone"
               dataKey="opex"
               name="Operating Expenses"
-              stroke="hsl(var(--destructive))"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="noi"
-              name="NOI (ex-debt)"
-              stroke="hsl(142, 76%, 36%)"
+              stroke="hsl(0, 65%, 45%)"
               strokeWidth={2}
               dot={false}
             />
             <Line
               type="monotone"
               dataKey="debtService"
-              name="Monthly Debt Service"
-              stroke="hsl(var(--muted-foreground))"
+              name="Debt Service"
+              stroke="hsl(221, 83%, 53%)"
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={false}
+              opacity={0.6}
             />
             <Line
               type="monotone"
               dataKey="cashFlow"
-              name="Cash Flow After Debt"
-              stroke="hsl(221, 83%, 53%)"
+              name="Free Cash Flow"
+              stroke="hsl(142, 76%, 36%)"
               strokeWidth={3}
               dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="breakEven"
-              name="Break-even Rent"
-              stroke="hsl(38, 92%, 50%)"
-              strokeWidth={2}
-              strokeDasharray="3 3"
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="inflation"
-              name="Inflation Benchmark"
-              stroke="hsl(var(--muted-foreground))"
-              strokeWidth={1}
-              strokeDasharray="2 2"
-              dot={false}
-              opacity={0.5}
             />
           </LineChart>
         </ResponsiveContainer>

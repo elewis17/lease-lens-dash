@@ -9,6 +9,8 @@ import { IncomeAndSafetyChart } from "@/components/IncomeAndSafetyChart";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { MortgagesTable } from "@/components/MortgagesTable";
 import { QuickActions } from "@/components/QuickActions";
+import { ROISummaryCard } from "@/components/ROISummaryCard";
+import { ScenarioToggle, Scenario } from "@/components/ScenarioToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,7 +18,7 @@ const Index = () => {
   const [showUploader, setShowUploader] = useState(false);
   const [properties, setProperties] = useState<any[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
-  const [selectedUnit, setSelectedUnit] = useState<string>("All");
+  const [scenario, setScenario] = useState<Scenario>("base");
   const [leases, setLeases] = useState<any[]>([]);
   const [mortgages, setMortgages] = useState<any[]>([]);
   const [expenses, setExpenses] = useState({
@@ -38,9 +40,27 @@ const Index = () => {
     cashFlow: 0,
     capRate: 0,
     dcr: 0,
+    roi: 0,
+    cashOnCash: 0,
+    irr10Year: 0,
   });
   const [currentProperty, setCurrentProperty] = useState<any>(null);
   const { toast } = useToast();
+
+  // Get scenario-adjusted growth rates
+  const getScenarioRates = () => {
+    const baseRent = currentProperty?.rent_growth_rate || 3;
+    const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
+    
+    switch (scenario) {
+      case "conservative":
+        return { rentGrowth: baseRent - 1, opexInflation: baseOpex + 0.5 };
+      case "optimistic":
+        return { rentGrowth: baseRent + 1.5, opexInflation: baseOpex - 0.5 };
+      default:
+        return { rentGrowth: baseRent, opexInflation: baseOpex };
+    }
+  };
 
   useEffect(() => {
     loadProperties();
@@ -185,6 +205,16 @@ const Index = () => {
     const dcr = annualDebt > 0 ? noi / annualDebt : 0;
     const totalUnits = propertyData?.total_units || 1;
     const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
+    
+    // Calculate ROI metrics
+    const totalInvestment = purchasePrice + (processedMortgages.reduce((sum, m) => sum + m.principal, 0));
+    const roi = totalInvestment > 0 ? (noi / totalInvestment) * 100 : 0;
+    const cashOnCash = totalInvestment > 0 ? (cashFlow / totalInvestment) * 100 : 0;
+    
+    // Simple 10-year IRR approximation using compound growth
+    const futureValue = purchasePrice * Math.pow(1.03, 10); // 3% appreciation
+    const totalCashFlows = cashFlow * 10;
+    const irr10Year = totalInvestment > 0 ? (Math.pow((futureValue + totalCashFlows) / totalInvestment, 1/10) - 1) * 100 : 0;
 
     setLeases(processedLeases);
     setMetrics({
@@ -197,6 +227,9 @@ const Index = () => {
       cashFlow: cashFlow / 12,
       capRate,
       dcr,
+      roi,
+      cashOnCash,
+      irr10Year,
     });
   };
 
@@ -362,10 +395,6 @@ const Index = () => {
     }
   };
 
-  // Filter leases based on selected unit
-  const filteredLeases = selectedUnit === "All" 
-    ? leases 
-    : leases.filter(lease => lease.unit.toLowerCase() === selectedUnit.toLowerCase());
 
   if (showUploader) {
     return (
@@ -394,17 +423,28 @@ const Index = () => {
             <h1 className="text-2xl font-bold leading-snug">Landlord Dashboard</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">Instant lease insights, zero tabs.</p>
           </div>
-          {leases.length > 0 && (
-            <PropertyFilter
-              units={[...new Set(leases.map(l => l.unit))]}
-              selectedUnit={selectedUnit}
-              onUnitChange={setSelectedUnit}
-            />
-          )}
+          <div className="flex items-center gap-4">
+            {properties.length > 0 && (
+              <PropertyFilter
+                properties={properties}
+                selectedProperty={selectedProperty}
+                onPropertyChange={setSelectedProperty}
+              />
+            )}
+            <ScenarioToggle scenario={scenario} onScenarioChange={setScenario} />
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
+        {/* ROI Summary Card */}
+        <ROISummaryCard
+          roi={metrics.roi}
+          capRate={metrics.capRate}
+          cashOnCash={metrics.cashOnCash}
+          irr10Year={metrics.irr10Year}
+        />
+
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <MetricCard
@@ -461,7 +501,7 @@ const Index = () => {
         {/* Lease Table Card */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold leading-snug">
-            Active Leases <span className="text-muted-foreground text-base">({filteredLeases.length})</span>
+            Active Leases <span className="text-muted-foreground text-base">({leases.length})</span>
           </h2>
           {leases.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4 shadow-sm animate-fade-in">
@@ -472,7 +512,7 @@ const Index = () => {
             </div>
           ) : (
             <LeaseTable
-              leases={filteredLeases}
+              leases={leases}
               onUpdate={handleUpdateLease}
               onDelete={handleDeleteLease}
               onAdd={handleAddLease}
@@ -509,17 +549,17 @@ const Index = () => {
         {/* Income & Safety Chart */}
         <div className="space-y-2">
           <div>
-            <h2 className="text-xl font-semibold leading-snug">Income & Safety View (10 Years)</h2>
+            <h2 className="text-xl font-semibold leading-snug">Cash Flow & Risk (10 Years)</h2>
             <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-              Annualized projections: Rent at {currentProperty?.rent_growth_rate || 3}% growth vs. OPEX at {currentProperty?.opex_inflation_rate || 2.5}% inflation
+              {scenario.charAt(0).toUpperCase() + scenario.slice(1)} scenario: Rent at {getScenarioRates().rentGrowth.toFixed(1)}% growth vs. OPEX at {getScenarioRates().opexInflation.toFixed(1)}% inflation
             </p>
           </div>
           <IncomeAndSafetyChart
             currentRent={metrics.mrr}
-            rentGrowthRate={currentProperty?.rent_growth_rate || 3}
+            rentGrowthRate={getScenarioRates().rentGrowth}
             noi={metrics.noi}
             opex={Object.values(expenses).reduce((sum, val) => sum + val, 0)}
-            opexInflationRate={currentProperty?.opex_inflation_rate || 2.5}
+            opexInflationRate={getScenarioRates().opexInflation}
             debtService={mortgages.reduce((sum, m) => sum + m.monthly_payment, 0)}
           />
         </div>
@@ -527,9 +567,9 @@ const Index = () => {
         {/* Wealth Build Chart */}
         <div className="space-y-2">
           <div>
-            <h2 className="text-xl font-semibold leading-snug">Wealth Build View (10 Years)</h2>
+            <h2 className="text-xl font-semibold leading-snug">Equity Growth Engine (10 Years)</h2>
             <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-              Long-term equity growth through appreciation and debt paydown
+              Long-term wealth building through appreciation and debt paydown
             </p>
           </div>
           <WealthBuildChart
