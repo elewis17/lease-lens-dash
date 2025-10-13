@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator } from "lucide-react";
+import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info} from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { PropertyFilter } from "@/components/PropertyFilter";
 import { LeaseTable } from "@/components/LeaseTable";
@@ -46,6 +46,9 @@ const Index = () => {
   });
   const [currentProperty, setCurrentProperty] = useState<any>(null);
   const { toast } = useToast();
+
+  // ---- Derived totals for Property Financials ----
+const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (Number(val) || 0), 0);
 
   // Get scenario-adjusted growth rates
   const getScenarioRates = () => {
@@ -420,7 +423,7 @@ const Index = () => {
       <header className="sticky top-0 z-50 border-b border-border backdrop-blur-sm bg-background/80">
         <div className="container mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold leading-snug">Landlord Dashboard</h1>
+            <h1 className="text-2xl font-bold leading-snug">Landlord Snapshot</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">Instant lease insights, zero tabs.</p>
           </div>
           <div className="flex items-center gap-4">
@@ -437,66 +440,172 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
-        {/* ROI Summary Card */}
-        <ROISummaryCard
-          roi={metrics.roi}
-          capRate={metrics.capRate}
-          cashOnCash={metrics.cashOnCash}
-          irr10Year={metrics.irr10Year}
-        />
+        {/* ---- Investment Performance ---- */}
+        <section className="space-y-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            <MetricCard
+              title="ROI"
+              value={`${metrics.roi.toFixed(2)}%`}
+              subtitle="Return on investment"
+              icon={TrendingUp}
+              variant="default"
+            />
+            <MetricCard
+              title="Cap Rate"
+              value={`${metrics.capRate.toFixed(2)}%`}
+              subtitle="NOI ÷ Property Value"
+              icon={Percent}
+              variant="default"
+            />
+            <MetricCard
+              title="10-Year IRR"
+              value={`${metrics.irr10Year.toFixed(2)}%`}
+              subtitle="Time-weighted return"
+              icon={LineChart}
+              variant="default"
+            />
+            <MetricCard
+              title="Cash-on-Cash"
+              value={`${metrics.cashOnCash.toFixed(2)}%`}
+              subtitle="Cash return / cash invested"
+              icon={DollarSign}xs
+              variant="success"
+            />
+          </div>
+        </section>
 
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-          <MetricCard
-            title="Expected Rent"
-            value={`$${metrics.expectedRent.toLocaleString()}`}
-            subtitle="Per month"
-            icon={DollarSign}
-            variant="default"
-          />
-          <MetricCard
-            title="Occupancy Rate"
-            value={`${metrics.occupancyRate.toFixed(1)}%`}
-            subtitle={`${metrics.activeLeases} of ${currentProperty?.total_units || 0} units filled`}
-            icon={Home}
-            variant="success"
-          />
-          <MetricCard
-            title="ARR"
-            value={`$${metrics.arr.toLocaleString()}`}
-            subtitle={`MRR: $${metrics.mrr.toLocaleString()}`}
-            icon={TrendingUp}
-            variant="default"
-          />
-          <MetricCard
-            title="NOI"
-            value={`$${metrics.noi.toLocaleString()}`}
-            subtitle="Net Operating Income"
-            icon={Wallet}
-            variant="success"
-          />
-          <MetricCard
-            title="Cash Flow"
-            value={`$${metrics.cashFlow.toLocaleString()}`}
-            subtitle={metrics.cashFlow >= 0 ? "Positive monthly flow" : "Negative monthly flow"}
-            icon={LineChart}
-            variant={metrics.cashFlow >= 0 ? "success" : "warning"}
-          />
-          <MetricCard
-            title="Cap Rate"
-            value={`${metrics.capRate.toFixed(2)}%`}
-            subtitle="Return on investment"
-            icon={Percent}
-            variant="default"
-          />
-          <MetricCard
-            title="DCR"
-            value={metrics.dcr.toFixed(2)}
-            subtitle={metrics.dcr >= 1.25 ? "Healthy coverage" : "Low coverage"}
-            icon={Calculator}
-            variant={metrics.dcr >= 1.25 ? "success" : "warning"}
-          />
-        </div>
+        {/* ---- Property Financials ---- */}
+        <section className="mt-10">
+          <div className="rounded-2xl bg-gradient-to-br from-white to-gray-50 p-8 shadow-sm border border-gray-100">
+            <div className="mb-6 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">Property Financials Summary</h2>
+
+              {/* Standard info icon + tooltip */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  aria-label="About Property Financials"
+                  className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:text-gray-700"
+                >
+                  <Info className="h-5 w-5" />
+                </button>
+                <div
+                  className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition
+                            absolute z-10 mt-2 w-[30rem] max-w-[90vw] rounded-xl border border-gray-200
+                            bg-white p-4 text-[13px] shadow-lg"
+                >
+                  <p className="mb-2 font-medium text-gray-900">What these mean (and why they matter)</p>
+                  <ul className="list-disc pl-5 space-y-1 text-gray-600">
+                    <li><strong>Contracted Monthly Rent</strong> — total rent due from current leases; your top-line rental revenue.</li>
+                    <li><strong>Total Monthly Expense</strong> — all operating costs; tracking this keeps spending in check.</li>
+                    <li><strong>Net Operating Income (NOI)</strong> — revenue minus operating expenses (no debt); core profitability metric.</li>
+                    <li><strong>Monthly Cash Flow</strong> — money left after all expenses & debt; positive flow builds reserves.</li>
+                    <li><strong>Occupancy Rate</strong> — % of units leased; steadier income at higher occupancy.</li>
+                    <li><strong>DCR</strong> — debt coverage ratio (NOI ÷ debt payments); <em>healthy is typically ≥ 1.25</em>.</li>
+                  </ul>
+                  <div className="mt-3 pt-3 border-t text-gray-500">
+                    <p className="mb-1 font-medium text-gray-900">Samples (Investment Performance terms):</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li><strong>ROI</strong> — Return on Investment: profitability vs. total investment.</li>
+                      <li><strong>Cap Rate</strong> — net income ÷ property value.</li>
+                      <li><strong>10-Year IRR</strong> — Internal Rate of Return over ten years.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* P&L order: 3×2 grid (no mini cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-8">
+              {/* 1) Contracted Monthly Rent */}
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                  <DollarSign className="h-4 w-4" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">Contracted Monthly Rent</p>
+                  <div className="text-2xl font-semibold leading-tight">
+                    ${metrics.expectedRent.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2) Total Monthly Expense */}
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50">
+                  <Calculator className="h-4 w-4" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">Operating Expenses (OPEX)</p>
+                  <div className="text-2xl font-semibold leading-tight">
+                    ${totalMonthlyExpense.toLocaleString()}
+                  </div>
+                    <p className="text-xs text-muted-foreground">*excludes debt</p>
+                </div>
+              </div>
+
+              {/* 3) Net Operating Income (NOI) */}
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
+                  <Wallet className="h-4 w-4" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">Net Operating Income (NOI)</p>
+                  <div className="text-2xl font-semibold leading-tight">
+                    ${metrics.noi.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4) Monthly Cash Flow */}
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
+                  <LineChart className="h-4 w-4" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">Monthly Cash Flow</p>
+                  <div className="text-2xl font-semibold leading-tight">
+                    ${metrics.cashFlow.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                  </p>
+                </div>
+              </div>
+
+              {/* 5) Occupancy Rate */}
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50">
+                  <Home className="h-4 w-4" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">Occupancy Rate</p>
+                  <div className="text-2xl font-semibold leading-tight">
+                    {metrics.occupancyRate.toFixed(1)}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {metrics.activeLeases} of {(currentProperty?.total_units || 0)} units filled
+                  </p>
+                </div>
+              </div>
+
+              {/* 6) DCR */}
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50">
+                  <Calculator className="h-4 w-4" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">Debt Coverage Ratio (DCR)</p>
+                  <div className="text-2xl font-semibold leading-tight">
+                    {metrics.dcr.toFixed(2)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {metrics.dcr >= 1.25 ? "Healthy coverage" : "Low coverage"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Lease Table Card */}
         <div className="space-y-2">
