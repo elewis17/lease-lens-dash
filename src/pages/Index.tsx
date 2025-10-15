@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info} from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { PropertyFilter } from "@/components/PropertyFilter";
+import PropertiesTable, { type Property } from "@/components/PropertiesTable";
 import { LeaseTable } from "@/components/LeaseTable";
 import { LeaseUploader } from "@/components/LeaseUploader";
 import { ExpensesForm } from "@/components/ExpensesForm";
@@ -14,14 +17,46 @@ import { ScenarioToggle, Scenario } from "@/components/ScenarioToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+type ExpensesBreakdown = {
+  taxes: number;
+  insurance: number;
+  maintenance: number;
+  management: number;
+  utilities: number;
+  hoa: number;
+  misc: number;
+};
+
+  // put near top (same as we did for add)
+type PropertyRowLegacy = {
+    id: string;
+    address: string | null;
+    created_at?: string | null;
+    mortgage_payment?: number | null;
+    opex_inflation_rate?: number | null;
+    property_value?: number | null;
+    purchase_price?: number | null;
+    rent_growth_rate?: number | null;
+    total_units?: number | null;
+    updated_at?: string | null;
+    // tolerate "new" columns if/when your migration is live
+    alias?: string | null;
+    type?: string | null;
+    sale_price?: number | null;
+    property_taxes?: number | null;
+    mgmt_pct?: number | null;
+    vacancy_pct?: number | null;
+    maintenance_pct?: number | null;
+  };
+
 const Index = () => {
   const [showUploader, setShowUploader] = useState(false);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string>(""); // property_id
   const [scenario, setScenario] = useState<Scenario>("base");
   const [leases, setLeases] = useState<any[]>([]);
   const [mortgages, setMortgages] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState({
+  const [expenses, setExpenses] = useState<ExpensesBreakdown>({ 
     taxes: 0,
     insurance: 0,
     maintenance: 0,
@@ -46,12 +81,13 @@ const Index = () => {
   });
   const [currentProperty, setCurrentProperty] = useState<any>(null);
   const { toast } = useToast();
-
-  // ---- Derived totals for Property Financials ----
-const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (Number(val) || 0), 0);
-
-  // Get scenario-adjusted growth rates
-  const getScenarioRates = () => {
+  const propertyOptions = (properties ?? []).map(p => ({ id: p.id, name: p.alias || "Property" }));
+  const propertyFilterList = (properties ?? []).map(p => ({ id: p.id, address: p.address ?? p.alias ?? "Property" }));
+  const filteredProperties = selectedProperty ? properties.filter(p => p.id === selectedProperty) : properties;
+  const filteredLeases = selectedProperty ? leases.filter(l => l.property_id === selectedProperty) : leases;
+  const filteredMortgages = selectedProperty ? mortgages.filter(m => m.property_id === selectedProperty) : mortgages;
+  const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (Number(val) ?? 0), 0); // ---- Derived totals for Property Financials ----
+  const getScenarioRates = () => {   // Get scenario-adjusted growth rates
     const baseRent = currentProperty?.rent_growth_rate || 3;
     const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
     
@@ -64,98 +100,129 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
         return { rentGrowth: baseRent, opexInflation: baseOpex };
     }
   };
+  const [newProperty, setNewProperty] = useState<{ name: string; address: string }>({
+  name: "",
+  address: "",
+  });
 
   useEffect(() => {
     loadProperties();
   }, []);
 
   useEffect(() => {
-    if (selectedProperty) {
-      loadData();
-    }
-  }, [selectedProperty]);
+    if (selectedProperty !== undefined) 
+      loadData(); // runs for "" (All) and for specific property ids
+    }, [selectedProperty]);
+
+  // sets default only once on mount
+  useEffect(() => {
+    if (selectedProperty === undefined) setSelectedProperty(""); // "" = All
+  }, []);
 
   const loadProperties = async () => {
-    const { data, error } = await supabase.from('properties').select('*');
+    const { data, error } = await supabase
+      .from("properties")
+      .select("*"); //.select("id, alias, address, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct");
     if (error) {
       console.error("Error loading properties:", error);
+      setProperties([]);
+      setSelectedProperty("");
+      setCurrentProperty(null);
       return;
     }
-    setProperties(data || []);
-    if (data && data.length > 0) {
-      setSelectedProperty(data[0].id);
-      setCurrentProperty(data[0]);
-    }
+
+    const rows = (data ?? []) as any[];
+
+    // normalize to PropertiesTable’s shape
+    const list: Property[] = rows.map((p: any) => ({
+      id: p.id,
+      alias: p.alias ?? p.name ?? p.address ?? "Property",
+      address: p.address ?? null,
+      type: p.type ?? null,
+      sale_price: p.sale_price ?? p.purchase_price ?? null,
+      property_taxes: p.property_taxes ?? null,
+      mgmt_pct: p.mgmt_pct ?? null,
+      vacancy_pct: p.vacancy_pct ?? null,
+      maintenance_pct: p.maintenance_pct ?? null,
+    }));
+
+    setProperties(list);
+    // Default to "All" so leases/mortgages with null property_id still show
+    if (!selectedProperty) {
+      setSelectedProperty("");
+      setCurrentProperty(null);
+      }
+
   };
 
   const loadData = async () => {
-    if (!selectedProperty) return;
-
-    // Fetch leases for selected property
-    const { data: leasesData, error: leasesError } = await supabase
+    // LEASES
+    let leasesQuery = supabase
       .from('leases')
-      .select(`
-        *,
-        tenant:tenants(*),
-        unit:units!inner(*)
-      `)
-      .eq('unit.property_id', selectedProperty);
+      .select(`*, tenant:tenants(*), unit:units(*)`);
+    if (selectedProperty) {
+      leasesQuery = leasesQuery.eq('unit.property_id', selectedProperty);
+    }
+    const { data: leasesData, error: leasesError } = await leasesQuery;
+    if (leasesError) console.error("Error loading leases:", leasesError);
 
-    // Fetch mortgages for selected property
-    const { data: mortgagesData } = await supabase
-      .from('mortgages')
-      .select('*')
-      .eq('property_id', selectedProperty);
+    // MORTGAGES
+    let mortgagesQuery = supabase.from('mortgages').select('*');
+    if (selectedProperty) {
+      mortgagesQuery = mortgagesQuery.eq('property_id', selectedProperty);
+    }
+    const { data: mortgagesData, error: mortgagesError } = await mortgagesQuery;
+    if (mortgagesError) console.error("Error loading mortgages:", mortgagesError);
 
-    if (leasesError) {
-      console.error("Error loading leases:", leasesError);
+    // EXPENSES + CURRENT PROPERTY (single-property mode only)
+    let expensesData: any[] | null = null;
+    let propertyData: any | null = null;
+
+    if (selectedProperty) {
+      const { data: eData } = await supabase.from('expenses').select('*').eq('property_id', selectedProperty);
+      expensesData = eData ?? null;
+
+      const { data: pData } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', selectedProperty)
+        .single();
+      propertyData = pData ?? null;
+    } else {
+      expensesData = [];   // all-mode: no single-property expenses context
+      propertyData = null; // all-mode: no current property
     }
 
-    // Fetch expenses for selected property
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('property_id', selectedProperty);
+    // Build expenses breakdown (typed) for UI + metrics
+    const expensesByCategory: ExpensesBreakdown = {
+      taxes: 0,
+      insurance: 0,
+      maintenance: 0,
+      management: 0,
+      utilities: 0,
+      hoa: 0,
+      misc: 0,
+    };
+    (expensesData ?? []).forEach((exp: any) => {
+      const amount = Number(exp?.amount) || 0;
+      const category = exp?.category;
+      if (category === 'tax') expensesByCategory.taxes += amount;
+      else if (category === 'insurance') expensesByCategory.insurance += amount;
+      else if (category === 'repairs') expensesByCategory.maintenance += amount;
+      else if (category === 'management') expensesByCategory.management += amount;
+      else if (category === 'utilities') expensesByCategory.utilities += amount;
+      else if (category === 'hoa') expensesByCategory.hoa += amount;
+      else expensesByCategory.misc += amount;
+    });
 
-    // Fetch current property details
-    const { data: propertyData } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('id', selectedProperty)
-      .single();
+    setExpenses(expensesByCategory);
+    setCurrentProperty(propertyData);
 
-    if (propertyData) {
-      setCurrentProperty(propertyData);
-      
-      // Calculate expenses breakdown (OPEX only, excluding mortgage)
-      const expensesByCategory = {
-        taxes: 0,
-        insurance: 0,
-        maintenance: 0,
-        management: 0,
-        utilities: 0,
-        hoa: 0,
-        misc: 0,
-      };
-
-      expensesData?.forEach((exp: any) => {
-        const amount = parseFloat(exp.amount.toString());
-        const category = exp.category;
-        if (category === 'tax') expensesByCategory.taxes += amount;
-        else if (category === 'insurance') expensesByCategory.insurance += amount;
-        else if (category === 'repairs') expensesByCategory.maintenance += amount;
-        else if (category === 'management') expensesByCategory.management += amount;
-        else if (category === 'utilities') expensesByCategory.utilities += amount;
-        else if (category === 'hoa') expensesByCategory.hoa += amount;
-        else expensesByCategory.misc += amount;
-      });
-
-      setExpenses(expensesByCategory);
-    }
 
     // Process mortgages
     const processedMortgages = mortgagesData?.map((mtg: any) => ({
       id: mtg.id,
+      property_id: mtg.property_id, // ✅ NEW
       loan_name: mtg.loan_name,
       principal: parseFloat(mtg.principal.toString()),
       interest_rate: parseFloat(mtg.interest_rate.toString()),
@@ -188,6 +255,7 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
 
       return {
         id: lease.id,
+        property_id: lease.unit?.property_id ?? "Unknown", // ✅ NEW
         tenant: lease.tenant?.name || "Unknown",
         unit: lease.unit?.unit_label || "Unknown",
         monthlyRent: parseFloat(lease.monthly_rent.toString()),
@@ -199,7 +267,7 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
     }) || [];
 
     // Calculate total OPEX (excluding mortgage - that's debt service)
-    const totalMonthlyOpex = Object.values(expenses).reduce((sum, val) => sum + val, 0);
+    const totalMonthlyOpex = Object.values(expensesByCategory).reduce((sum, val) => sum + Number(val || 0), 0);
     const noi = (totalMRR * 12) - (totalMonthlyOpex * 12);
     const cashFlow = noi - (totalDebtService * 12);
     const purchasePrice = parseFloat((propertyData?.purchase_price || 1).toString());
@@ -237,14 +305,27 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
   };
 
   const handleUpdateLease = async (id: string, data: Partial<any>) => {
+    if (data.property_id) {
+      const { data: leaseRow } = await supabase
+        .from('leases')
+        .select('unit_id')
+        .eq('id', id)
+        .single();
+      if (leaseRow?.unit_id) {
+        await supabase
+          .from('units')
+          .update({ property_id: data.property_id })
+          .eq('id', leaseRow.unit_id);
+      }
+    }
     const { error } = await supabase
       .from('leases')
       .update({
         monthly_rent: data.monthlyRent,
         vacancy_rate: data.vacancyRate,
         deposit: data.deposit,
-        start_date: data.startDate?.toISOString(),
-        end_date: data.leaseEnd?.toISOString(),
+        start_date: data.startDate instanceof Date ? data.startDate.toISOString() : data.startDate,
+        end_date: data.leaseEnd instanceof Date ? data.leaseEnd.toISOString() : data.leaseEnd,
       })
       .eq('id', id);
 
@@ -258,7 +339,7 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
 
   const handleDeleteLease = async (id: string) => {
     const { error } = await supabase.from('leases').delete().eq('id', id);
-    
+
     if (error) {
       toast({ title: "Error", description: "Failed to delete lease", variant: "destructive" });
     } else {
@@ -281,9 +362,10 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
     }
 
     // Get or create unit
+    const targetPropertyId = data.property_id ?? selectedProperty;
     const { data: unitData, error: unitError } = await supabase
       .from('units')
-      .insert({ unit_label: data.unit, property_id: selectedProperty })
+      .insert({ unit_label: data.unit, property_id: targetPropertyId})
       .select()
       .single();
 
@@ -345,12 +427,13 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
 
     toast({ title: "Success", description: "Expenses saved successfully" });
     loadData();
-  };
+   };
 
   const handleUpdateMortgage = async (id: string, data: any) => {
     const { error } = await supabase
       .from('mortgages')
       .update({
+        property_id: data.property_id ?? selectedProperty, // ✅ NEW
         loan_name: data.loan_name,
         principal: data.principal,
         interest_rate: data.interest_rate,
@@ -381,7 +464,7 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
 
   const handleAddMortgage = async (data: any) => {
     const { error } = await supabase.from('mortgages').insert({
-      property_id: selectedProperty,
+      property_id: data.property_id ?? selectedProperty,
       loan_name: data.loan_name,
       principal: data.principal,
       interest_rate: data.interest_rate,
@@ -398,6 +481,111 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
     }
   };
 
+  const handleAddProperty = async (data: Omit<Property, "id">) => {
+    const payload = {
+      alias: data.alias,
+      address: data.address ?? null,
+      type: data.type ?? null,
+      sale_price: data.sale_price ?? null,
+      property_taxes: data.property_taxes ?? null,
+      mgmt_pct: data.mgmt_pct ?? null,
+      vacancy_pct: data.vacancy_pct ?? null,
+      maintenance_pct: data.maintenance_pct ?? null,
+    };
+
+    const { data: inserted, error } = await supabase
+      .from("properties")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to add property", variant: "destructive" });
+      return;
+    }
+
+    // append to list so UI updates immediately
+    setProperties((prev) => [...prev, inserted as Property]);
+    toast({ title: "Success", description: "Property added" });
+    loadProperties();
+  };
+  // (existing code continues)
+  type PropertyRowLegacy = {
+    id: string;
+    address: string | null;
+    // ...
+  };
+
+  const handleUpdateProperty = async (id: string, patch: Partial<Property>) => {
+    // Build a payload your current DB actually accepts:
+    // - Always allow address
+    // - Map sale_price -> purchase_price (legacy column) if provided
+    // - Only include fields that are not undefined (avoid sending unknown keys)
+    const payload: any = {};
+    if (patch.address !== undefined) payload.address = patch.address ?? null;
+    if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price ?? null;
+
+    // If your migration with the new columns is applied, these will also succeed (harmless if ignored by types)
+    if (patch.alias !== undefined) payload.alias = patch.alias ?? null;
+    if (patch.type !== undefined) payload.type = patch.type ?? null;
+    if (patch.property_taxes !== undefined) payload.property_taxes = patch.property_taxes ?? null;
+    if (patch.mgmt_pct !== undefined) payload.mgmt_pct = patch.mgmt_pct ?? null;
+    if (patch.vacancy_pct !== undefined) payload.vacancy_pct = patch.vacancy_pct ?? null;
+    if (patch.maintenance_pct !== undefined) payload.maintenance_pct = patch.maintenance_pct ?? null;
+
+    const prev = properties;
+    setProperties(list => list.map(p => (p.id === id ? { ...p, ...patch } : p)));
+
+    const { data: updated, error } = await supabase
+      .from("properties")
+      .update(payload)
+      .eq("id", id)
+      .select("id, address, purchase_price, alias, name, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct")
+      .single<PropertyRowLegacy>();
+
+    if (error || !updated) {
+      // rollback optimistic change
+      setProperties(prev);
+      console.error("[update property] error:", error);
+      toast({ title: "Update failed", description: String(error?.message ?? error ?? "Unknown error"), variant: "destructive" });
+      return;
+    }
+
+    // normalize the returned row back into your UI shape
+    setProperties(list =>
+      list.map(p =>
+        p.id === id
+          ? {
+              ...p,
+              alias: p.alias ?? updated.alias ?? (updated as any).name ?? p.address ?? "Property",
+              address: updated.address ?? null,
+              sale_price: p.sale_price ?? updated.purchase_price ?? null,
+              // leave the rest as-is unless your DB returned them (depends on migration)
+              property_taxes: p.property_taxes ?? null,
+              mgmt_pct: p.mgmt_pct ?? null,
+              vacancy_pct: p.vacancy_pct ?? null,
+              maintenance_pct: p.maintenance_pct ?? null,
+            }
+          : p
+      )
+    );
+
+    toast({ title: "Property updated" });
+  };
+  const handleDeleteProperty = async (id: string) => {
+  const prev = properties;
+  setProperties(list => list.filter(p => p.id !== id));
+
+  const { error } = await supabase.from("properties").delete().eq("id", id);
+  if (error) {
+    setProperties(prev); // rollback
+    toast({ title: "Error", description: "Failed to delete property", variant: "destructive" });
+  } else if (selectedProperty === id) {
+    setSelectedProperty(""); // clear filter if you deleted the selected one
+  }
+  };
+  // Helper to format a property label from the selected/current property
+  const formatPropertyLabel = (p: any | null) => String(p?.alias ?? p?.name ?? "Property");
 
   if (showUploader) {
     return (
@@ -424,17 +612,16 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
         <div className="container mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold leading-snug">Landlord Snapshot</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">Instant lease insights, zero tabs.</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">Instant insights, zero tabs.</p>
           </div>
           <div className="flex items-center gap-4">
             {properties.length > 0 && (
               <PropertyFilter
-                properties={properties}
+                properties={propertyFilterList}
                 selectedProperty={selectedProperty}
                 onPropertyChange={setSelectedProperty}
               />
             )}
-            <ScenarioToggle scenario={scenario} onScenarioChange={setScenario} />
           </div>
         </div>
       </header>
@@ -468,7 +655,7 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
               title="Cash-on-Cash"
               value={`${metrics.cashOnCash.toFixed(2)}%`}
               subtitle="Cash return / cash invested"
-              icon={DollarSign}xs
+              icon={DollarSign}
               variant="success"
             />
           </div>
@@ -607,12 +794,25 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
           </div>
         </section>
 
+        {/* Properties Card */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold leading-snug">
+            Properties <span className="text-muted-foreground text-base">({filteredProperties.length})</span>
+          </h2>
+          <PropertiesTable
+            properties={filteredProperties}
+            onAdd={handleAddProperty}
+            onUpdate={handleUpdateProperty}
+            onDelete={handleDeleteProperty}
+          />
+        </div>
+
         {/* Lease Table Card */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold leading-snug">
-            Active Leases <span className="text-muted-foreground text-base">({leases.length})</span>
+            Active Leases <span className="text-muted-foreground text-base">({filteredLeases.length})</span>
           </h2>
-          {leases.length === 0 ? (
+          {filteredLeases.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4 shadow-sm animate-fade-in">
               <div className="text-muted-foreground">
                 <p className="font-medium text-base mb-2">No leases yet</p>
@@ -621,10 +821,11 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
             </div>
           ) : (
             <LeaseTable
-              leases={leases}
+              leases={filteredLeases}
               onUpdate={handleUpdateLease}
               onDelete={handleDeleteLease}
               onAdd={handleAddLease}
+              propertyOptions={propertyOptions}
             />
           )}
         </div>
@@ -635,10 +836,11 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
             Mortgages <span className="text-muted-foreground text-base">({mortgages.length})</span>
           </h2>
           <MortgagesTable
-            mortgages={mortgages}
+            mortgages={filteredMortgages}
             onUpdate={handleUpdateMortgage}
             onDelete={handleDeleteMortgage}
             onAdd={handleAddMortgage}
+            propertyOptions={propertyOptions}
           />
         </div>
 
@@ -657,12 +859,16 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
 
         {/* Income & Safety Chart */}
         <div className="space-y-2">
-          <div>
-            <h2 className="text-xl font-semibold leading-snug">Cash Flow & Risk (10 Years)</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-              {scenario.charAt(0).toUpperCase() + scenario.slice(1)} scenario: Rent at {getScenarioRates().rentGrowth.toFixed(1)}% growth vs. OPEX at {getScenarioRates().opexInflation.toFixed(1)}% inflation
-            </p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold leading-snug">Cash Flow & Risk (10 Years)</h2>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                {scenario.charAt(0).toUpperCase() + scenario.slice(1)} scenario: Rent at {getScenarioRates().rentGrowth.toFixed(1)}% growth vs. OPEX at {getScenarioRates().opexInflation.toFixed(1)}% inflation
+              </p>
+            </div>
+            <ScenarioToggle scenario={scenario} onScenarioChange={setScenario} />
           </div>
+
           <IncomeAndSafetyChart
             currentRent={metrics.mrr}
             rentGrowthRate={getScenarioRates().rentGrowth}
@@ -689,7 +895,7 @@ const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (
         </div>
       </main>
 
-      <QuickActions onUploadClick={() => setShowUploader(true)} />
+      {/*<QuickActions onUploadClick={() => setShowUploader(true)} /> //Floating footer with buttons*/}
     </div>
   );
 };

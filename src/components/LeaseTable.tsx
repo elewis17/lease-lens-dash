@@ -14,16 +14,20 @@ interface LeaseData {
   deposit: number;
   startDate: Date;
   leaseEnd: Date;
+  property_id?: string; // ✅ NEW
 }
+
+type PropertyOption = { id: string; name: string }; // NEW
 
 interface LeaseTableProps {
   leases: LeaseData[];
   onUpdate: (id: string, data: Partial<LeaseData>) => void;
   onDelete: (id: string) => void;
   onAdd: (data: Omit<LeaseData, "id">) => void;
+  propertyOptions: PropertyOption[]; // NEW
 }
 
-export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd }: LeaseTableProps) => {
+export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}: LeaseTableProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<LeaseData>>({});
   const [isAdding, setIsAdding] = useState(false);
@@ -35,6 +39,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd }: LeaseTableProp
     deposit: 0,
     startDate: new Date(),
     leaseEnd: new Date(),
+    property_id: undefined, // ✅ NEW
   });
 
   const handleEdit = (lease: LeaseData) => {
@@ -78,6 +83,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd }: LeaseTableProp
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold text-sm sticky left-0 bg-muted/50 backdrop-blur-sm">Tenant</TableHead>
+              <TableHead className="font-semibold text-sm">Property</TableHead> {/* ✅ NEW */}
               <TableHead className="font-semibold text-sm">Unit</TableHead>
               <TableHead className="font-semibold text-sm">Monthly Rent</TableHead>
               <TableHead className="font-semibold text-sm">Vacancy %</TableHead>
@@ -98,6 +104,18 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd }: LeaseTableProp
                       onChange={(e) => setEditData({ ...editData, tenant: e.target.value })}
                       className="h-8 text-sm"
                     />
+                  </TableCell>
+                  <TableCell>
+                    <select
+                      className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
+                      value={editData.property_id ?? ""}
+                      onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
+                    >
+                      <option value="">Select property…</option>
+                      {propertyOptions.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
                   </TableCell>
                   <TableCell>
                     <Input
@@ -161,6 +179,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd }: LeaseTableProp
               ) : (
                 <>
                   <TableCell className="font-medium text-sm sticky left-0 bg-card backdrop-blur-sm">{lease.tenant}</TableCell>
+                  <TableCell className="text-sm">{propertyOptions.find(p => p.id === lease.property_id)?.name ?? "—"}</TableCell>
                   <TableCell className="text-sm">{lease.unit}</TableCell>
                   <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{lease.vacancyRate ?? 5}%</TableCell>
@@ -191,6 +210,18 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd }: LeaseTableProp
                   onChange={(e) => setNewLease({ ...newLease, tenant: e.target.value })}
                   className="h-8 text-sm"
                 />
+              </TableCell>
+              <TableCell>
+                <select
+                  className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
+                  value={newLease.property_id ?? ""}
+                  onChange={(e) => setNewLease({ ...newLease, property_id: e.target.value || undefined })}
+                >mo
+                  <option value="">Select property…</option>
+                  {propertyOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </TableCell>
               <TableCell>
                 <Input

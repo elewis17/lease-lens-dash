@@ -5,8 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Check, X, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
+type PropertyOption = { id: string; name: string };
+
 interface Mortgage {
   id: string;
+  property_id?: string; // NEW
   loan_name: string;
   principal: number;
   interest_rate: number;
@@ -20,9 +23,10 @@ interface MortgagesTableProps {
   onUpdate: (id: string, data: Partial<Mortgage>) => void;
   onDelete: (id: string) => void;
   onAdd: (data: Omit<Mortgage, "id">) => void;
+  propertyOptions: PropertyOption[]; // NEW
 }
 
-export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd }: MortgagesTableProps) => {
+export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyOptions}: MortgagesTableProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editData, setEditData] = useState<any>({});
@@ -48,13 +52,14 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd }: Mortgag
 
   const handleAddNew = () => {
     onAdd({
+      property_id: editData.property_id, // ✅ NEW
       loan_name: editData.loan_name || "Primary Mortgage",
       principal: parseFloat(editData.principal) || 0,
       interest_rate: parseFloat(editData.interest_rate) || 0,
       term_months: parseInt(editData.term_months) || 360,
       start_date: new Date(editData.start_date || new Date()),
       monthly_payment: parseFloat(editData.monthly_payment) || 0,
-    });
+    } as Omit<Mortgage, "id">);
     setIsAdding(false);
     setEditData({});
   };
@@ -65,6 +70,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd }: Mortgag
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 border-b border-border">
+              <TableHead className="px-4 py-3">Property</TableHead> {/* NEW */}
               <TableHead className="font-semibold px-4 py-3">Loan Name</TableHead>
               <TableHead className="font-semibold px-4 py-3">Principal</TableHead>
               <TableHead className="font-semibold px-4 py-3">Rate (%)</TableHead>
@@ -79,12 +85,21 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd }: Mortgag
               <TableRow key={mortgage.id} className="hover:bg-muted/30 transition-colors border-b border-border/50">
                 {editingId === mortgage.id ? (
                   <>
+                    {/* NEW: Property select */}
                     <TableCell className="px-4 py-3">
-                      <Input
-                        value={editData.loan_name}
-                        onChange={(e) => setEditData({ ...editData, loan_name: e.target.value })}
-                        className="h-8"
-                      />
+                      <select
+                        className="h-8 w-full rounded-md border border-input bg-background px-2"
+                        value={editData.property_id ?? mortgage.property_id ?? ""}
+                        onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
+                      >
+                        <option value="">Select property…</option>
+                        {propertyOptions.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Input value={editData.loan_name} onChange={(e) => setEditData({ ...editData, loan_name: e.target.value })}className="h-8"/>
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <Input
@@ -140,6 +155,8 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd }: Mortgag
                   </>
                 ) : (
                   <>
+                  {/* NEW: read-mode name */}
+                    <TableCell className="px-4 py-3"> {propertyOptions.find(p => p.id === mortgage.property_id)?.name ?? "—"}</TableCell>
                     <TableCell className="font-medium px-4 py-3">{mortgage.loan_name}</TableCell>
                     <TableCell className="px-4 py-3">${mortgage.principal.toLocaleString()}</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.interest_rate}%</TableCell>
@@ -162,6 +179,18 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd }: Mortgag
             ))}
             {isAdding && (
               <TableRow className="bg-muted/20 border-b border-border/50">
+                <TableCell className="px-4 py-3">
+                  <select
+                    className="h-8 w-full rounded-md border border-input bg-background px-2"
+                    value={editData.property_id ?? ""}
+                    onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
+                  >
+                    <option value="">Select property…</option>
+                    {propertyOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </TableCell>
                 <TableCell className="px-4 py-3">
                   <Input
                     placeholder="Loan name"

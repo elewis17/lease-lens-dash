@@ -16,6 +16,7 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
   const [open, setOpen] = useState(false);
   
   const currentProperty = properties.find(p => p.id === selectedProperty);
+  const buttonLabel = selectedProperty === "" ? "All properties" : (currentProperty?.address || "Select property...");
 
   return (
     <div className="flex items-center gap-2">
@@ -27,8 +28,9 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
             role="combobox"
             aria-expanded={open}
             className="w-[300px] justify-between"
+            onClick={() => setOpen(!open)}
           >
-            {currentProperty?.address || "Select property..."}
+            {buttonLabel}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -37,25 +39,44 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
             <CommandInput placeholder="Search property..." />
             <CommandEmpty>No property found.</CommandEmpty>
             <CommandGroup>
-              {properties.map((property) => (
-                <CommandItem
-                  key={property.id}
-                  value={property.address}
-                  onSelect={() => {
-                    onPropertyChange(property.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedProperty === property.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {property.address}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {/* All properties option */}
+            <CommandItem
+              key="__all"
+              value="All properties"
+              onSelect={() => {
+                onPropertyChange(""); // "" = All
+                setOpen(false);
+              }}
+            >
+              <Check
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  selectedProperty === "" ? "opacity-100" : "opacity-0"
+                )}
+              />
+              All properties
+            </CommandItem>
+
+            {/* Individual properties */}
+            {properties.map((property) => (
+              <CommandItem
+                key={property.id}
+                value={property.address}
+                onSelect={() => {
+                  onPropertyChange(property.id);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    selectedProperty === property.id ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                {property.address}
+              </CommandItem>
+            ))}
+          </CommandGroup>
           </Command>
         </PopoverContent>
       </Popover>
