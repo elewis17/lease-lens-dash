@@ -27,7 +27,7 @@ type ExpensesBreakdown = {
   misc: number;
 };
 
-  // put near top (same as we did for add)
+
 type PropertyRowLegacy = {
     id: string;
     address: string | null;
@@ -69,6 +69,7 @@ const Index = () => {
     expectedRent: 0,
     occupancyRate: 0,
     activeLeases: 0,
+    totalUnits: 0, 
     arr: 0,
     mrr: 0,
     noi: 0,
@@ -156,6 +157,12 @@ const Index = () => {
   };
 
   const loadData = async () => {
+    // Build once per loadData run
+    const vacancyPctByProperty = new Map<string, number>(
+      (properties ?? []).map(p => [p.id, Number(p.vacancy_pct ?? 0)])
+    );
+    const getPropVacancy = (pid?: string) => vacancyPctByProperty.get(pid ?? "") ?? 0;
+    
     // LEASES
     let leasesQuery = supabase
       .from('leases')
@@ -189,7 +196,9 @@ const Index = () => {
         .single();
       propertyData = pData ?? null;
     } else {
-      expensesData = [];   // all-mode: no single-property expenses context
+      //expensesData = [];   // all-mode: no single-property expenses context
+      const { data: eAll } = await supabase.from('expenses').select('*'); // ✅ all properties
+      expensesData = eAll ?? [];
       propertyData = null; // all-mode: no current property
     }
 
@@ -239,32 +248,52 @@ const Index = () => {
     // Calculate metrics
     let totalMRR = 0;
     let totalExpected = 0;
-    let activeLeases = 0;
 
-    const processedLeases = leasesData?.map((lease: any) => {
-      const monthlyRent = parseFloat(lease.monthly_rent.toString());
-      const vacancyRate = parseFloat((lease.vacancy_rate || 5).toString()) / 100;
-      const adjustedRent = monthlyRent * (1 - vacancyRate);
-      
+    // ✅ use a set to count unique active unit IDs
+    const activeUnitIds = new Set<string>();
+    const now = new Date();
+
+    const processedLeases = (leasesData ?? []).map((lease: any) => {
+      const monthlyRent = Number(lease?.monthly_rent ?? 0);
+      const pid = lease?.unit?.property_id as string | undefined;
+      const propVacancyPct = getPropVacancy(pid);
+      const adjustedRent = monthlyRent * (1 - propVacancyPct / 100);
       totalMRR += adjustedRent;
       totalExpected += monthlyRent;
 
-      if (lease.status === 'active' || lease.status === 'expiring') {
-        activeLeases++;
+      // ----- active check (status OR dates) -----
+      const status = String(lease?.status ?? "").toLowerCase();
+      const start = lease?.start_date ? new Date(lease.start_date) : null;
+      const end   = lease?.end_date ? new Date(lease.end_date) : null;
+
+      const isActiveByStatus = status === "active" || status === "expiring";
+      const isActiveByDates  = !!(start && end && start <= now && now <= end);
+      const isActive = isActiveByStatus || isActiveByDates;
+
+      // ----- property filter + unique unit counting -----
+      const unitId = lease?.unit?.id as string | undefined;
+      const unitPropertyId = lease?.unit?.property_id as string | undefined;
+      const matchesSelection = selectedProperty ? unitPropertyId === selectedProperty : true;
+
+      if (isActive && unitId && matchesSelection) {
+        activeUnitIds.add(unitId); // ✅ one per unit
       }
 
       return {
         id: lease.id,
-        property_id: lease.unit?.property_id ?? "Unknown", // ✅ NEW
+        property_id: unitPropertyId ?? "Unknown",
         tenant: lease.tenant?.name || "Unknown",
         unit: lease.unit?.unit_label || "Unknown",
-        monthlyRent: parseFloat(lease.monthly_rent.toString()),
-        vacancyRate: parseFloat((lease.vacancy_rate || 5).toString()),
-        deposit: parseFloat((lease.deposit || 0).toString()),
-        startDate: new Date(lease.start_date),
-        leaseEnd: new Date(lease.end_date),
+        monthlyRent,
+        //vacancyRate: vacancyRatePct, --- to be removed
+        deposit: Number(lease?.deposit ?? 0),
+        startDate: start ?? new Date(),
+        leaseEnd: end ?? new Date(),
       };
-    }) || [];
+    });
+
+    // use unique active units as the numerator
+    const activeLeases = activeUnitIds.size
 
     // Calculate total OPEX (excluding mortgage - that's debt service)
     const totalMonthlyOpex = Object.values(expensesByCategory).reduce((sum, val) => sum + Number(val || 0), 0);
@@ -274,9 +303,24 @@ const Index = () => {
     const capRate = purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0;
     const annualDebt = totalDebtService * 12;
     const dcr = annualDebt > 0 ? noi / annualDebt : 0;
-    const totalUnits = propertyData?.total_units || 1;
+    //const totalUnits = propertyData?.total_units || 1;
+    //const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
+    // ✅ Derive totalUnits safely for both single-property and "All" modes
+    let totalUnits = 0;
+    const uniqueUnitIds = new Set((leasesData ?? []).map((l: any) => l.unit?.id).filter(Boolean));
+
+    // If a single property is selected, prefer DB total_units; fall back to unique unit IDs
+    if (selectedProperty) {
+      totalUnits = Number(propertyData?.total_units ?? 0);
+      if (!totalUnits) totalUnits = uniqueUnitIds.size;
+    } else {
+      // "All" mode: use the number of unique units seen in leases as the capacity proxy
+      totalUnits = uniqueUnitIds.size;
+    }
+
     const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
-    
+
+
     // Calculate ROI metrics
     const totalInvestment = purchasePrice + (processedMortgages.reduce((sum, m) => sum + m.principal, 0));
     const roi = totalInvestment > 0 ? (noi / totalInvestment) * 100 : 0;
@@ -292,6 +336,7 @@ const Index = () => {
       expectedRent: totalExpected,
       occupancyRate,
       activeLeases,
+      totalUnits,
       arr: totalMRR * 12,
       mrr: totalMRR,
       noi: noi / 12,
@@ -304,6 +349,7 @@ const Index = () => {
     });
   };
 
+// LEASE HANDLERS
   const handleUpdateLease = async (id: string, data: Partial<any>) => {
     if (data.property_id) {
       const { data: leaseRow } = await supabase
@@ -322,7 +368,7 @@ const Index = () => {
       .from('leases')
       .update({
         monthly_rent: data.monthlyRent,
-        vacancy_rate: data.vacancyRate,
+        //vacancy_rate: data.vacancyRate, --- to be removed
         deposit: data.deposit,
         start_date: data.startDate instanceof Date ? data.startDate.toISOString() : data.startDate,
         end_date: data.leaseEnd instanceof Date ? data.leaseEnd.toISOString() : data.leaseEnd,
@@ -379,7 +425,7 @@ const Index = () => {
       tenant_id: tenantData.id,
       unit_id: unitData.id,
       monthly_rent: data.monthlyRent,
-      vacancy_rate: data.vacancyRate ?? 5,
+      //vacancy_rate: data.vacancyRate ?? 5, --- to be removed
       deposit: data.deposit,
       start_date: data.startDate.toISOString(),
       end_date: data.leaseEnd.toISOString(),
@@ -429,6 +475,7 @@ const Index = () => {
     loadData();
    };
 
+  //MORTGAGE HANDLERS
   const handleUpdateMortgage = async (id: string, data: any) => {
     const { error } = await supabase
       .from('mortgages')
@@ -481,6 +528,7 @@ const Index = () => {
     }
   };
 
+  //PROPERTY HANDLERS
   const handleAddProperty = async (data: Omit<Property, "id">) => {
     const payload = {
       alias: data.alias,
@@ -505,15 +553,12 @@ const Index = () => {
     }
 
     // append to list so UI updates immediately
-    setProperties((prev) => [...prev, inserted as Property]);
+    //setProperties((prev) => [...prev, inserted as Property]);
+    //toast({ title: "Success", description: "Property added" });
+    //loadProperties();
     toast({ title: "Success", description: "Property added" });
-    loadProperties();
-  };
-  // (existing code continues)
-  type PropertyRowLegacy = {
-    id: string;
-    address: string | null;
-    // ...
+    await loadProperties(); // rely on normalized loader; no TypeScript cast needed
+
   };
 
   const handleUpdateProperty = async (id: string, patch: Partial<Property>) => {
@@ -573,17 +618,18 @@ const Index = () => {
     toast({ title: "Property updated" });
   };
   const handleDeleteProperty = async (id: string) => {
-  const prev = properties;
-  setProperties(list => list.filter(p => p.id !== id));
+    const prev = properties;
+    setProperties(list => list.filter(p => p.id !== id));
 
-  const { error } = await supabase.from("properties").delete().eq("id", id);
-  if (error) {
-    setProperties(prev); // rollback
-    toast({ title: "Error", description: "Failed to delete property", variant: "destructive" });
-  } else if (selectedProperty === id) {
-    setSelectedProperty(""); // clear filter if you deleted the selected one
-  }
+    const { error } = await supabase.from("properties").delete().eq("id", id);
+    if (error) {
+      setProperties(prev); // rollback
+      toast({ title: "Error", description: "Failed to delete property", variant: "destructive" });
+    } else if (selectedProperty === id) {
+      setSelectedProperty(""); // clear filter if you deleted the selected one
+    }
   };
+
   // Helper to format a property label from the selected/current property
   const formatPropertyLabel = (p: any | null) => String(p?.alias ?? p?.name ?? "Property");
 
@@ -770,7 +816,7 @@ const Index = () => {
                     {metrics.occupancyRate.toFixed(1)}%
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {metrics.activeLeases} of {(currentProperty?.total_units || 0)} units filled
+                    {metrics.activeLeases} of {metrics.totalUnits} units filled
                   </p>
                 </div>
               </div>

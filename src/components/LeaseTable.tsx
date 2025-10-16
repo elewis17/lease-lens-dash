@@ -10,7 +10,6 @@ interface LeaseData {
   tenant: string;
   unit: string;
   monthlyRent: number;
-  vacancyRate?: number;
   deposit: number;
   startDate: Date;
   leaseEnd: Date;
@@ -35,7 +34,6 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
     tenant: "",
     unit: "",
     monthlyRent: 0,
-    vacancyRate: 5,
     deposit: 0,
     startDate: new Date(),
     leaseEnd: new Date(),
@@ -67,10 +65,10 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
         tenant: "",
         unit: "",
         monthlyRent: 0,
-        vacancyRate: 5,
         deposit: 0,
         startDate: new Date(),
         leaseEnd: new Date(),
+        property_id: undefined,
       });
       setIsAdding(false);
     }
@@ -86,7 +84,6 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               <TableHead className="font-semibold text-sm">Property</TableHead> {/* ✅ NEW */}
               <TableHead className="font-semibold text-sm">Unit</TableHead>
               <TableHead className="font-semibold text-sm">Monthly Rent</TableHead>
-              <TableHead className="font-semibold text-sm">Vacancy %</TableHead>
               <TableHead className="font-semibold text-sm">Lease Start</TableHead>
               <TableHead className="font-semibold text-sm">Lease End</TableHead>
               <TableHead className="font-semibold text-sm">Deposit</TableHead>
@@ -134,15 +131,6 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   </TableCell>
                   <TableCell>
                     <Input
-                      type="number"
-                      step="0.1"
-                      value={editData.vacancyRate ?? 5}
-                      onChange={(e) => setEditData({ ...editData, vacancyRate: parseFloat(e.target.value) })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
                       type="date"
                       value={editData.startDate ? format(editData.startDate, "yyyy-MM-dd") : ""}
                       onChange={(e) => setEditData({ ...editData, startDate: new Date(e.target.value) })}
@@ -182,7 +170,6 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell className="text-sm">{propertyOptions.find(p => p.id === lease.property_id)?.name ?? "—"}</TableCell>
                   <TableCell className="text-sm">{lease.unit}</TableCell>
                   <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
-                  <TableCell className="text-sm">{lease.vacancyRate ?? 5}%</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{format(lease.startDate, "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{format(lease.leaseEnd, "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-sm">${lease.deposit.toLocaleString()}</TableCell>
@@ -215,8 +202,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 <select
                   className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                   value={newLease.property_id ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, property_id: e.target.value || undefined })}
-                >mo
+                  onChange={(e) => setNewLease({ ...newLease, property_id: e.target.value || undefined })}>
                   <option value="">Select property…</option>
                   {propertyOptions.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
@@ -237,16 +223,6 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   placeholder="Rent"
                   value={newLease.monthlyRent}
                   onChange={(e) => setNewLease({ ...newLease, monthlyRent: parseFloat(e.target.value) || 0 })}
-                  className="h-8 text-sm"
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder="Vacancy %"
-                  value={newLease.vacancyRate ?? 5}
-                  onChange={(e) => setNewLease({ ...newLease, vacancyRate: parseFloat(e.target.value) || 5 })}
                   className="h-8 text-sm"
                 />
               </TableCell>
