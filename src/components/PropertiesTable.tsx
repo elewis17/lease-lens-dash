@@ -7,16 +7,22 @@ import { Plus, Pencil, Check, X, Trash2, Info } from "lucide-react";
 
 export type PropertyType = "Single-Family" | "Multi-Family" | "Commercial" | "Industrial";
 export type Property = {
-  id: string;                // DB primary key (UUID)
-  alias: string;             // human-readable unique identifier (user-facing “ID”)
-  address?: string | null;
-  type?: PropertyType | null;
-  sale_price?: number | null;
-  property_taxes?: number | null; // if null, UI will auto-calc from sale_price * 0.013
-  mgmt_pct?: number | null;       // Management %
-  vacancy_pct?: number | null;    // Vacancy %
-  maintenance_pct?: number | null;// Maintenance %
+  id: string;
+  alias: string;
+  address: string | null;
+  type: string | null;
+  sale_price: number | null;
+
+  // OPEX inputs (some may be null/undefined)
+  property_taxes: number | null;   // monthly $
+  insurance?: number | null;       // monthly $
+  hoa?: number | null;             // monthly $
+  misc?: number | null;            // monthly $
+  mgmt_pct: number | null;         // % of rent
+  maintenance_pct: number | null;  // % of rent
+  vacancy_pct: number | null;
 };
+
 
 export interface PropertiesTableProps {
   properties: Property[];
@@ -117,9 +123,19 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
                   <Info className="h-3 w-3" />
                 </span>
               </TableHead>
-              <TableHead className="px-4 py-2">Mgmt %</TableHead>
+              <TableHead className="bg-rose-50/40">
+                <div className="flex items-center gap-2">
+                  <span>Mgmt %</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">OPEX</span>
+                </div>
+              </TableHead>
               <TableHead className="px-4 py-2">Vacancy %</TableHead>
-              <TableHead className="px-4 py-2">Maint %</TableHead>
+              <TableHead className="bg-rose-50/40">
+                <div className="flex items-center gap-2">
+                  <span>Maint %</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">OPEX</span>
+                </div>
+              </TableHead>
               <TableHead className="px-4 py-2 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

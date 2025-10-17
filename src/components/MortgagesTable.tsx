@@ -12,6 +12,8 @@ interface Mortgage {
   property_id?: string; // NEW
   loan_name: string;
   principal: number;
+  principal_original?: number | null;  
+  current_balance?: number | null;   
   interest_rate: number;
   term_months: number;
   start_date: Date;
@@ -34,27 +36,63 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
   const handleEdit = (mortgage: Mortgage) => {
     setEditingId(mortgage.id);
     setEditData({
-      loan_name: mortgage.loan_name,
-      principal: mortgage.principal,
-      interest_rate: mortgage.interest_rate,
-      term_months: mortgage.term_months,
-      start_date: mortgage.start_date,
-      monthly_payment: mortgage.monthly_payment,
+      property_id: mortgage.property_id ?? null,
+      loan_name: mortgage.loan_name ?? "",
+      principal: typeof mortgage.principal === "number" ? mortgage.principal : null,
+      principal_original: typeof mortgage.principal_original === "number" ? mortgage.principal_original : null,
+      current_balance: typeof mortgage.current_balance === "number" ? mortgage.current_balance : null,
+      interest_rate: typeof mortgage.interest_rate === "number" ? mortgage.interest_rate : null,
+      term_months: typeof mortgage.term_months === "number" ? mortgage.term_months : null,
+      start_date: mortgage.start_date ?? null,
+      monthly_payment: typeof mortgage.monthly_payment === "number" ? mortgage.monthly_payment : null,
     });
   };
 
-  const handleSave = () => {
-    if (editingId) {
-      onUpdate(editingId, editData);
+
+    // helpers
+    const numOrNull = (v: any) => (v === "" || v === undefined || v === null ? null : Number(v));
+    const intOrNull = (v: any) => (v === "" || v === undefined || v === null ? null : parseInt(v));
+    const toApiDate = (d: string | Date | null | undefined): string | null => {
+      if (!d) return null;
+      if (d instanceof Date) return d.toISOString().slice(0, 10);  // YYYY-MM-DD
+      // if already a string, pass through (assume YYYY-MM-DD)
+      return d;
+    };
+
+    const handleSave = () => {
+      if (!editingId) return;
+
+      const payload: any = {
+        property_id: editData.property_id || null,
+        loan_name: (editData.loan_name ?? "").toString().trim() || null,
+
+        // balances
+        principal_original: numOrNull(editData.principal_original),
+        current_balance:   numOrNull(editData.current_balance),
+        principal:         numOrNull(editData.principal), // legacy
+
+        // terms
+        interest_rate:  numOrNull(editData.interest_rate),
+        term_months:    intOrNull(editData.term_months),
+        start_date:     toApiDate(editData.start_date),   // ✅ handles Date or string
+        monthly_payment: numOrNull(editData.monthly_payment),
+      };
+
+      // drop undefined keys
+      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+
+      onUpdate(editingId, payload);
       setEditingId(null);
-    }
-  };
+    };
 
   const handleAddNew = () => {
     onAdd({
-      property_id: editData.property_id, // ✅ NEW
+      property_id: editData.property_id,
       loan_name: editData.loan_name || "Primary Mortgage",
-      principal: parseFloat(editData.principal) || 0,
+      // keep "principal" for legacy if your backend expects it; else set null
+      principal: editData.principal ? Number(editData.principal) : 0,
+      principal_original: editData.principal_original ?? null, // ✅ NEW
+      current_balance: editData.current_balance ?? null,       // ✅ NEW
       interest_rate: parseFloat(editData.interest_rate) || 0,
       term_months: parseInt(editData.term_months) || 360,
       start_date: new Date(editData.start_date || new Date()),
@@ -72,7 +110,8 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
             <TableRow className="bg-muted/50 border-b border-border">
               <TableHead className="px-4 py-3">Property</TableHead> {/* NEW */}
               <TableHead className="font-semibold px-4 py-3">Loan Name</TableHead>
-              <TableHead className="font-semibold px-4 py-3">Principal</TableHead>
+              <TableHead className="font-semibold px-4 py-3">Original Principal</TableHead> 
+              <TableHead className="font-semibold px-4 py-3">Current Balance</TableHead>   
               <TableHead className="font-semibold px-4 py-3">Rate (%)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Term (months)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Start Date</TableHead>
@@ -104,8 +143,22 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">
                       <Input
                         type="number"
-                        value={editData.principal}
-                        onChange={(e) => setEditData({ ...editData, principal: e.target.value })}
+                        placeholder="Original Principal"
+                        value={editData.principal_original ?? ""}
+                        onChange={(e) =>
+                          setEditData({ ...editData, principal_original: e.target.value === "" ? null : Number(e.target.value) })
+                        }
+                        className="h-8"
+                      />
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Input
+                        type="number"
+                        placeholder="Current Balance"
+                        value={editData.current_balance ?? ""}
+                        onChange={(e) =>
+                          setEditData({ ...editData, current_balance: e.target.value === "" ? null : Number(e.target.value) })
+                        }
                         className="h-8"
                       />
                     </TableCell>
@@ -158,7 +211,8 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   {/* NEW: read-mode name */}
                     <TableCell className="px-4 py-3"> {propertyOptions.find(p => p.id === mortgage.property_id)?.name ?? "—"}</TableCell>
                     <TableCell className="font-medium px-4 py-3">{mortgage.loan_name}</TableCell>
-                    <TableCell className="px-4 py-3">${mortgage.principal.toLocaleString()}</TableCell>
+                    <TableCell className="px-4 py-3">${ (mortgage.principal_original ?? mortgage.principal ?? 0).toLocaleString() }</TableCell>
+                    <TableCell className="px-4 py-3">${ (mortgage.current_balance ?? mortgage.principal ?? 0).toLocaleString() }</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.interest_rate}%</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.term_months}</TableCell>
                     <TableCell className="px-4 py-3">{new Date(mortgage.start_date).toLocaleDateString()}</TableCell>
@@ -202,9 +256,24 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                 <TableCell className="px-4 py-3">
                   <Input
                     type="number"
-                    placeholder="Principal"
-                    value={editData.principal || ""}
-                    onChange={(e) => setEditData({ ...editData, principal: e.target.value })}
+                    placeholder="Original Principal"
+                    value={editData.principal_original ?? ""}
+                    onChange={(e) => setEditData({
+                      ...editData,
+                      principal_original: e.target.value === "" ? null : Number(e.target.value)
+                    })}
+                    className="h-8"
+                  />
+                </TableCell>
+                <TableCell className="px-4 py-3">
+                  <Input
+                    type="number"
+                    placeholder="Current Balance"
+                    value={editData.current_balance ?? ""}
+                    onChange={(e) => setEditData({
+                      ...editData,
+                      current_balance: e.target.value === "" ? null : Number(e.target.value)
+                    })}
                     className="h-8"
                   />
                 </TableCell>

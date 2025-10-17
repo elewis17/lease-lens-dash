@@ -2,11 +2,11 @@ import { Card } from "@/components/ui/card";
 import { LucideIcon } from "lucide-react";
 
 interface MetricCardProps {
-  title: string;
+  title: string | React.ReactNode;
   value: string;
   subtitle?: string;
-  icon: LucideIcon;
-  variant?: "default" | "success" | "warning";
+   icon?: React.ElementType;
+  variant?: "default" | "success" | "warning" | "danger";
 }
 
 export const MetricCard = ({ title, value, subtitle, icon: Icon, variant = "default" }: MetricCardProps) => {

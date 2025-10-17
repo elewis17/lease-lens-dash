@@ -122,6 +122,17 @@ CREATE TABLE IF NOT EXISTS public.mortgages (
   start_date DATE,
   monthly_payment NUMERIC(14,2)
 );
+
+-- ✅ Non-destructive schema updates
+ALTER TABLE public.mortgages
+  ADD COLUMN IF NOT EXISTS principal_original NUMERIC(14,2),
+  ADD COLUMN IF NOT EXISTS current_balance   NUMERIC(14,2);
+
+-- Optional: backfill principal_original from existing principal
+UPDATE public.mortgages
+SET principal_original = COALESCE(principal_original, principal)
+WHERE principal_original IS NULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='mortgages_property_id_fkey') THEN

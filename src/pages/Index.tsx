@@ -163,14 +163,26 @@ const Index = () => {
     );
     const getPropVacancy = (pid?: string) => vacancyPctByProperty.get(pid ?? "") ?? 0;
     
-    // LEASES
+    // LEASES (inner-join units so property filter works)
     let leasesQuery = supabase
       .from('leases')
-      .select(`*, tenant:tenants(*), unit:units(*)`);
+      .select(`
+        id, monthly_rent, status, start_date, end_date, deposit,
+        tenant:tenants(*),
+        unit:units!inner(id, unit_label, property_id)
+      `);
+
     if (selectedProperty) {
       leasesQuery = leasesQuery.eq('unit.property_id', selectedProperty);
     }
-    const { data: leasesData, error: leasesError } = await leasesQuery;
+
+    let { data: leasesData, error: leasesError } = await leasesQuery;
+
+    // Fallback safeguard: if selectedProperty is set, ensure client-side filter too
+    if (!leasesError && selectedProperty) {
+      leasesData = (leasesData ?? []).filter((l: any) => l?.unit?.property_id === selectedProperty);
+    }
+
     if (leasesError) console.error("Error loading leases:", leasesError);
 
     // MORTGAGES
@@ -229,16 +241,21 @@ const Index = () => {
 
 
     // Process mortgages
-    const processedMortgages = mortgagesData?.map((mtg: any) => ({
+    const processedMortgages = (mortgagesData ?? []).map((mtg:any)=>({
       id: mtg.id,
-      property_id: mtg.property_id, // ✅ NEW
+      property_id: mtg.property_id,
       loan_name: mtg.loan_name,
-      principal: parseFloat(mtg.principal.toString()),
-      interest_rate: parseFloat(mtg.interest_rate.toString()),
-      term_months: mtg.term_months,
-      start_date: new Date(mtg.start_date),
-      monthly_payment: parseFloat(mtg.monthly_payment.toString()),
-    })) || [];
+      principal_original: mtg.principal_original === null || mtg.principal_original === undefined
+        ? null : Number(mtg.principal_original),
+      current_balance: mtg.current_balance === null || mtg.current_balance === undefined
+        ? null : Number(mtg.current_balance),
+      principal: mtg.principal === null || mtg.principal === undefined
+        ? null : Number(mtg.principal), // legacy, but independent
+      interest_rate: Number(mtg.interest_rate ?? 0),
+      term_months: Number(mtg.term_months ?? 0),
+      start_date: mtg.start_date ? new Date(mtg.start_date) : null,
+      monthly_payment: Number(mtg.monthly_payment ?? 0),
+    }));
 
     setMortgages(processedMortgages);
 
@@ -295,16 +312,47 @@ const Index = () => {
     // use unique active units as the numerator
     const activeLeases = activeUnitIds.size
 
+    // ----- Value basis (selected property vs All) -----
+    const propertyValue = Number(
+      selectedProperty
+        ? (propertyData?.sale_price ?? propertyData?.purchase_price ?? 0)
+        : (properties ?? []).reduce((s, p: any) => s + Number(p?.sale_price ?? p?.purchase_price ?? 0), 0)
+    );
+
     // Calculate total OPEX (excluding mortgage - that's debt service)
     const totalMonthlyOpex = Object.values(expensesByCategory).reduce((sum, val) => sum + Number(val || 0), 0);
     const noi = (totalMRR * 12) - (totalMonthlyOpex * 12);
     const cashFlow = noi - (totalDebtService * 12);
     const purchasePrice = parseFloat((propertyData?.purchase_price || 1).toString());
-    const capRate = purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0;
+
+    // Cap Rate = Annual NOI / Property Value
+    const capRate = propertyValue > 0 ? (noi / propertyValue) * 100 : 0;
+
+    //Core coverage
     const annualDebt = totalDebtService * 12;
-    const dcr = annualDebt > 0 ? noi / annualDebt : 0;
-    //const totalUnits = propertyData?.total_units || 1;
-    //const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
+    const dcr = annualDebt > 0 ? (noi / annualDebt) : 0;
+
+    // ---- Equity and return bases ----
+    // Use original principals as a proxy for debt; if that overstates leverage, fall back to 25% equity.
+    const totalOriginalPrincipal = processedMortgages.reduce((s, m) => s + Number(m.principal || 0), 0);
+    let equityEstimate = propertyValue - totalOriginalPrincipal;
+    if (equityEstimate <= 0) equityEstimate = propertyValue * 0.25;
+
+    // ROI ~ annual cash return on property value (distinct from Cap Rate which uses NOI, no debt)
+    const roi = propertyValue > 0 ? (cashFlow / propertyValue) * 100 : 0;
+
+    // Cash-on-Cash = Annual Cash Flow / Equity Invested
+    const cashOnCash = equityEstimate > 0 ? (cashFlow / equityEstimate) * 100 : 0;
+
+    // ---- 10-year IRR (simple proxy; appreciation + cash flows) ----
+    const futureValue = propertyValue * Math.pow(1.03, 10); // 3%/yr appreciation
+    const totalCashFlows = cashFlow * 10;
+    const basis = Math.max(equityEstimate, 1);              // avoid /0
+    const irr10Year = (Math.pow((futureValue + totalCashFlows) / basis, 1 / 10) - 1) * 100;
+
+    // Guard helper
+    const safe = (n: number) => (Number.isFinite(n) ? n : 0);
+
     // ✅ Derive totalUnits safely for both single-property and "All" modes
     let totalUnits = 0;
     const uniqueUnitIds = new Set((leasesData ?? []).map((l: any) => l.unit?.id).filter(Boolean));
@@ -319,17 +367,6 @@ const Index = () => {
     }
 
     const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
-
-
-    // Calculate ROI metrics
-    const totalInvestment = purchasePrice + (processedMortgages.reduce((sum, m) => sum + m.principal, 0));
-    const roi = totalInvestment > 0 ? (noi / totalInvestment) * 100 : 0;
-    const cashOnCash = totalInvestment > 0 ? (cashFlow / totalInvestment) * 100 : 0;
-    
-    // Simple 10-year IRR approximation using compound growth
-    const futureValue = purchasePrice * Math.pow(1.03, 10); // 3% appreciation
-    const totalCashFlows = cashFlow * 10;
-    const irr10Year = totalInvestment > 0 ? (Math.pow((futureValue + totalCashFlows) / totalInvestment, 1/10) - 1) * 100 : 0;
 
     setLeases(processedLeases);
     setMetrics({
@@ -476,27 +513,27 @@ const Index = () => {
    };
 
   //MORTGAGE HANDLERS
-  const handleUpdateMortgage = async (id: string, data: any) => {
-    const { error } = await supabase
-      .from('mortgages')
-      .update({
-        property_id: data.property_id ?? selectedProperty, // ✅ NEW
-        loan_name: data.loan_name,
-        principal: data.principal,
-        interest_rate: data.interest_rate,
-        term_months: data.term_months,
-        start_date: data.start_date instanceof Date ? data.start_date.toISOString() : data.start_date,
-        monthly_payment: data.monthly_payment,
-      })
-      .eq('id', id);
+  const handleUpdateMortgage = async (id:string, data:any)=>{
+    const clean: Record<string, any> = { ...data };
+    Object.keys(clean).forEach(k => clean[k] === undefined && delete clean[k]); // drop undefined
+    // also drop null for optional fields to avoid wiping DB when user left it blank
+    ["principal_original","current_balance","principal","property_id"].forEach(k=>{
+      if (clean[k] === null) delete clean[k];
+    });
 
-    if (error) {
-      toast({ title: "Error", description: "Failed to update mortgage", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Mortgage updated successfully" });
-      loadData();
-    }
+    const { data: rows, error } = await supabase.from('mortgages').update(clean).eq('id', id).select();
+    if (error) { /* toast error */ return; }
+
+    // Optimistic merge so UI reflects server truth
+    const updated = rows?.[0];
+    setMortgages(prev => prev.map(m => m.id === id ? {
+      ...m,
+      ...updated,
+      start_date: updated?.start_date ? new Date(updated.start_date) : m.start_date,
+    } : m));
+    await loadData();
   };
+
 
   const handleDeleteMortgage = async (id: string) => {
     const { error } = await supabase.from('mortgages').delete().eq('id', id);
@@ -676,31 +713,238 @@ const Index = () => {
         {/* ---- Investment Performance ---- */}
         <section className="space-y-3">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {/* ROI with centered, mobile-friendly popover beside title */}
             <MetricCard
-              title="ROI"
+              title={
+                <div className="flex items-center gap-1.5">
+                  <span>ROI</span>
+
+                  {/* Click/tap to open; ESC or click backdrop to close */}
+                  <details className="relative">
+                    <summary
+                      className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
+                      aria-label="About ROI"
+                    >
+                      <Info className="h-4 w-4" />
+                    </summary>
+
+                    {/* Backdrop + centered sheet (prevents cutoff) */}
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
+                      {/* Backdrop */}
+                      <button
+                        aria-label="Close"
+                        className="absolute inset-0 bg-black/20"
+                        onClick={(e) => {
+                          const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                          if (d) d.open = false;
+                        }}
+                      />
+                      {/* Sheet */}
+                      <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold text-gray-900">ROI (Return on Investment)</p>
+                          <button
+                            className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
+                            aria-label="Close"
+                            onClick={(e) => {
+                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                              if (d) d.open = false;
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
+                          <li><strong>What it measures:</strong> ROI shows your total return compared to what you’ve invested. It includes income, appreciation, and costs, giving a snapshot of your overall profitability.</li>
+                          <li><strong>Why you see what you see:</strong> A lower ROI often means you’ve recently spent on upgrades, had high upfront costs, or are early in ownership. As rents rise and expenses stabilize, ROI typically improves.</li>
+                          <li><strong>When to look at it:</strong> Use ROI to evaluate your overall performance or to compare your property against other types of investments.</li>
+                          <li><strong>How to improve it:</strong> Increase income, reduce expenses, or refinance to lower financing costs.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              }
               value={`${metrics.roi.toFixed(2)}%`}
-              subtitle="Return on investment"
+              subtitle="What’s my profit % right now?"
               icon={TrendingUp}
               variant="default"
             />
+            {/* Cap Rate with centered, mobile-friendly popover beside title */}
             <MetricCard
-              title="Cap Rate"
+              title={
+                <div className="flex items-center gap-1.5">
+                  <span>Cap Rate</span>
+
+                  {/* Click/tap to open; ESC or click backdrop to close */}
+                  <details className="relative">
+                    <summary
+                      className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
+                      aria-label="About Cap Rate"
+                    >
+                      <Info className="h-4 w-4" />
+                    </summary>
+
+                    {/* Backdrop + centered sheet (prevents cutoff) */}
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
+                      {/* Backdrop */}
+                      <button
+                        aria-label="Close"
+                        className="absolute inset-0 bg-black/20"
+                        onClick={(e) => {
+                          const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                          if (d) d.open = false;
+                        }}
+                      />
+                      {/* Sheet */}
+                      <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold text-gray-900">Cap Rate (Capitalization Rate)</p>
+                          <button
+                            className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
+                            aria-label="Close"
+                            onClick={(e) => {
+                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                              if (d) d.open = false;
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
+                          <li><strong>Formula:</strong> NOI/Property Value</li>
+                          <li><strong>What it measures:</strong> Cap Rate = Net Operating Income ÷ Property Value. It measures how efficiently a property generates income relative to its value, ignoring financing or debt structure.</li>
+                          <li><strong>Why you see what you see:</strong> A higher cap rate can mean stronger income potential or higher market risk. A lower one means a more stable property or a higher-value area where prices outpace rent.</li>
+                          <li><strong>When to look at it:</strong> Check the cap rate when comparing properties or evaluating how effective your property is at producing income at its market value.</li>
+                          <li><strong>How to improve it:</strong> Increase rent, reduce operating expenses, or acquire properties below market value to raise your cap rate.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              }
               value={`${metrics.capRate.toFixed(2)}%`}
-              subtitle="NOI ÷ Property Value"
+              subtitle="If I bought this in cash, how much would it earn me per year?"
               icon={Percent}
               variant="default"
             />
+            {/* 10-Year IRR with centered, mobile-friendly popover beside title */}
             <MetricCard
-              title="10-Year IRR"
+              title={
+                <div className="flex items-center gap-1.5">
+                  <span>10-Year IRR</span>
+
+                  {/* Click/tap to open; ESC or click backdrop to close */}
+                  <details className="relative">
+                    <summary
+                      className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
+                      aria-label="About 10-Year IRR"
+                    >
+                      <Info className="h-4 w-4" />
+                    </summary>
+
+                    {/* Backdrop + centered sheet (prevents cutoff) */}
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
+                      {/* Backdrop */}
+                      <button
+                        aria-label="Close"
+                        className="absolute inset-0 bg-black/20"
+                        onClick={(e) => {
+                          const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                          if (d) d.open = false;
+                        }}
+                      />
+                      {/* Sheet */}
+                      <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold text-gray-900">10-Year IRR (Internal Rate of Return)</p>
+                          <button
+                            className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
+                            aria-label="Close"
+                            onClick={(e) => {
+                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                              if (d) d.open = false;
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
+                          <li><strong>Formula:</strong> IRR=Discount rate where NPV(10-year cash flows + sale proceeds)=0</li>
+                          <li><strong>What it measures:</strong> IRR shows your average annual return over time, factoring in both cash flow and appreciation. It accounts for when money goes in and when it comes back — through rent, loan paydown, or eventual sale.</li>
+                          <li><strong>Why you see what you see:</strong> A higher IRR usually means the property is benefiting from appreciation, equity growth, or strong long-term performance. It combines all return sources into one time-weighted rate.</li>
+                          <li><strong>When to look at it:</strong> Use IRR to evaluate long-term investment performance or compare potential returns across different properties and hold periods.</li>
+                          <li><strong>How to improve it:</strong> Add value through renovations, increase equity by paying down principal faster, or time your sale to capture peak market appreciation.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              }
               value={`${metrics.irr10Year.toFixed(2)}%`}
-              subtitle="Time-weighted return"
+              subtitle="What’s my total return if I hold and sell later?"
               icon={LineChart}
               variant="default"
             />
+            {/* Cash-on-Cash Return with centered, mobile-friendly popover beside title */}
             <MetricCard
-              title="Cash-on-Cash"
+              title={
+                <div className="flex items-center gap-1.5">
+                  <span>Cash-on-Cash Return</span>
+
+                  {/* Click/tap to open; ESC or click backdrop to close */}
+                  <details className="relative">
+                    <summary
+                      className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
+                      aria-label="About Cash-on-Cash Return"
+                    >
+                      <Info className="h-4 w-4" />
+                    </summary>
+
+                    {/* Backdrop + centered sheet (prevents cutoff) */}
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
+                      {/* Backdrop */}
+                      <button
+                        aria-label="Close"
+                        className="absolute inset-0 bg-black/20"
+                        onClick={(e) => {
+                          const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                          if (d) d.open = false;
+                        }}
+                      />
+                      {/* Sheet */}
+                      <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold text-gray-900">Cash-on-Cash Return</p>
+                          <button
+                            className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
+                            aria-label="Close"
+                            onClick={(e) => {
+                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
+                              if (d) d.open = false;
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
+                          <li><strong>Formula:</strong> Cash Return/Cash Invested</li>
+                          <li><strong>What it measures:</strong> Cash-on-cash return shows how much annual cash flow you earn compared to the cash you invested. It reflects the property’s actual cash performance after financing.</li>
+                          <li><strong>Why you see what you see:</strong> This number changes with loan terms, rent levels, and expenses. A lower return may mean high upfront costs or conservative leverage, while a higher one signals stronger cash flow efficiency.</li>
+                          <li><strong>When to look at it:</strong> Use cash-on-cash return to assess short-term income performance or compare how different properties perform when leverage is involved.</li>
+                          <li><strong>How to improve it:</strong> Increase rent, lower expenses, refinance for better loan terms, or reduce vacancy to improve annual cash flow.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              }
               value={`${metrics.cashOnCash.toFixed(2)}%`}
-              subtitle="Cash return / cash invested"
+              subtitle="How much cash am I earning on the cash I invested?"
               icon={DollarSign}
               variant="success"
             />
