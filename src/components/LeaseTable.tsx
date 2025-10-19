@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Save, X, Plus, Edit } from "lucide-react";
+import { Trash2, Save, X, Plus, Edit, Pencil } from "lucide-react";
 import { format } from "date-fns";
 
 interface LeaseData {
@@ -176,8 +176,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} className="hover:scale-105 transition-transform">
-                        <Edit className="h-3 w-3 mr-1" />
-                        <span className="text-xs">Edit</span>
+                        <Pencil className="h-3 w-3 mr-1" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} className="hover:scale-105 transition-transform">
                         <Trash2 className="h-3 w-3 text-destructive" />

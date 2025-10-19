@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info} from "lucide-react";
@@ -1083,18 +1083,64 @@ const Index = () => {
             </div>
           </div>
         </section>
-
+        
         {/* Properties Card */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold leading-snug">
             Properties <span className="text-muted-foreground text-base">({filteredProperties.length})</span>
           </h2>
-          <PropertiesTable
-            properties={filteredProperties}
-            onAdd={handleAddProperty}
-            onUpdate={handleUpdateProperty}
-            onDelete={handleDeleteProperty}
-          />
+          {/* Floating OPEX pill aligned over the Taxes column (left aligned) */}
+          {(() => {
+            const OpexOverTaxes = () => {
+              const wrapRef = useRef<HTMLDivElement | null>(null);
+              const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+              useEffect(() => {
+                const el = wrapRef.current;
+                if (!el) return;
+
+                const compute = () => {
+                  // Grab the Taxes header only (first rose-colored column)
+                  const th = el.querySelector<HTMLElement>('th.bg-rose-50\\/60, th.bg-rose-50\\/40');
+                  if (!th) return;
+
+                  const thRect = th.getBoundingClientRect();
+                  const containerRect = el.getBoundingClientRect();
+
+                  // Align left edge of the Taxes column
+                  const left = thRect.left - containerRect.left + 4; // +4 for a little padding
+                  const top = thRect.top - containerRect.top - 6;   // hover slightly above header
+
+                  setPos({ left, top });
+                };
+
+                compute();
+                window.addEventListener("resize", compute);
+                return () => window.removeEventListener("resize", compute);
+              }, [filteredProperties.length]);
+
+              return (
+                <div ref={wrapRef} className="relative">
+                  {pos && (
+                    <span
+                      className="absolute -translate-y-full z-20 inline-flex items-center rounded-t-lg bg-rose-100 text-rose-700 px-3 py-0.5 text-xs font-medium shadow-sm pointer-events-none"
+                      style={{ left: pos.left, top: pos.top }}
+                    >
+                      OPEX
+                    </span>
+                  )}
+
+                  <PropertiesTable
+                    properties={filteredProperties}
+                    onAdd={handleAddProperty}
+                    onUpdate={handleUpdateProperty}
+                    onDelete={handleDeleteProperty}
+                  />
+                </div>
+              );
+            };
+            return <OpexOverTaxes />;
+          })()}
         </div>
 
         {/* Lease Table Card */}

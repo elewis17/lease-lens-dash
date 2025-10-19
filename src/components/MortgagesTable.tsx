@@ -116,7 +116,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
               <TableHead className="font-semibold px-4 py-3">Term (months)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Start Date</TableHead>
               <TableHead className="font-semibold px-4 py-3">Monthly Payment</TableHead>
-              <TableHead className="font-semibold px-4 py-3 text-right">Actions</TableHead>
+              <TableHead className="font-semibold px-4 py-3 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

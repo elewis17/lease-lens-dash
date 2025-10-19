@@ -117,26 +117,31 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
               <TableHead className="px-4 py-2">Address</TableHead>
               <TableHead className="px-4 py-2">Type</TableHead>
               <TableHead className="px-4 py-2">Sale Price</TableHead>
-              <TableHead className="px-4 py-2">
-                Taxes
-                <span className="inline-flex items-center ml-1 text-muted-foreground" title="Defaults to 1.3% of Sale Price unless overridden">
-                  <Info className="h-3 w-3" />
-                </span>
-              </TableHead>
-              <TableHead className="bg-rose-50/40">
-                <div className="flex items-center gap-2">
-                  <span>Mgmt %</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">OPEX</span>
-                </div>
-              </TableHead>
+
+              {/* Non-OPEX: Vacancy */}
               <TableHead className="px-4 py-2">Vacancy %</TableHead>
-              <TableHead className="bg-rose-50/40">
-                <div className="flex items-center gap-2">
-                  <span>Maint %</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">OPEX</span>
+
+              {/* OPEX #1: Taxes */}
+              <TableHead className="px-4 py-2 bg-rose-50/60">
+                <div className="flex items-center">
+                  <span>Taxes</span>
+                  <span
+                    className="inline-flex items-center ml-1 text-muted-foreground"
+                    title="Defaults to 1.3% of Sale Price unless overridden"
+                  >
+                    <Info className="h-3 w-3" />
+                  </span>
                 </div>
               </TableHead>
-              <TableHead className="px-4 py-2 text-right">Actions</TableHead>
+
+              {/* OPEX #2: Mgmt % */}
+              <TableHead className="px-4 py-2 bg-rose-50/60">Mgmt %</TableHead>
+
+              {/* OPEX #3: Maint % */}
+              <TableHead className="px-4 py-2 bg-rose-50/60">Maint %</TableHead>
+
+              <TableHead className="px-4 py-2 text-center">Actions</TableHead>
+
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -182,6 +187,9 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
                       />
                     </TableCell>
                     <TableCell className="px-4 py-2">
+                      <Input type="number" value={editData.vacancy_pct ?? 5} onChange={(e)=>setEditData({ ...editData, vacancy_pct: Number(e.target.value) })} className="h-8" />
+                    </TableCell>
+                    <TableCell className="px-4 py-2">
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -199,10 +207,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
                     </TableCell>
                     <TableCell className="px-4 py-2">
                       <Input type="number" value={editData.mgmt_pct ?? 8} onChange={(e)=>setEditData({ ...editData, mgmt_pct: Number(e.target.value) })} className="h-8" />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.vacancy_pct ?? 5} onChange={(e)=>setEditData({ ...editData, vacancy_pct: Number(e.target.value) })} className="h-8" />
-                    </TableCell>
+                    </TableCell>          
                     <TableCell className="px-4 py-2">
                       <Input type="number" value={editData.maintenance_pct ?? 5} onChange={(e)=>setEditData({ ...editData, maintenance_pct: Number(e.target.value) })} className="h-8" />
                     </TableCell>
@@ -219,9 +224,9 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
                     <TableCell className="px-4 py-2">{p.address ?? "—"}</TableCell>
                     <TableCell className="px-4 py-2">{p.type ?? "—"}</TableCell>
                     <TableCell className="px-4 py-2">{fmtMoney(p.sale_price ?? undefined)}</TableCell>
-                    <TableCell className="px-4 py-2">{fmtMoney(p.property_taxes ?? (p.sale_price ? Math.round(p.sale_price * 0.013) : undefined))}</TableCell>
-                    <TableCell className="px-4 py-2">{pct(p.mgmt_pct ?? undefined)}</TableCell>
                     <TableCell className="px-4 py-2">{pct(p.vacancy_pct ?? undefined)}</TableCell>
+                    <TableCell className="px-4 py-2">{fmtMoney(p.property_taxes ?? (p.sale_price ? Math.round(p.sale_price * 0.013) : undefined))}</TableCell>
+                    <TableCell className="px-4 py-2">{pct(p.mgmt_pct ?? undefined)}</TableCell>                    
                     <TableCell className="px-4 py-2">{pct(p.maintenance_pct ?? undefined)}</TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex justify-end gap-2">
@@ -273,6 +278,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
                     className="h-8"
                   />
                 </TableCell>
+                <TableCell className="px-4 py-2"><Input type="number" value={editData.vacancy_pct ?? 5} onChange={(e)=>setEditData({ ...editData, vacancy_pct: Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2">
                   <div className="flex items-center gap-2">
                     <Input
@@ -290,7 +296,6 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete 
                   </div>
                 </TableCell>
                 <TableCell className="px-4 py-2"><Input type="number" value={editData.mgmt_pct ?? 8} onChange={(e)=>setEditData({ ...editData, mgmt_pct: Number(e.target.value) })} className="h-8" /></TableCell>
-                <TableCell className="px-4 py-2"><Input type="number" value={editData.vacancy_pct ?? 5} onChange={(e)=>setEditData({ ...editData, vacancy_pct: Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2"><Input type="number" value={editData.maintenance_pct ?? 5} onChange={(e)=>setEditData({ ...editData, maintenance_pct: Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2">
                   <div className="flex justify-end gap-2">
