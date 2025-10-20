@@ -9,7 +9,6 @@ import { OpexCalculator } from "@/domain/finance/OpexCalculator";
 import { MetricsCalculator } from "@/domain/finance/MetricsCalculator";
 import { LeaseTable } from "@/components/LeaseTable";
 import { LeaseUploader } from "@/components/LeaseUploader";
-import { ExpensesForm } from "@/components/ExpensesForm";
 import { IncomeAndSafetyChart } from "@/components/IncomeAndSafetyChart";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { MortgagesTable } from "@/components/MortgagesTable";
@@ -67,6 +66,7 @@ const Index = () => {
     hoa: 0,
     misc: 0,
   });
+  const [escrowByProperty, setEscrowByProperty] = useState<Map<string, boolean>>(new Map());
   const [metrics, setMetrics] = useState({
     expectedRent: 0,
     occupancyRate: 0,
@@ -263,11 +263,13 @@ const Index = () => {
     }));
 
     // Build a quick lookup: does this property have any escrowed mortgage?
-    const escrowByProperty = new Map<string, boolean>();
-    processedMortgages.forEach(m => {
-      if (!m.property_id) return;
-      if (m.includes_escrow) escrowByProperty.set(m.property_id, true);
-    });
+    const escrowMap = new Map<string, boolean>();
+      processedMortgages.forEach((m) => {
+        if (!m.property_id) return;
+        const current = escrowMap.get(m.property_id) ?? false;
+        escrowMap.set(m.property_id, current || !!m.includes_escrow);
+      });
+      setEscrowByProperty(escrowMap);
 
     setMortgages(processedMortgages);
 
@@ -510,41 +512,6 @@ const Index = () => {
     }
   };
 
-  const handleSaveExpenses = async (expensesData: any) => {
-    // Delete existing expenses and create new ones
-    await supabase.from('expenses').delete().eq('property_id', selectedProperty);
-
-    const expensesToInsert = [];
-    if (expensesData.taxes > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'tax', amount: expensesData.taxes, date: new Date().toISOString() });
-    }
-    if (expensesData.insurance > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'insurance', amount: expensesData.insurance, date: new Date().toISOString() });
-    }
-    if (expensesData.maintenance > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'repairs', amount: expensesData.maintenance, date: new Date().toISOString() });
-    }
-    if (expensesData.management > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'management', amount: expensesData.management, date: new Date().toISOString() });
-    }
-    if (expensesData.utilities > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'utilities', amount: expensesData.utilities, date: new Date().toISOString() });
-    }
-    if (expensesData.hoa > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'hoa', amount: expensesData.hoa, date: new Date().toISOString() });
-    }
-    if (expensesData.misc > 0) {
-      expensesToInsert.push({ property_id: selectedProperty, category: 'other', amount: expensesData.misc, date: new Date().toISOString() });
-    }
-
-    if (expensesToInsert.length > 0) {
-      await supabase.from('expenses').insert(expensesToInsert);
-    }
-
-    toast({ title: "Success", description: "Expenses saved successfully" });
-    loadData();
-   };
-
   //MORTGAGE HANDLERS
   const handleUpdateMortgage = async (id:string, data:any)=>{
     const clean: Record<string, any> = { ...data };
@@ -733,7 +700,11 @@ const Index = () => {
           <div className="flex items-center gap-4">
             {properties.length > 0 && (
               <PropertyFilter
-                properties={propertyFilterList}
+                properties={properties.map(p => ({
+                  id: p.id,
+                  address: p.address ?? "",
+                  alias: p.alias,   // ✅ required by PropertyFilterProps
+                }))}
                 selectedProperty={selectedProperty}
                 onPropertyChange={setSelectedProperty}
               />
@@ -1168,6 +1139,7 @@ const Index = () => {
                     onAdd={handleAddProperty}
                     onUpdate={handleUpdateProperty}
                     onDelete={handleDeleteProperty}
+                    escrowByProperty={Object.fromEntries(escrowByProperty ?? new Map())}
                   />
                 </div>
               );
@@ -1210,19 +1182,6 @@ const Index = () => {
             onDelete={handleDeleteMortgage}
             onAdd={handleAddMortgage}
             propertyOptions={propertyOptions}
-          />
-        </div>
-
-        {/* Expenses Card */}
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold leading-snug">Operating Expenses (OPEX)</h2>
-          <p className="text-xs text-muted-foreground">
-            Enter all operating expenses excluding mortgage principal & interest (debt service tracked separately)
-          </p>
-          <ExpensesForm
-            propertyId={selectedProperty}
-            initialData={expenses}
-            onSave={handleSaveExpenses}
           />
         </div>
 

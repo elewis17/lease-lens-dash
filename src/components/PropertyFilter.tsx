@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 interface PropertyFilterProps {
-  properties: Array<{ id: string; address: string }>;
+  properties: Array<{ id: string; address: string ; alias: string }>;
   selectedProperty: string;
   onPropertyChange: (propertyId: string) => void;
 }
@@ -16,7 +16,7 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
   const [open, setOpen] = useState(false);
   
   const currentProperty = properties.find(p => p.id === selectedProperty);
-  const buttonLabel = selectedProperty === "" ? "All properties" : (currentProperty?.address || "Select property...");
+  const buttonLabel = selectedProperty === "" ? "All Properties" : (currentProperty?.alias ?? "Select property...");
 
   return (
     <div className="flex items-center gap-2">
@@ -42,7 +42,7 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
             {/* All properties option */}
             <CommandItem
               key="__all"
-              value="All properties"
+              value="All Properties"
               onSelect={() => {
                 onPropertyChange(""); // "" = All
                 setOpen(false);
@@ -54,14 +54,14 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
                   selectedProperty === "" ? "opacity-100" : "opacity-0"
                 )}
               />
-              All properties
+              All Properties
             </CommandItem>
 
             {/* Individual properties */}
             {properties.map((property) => (
               <CommandItem
                 key={property.id}
-                value={property.address}
+                value={property.alias}
                 onSelect={() => {
                   onPropertyChange(property.id);
                   setOpen(false);
@@ -73,7 +73,7 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
                     selectedProperty === property.id ? "opacity-100" : "opacity-0"
                   )}
                 />
-                {property.address}
+                {property.alias}
               </CommandItem>
             ))}
           </CommandGroup>

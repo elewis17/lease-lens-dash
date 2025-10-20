@@ -18,6 +18,7 @@ interface Mortgage {
   term_months: number;
   start_date: Date;
   monthly_payment: number;
+  includes_escrow?: boolean;  // NEW
 }
 
 interface MortgagesTableProps {
@@ -76,6 +77,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
         term_months:    intOrNull(editData.term_months),
         start_date:     toApiDate(editData.start_date),   // ✅ handles Date or string
         monthly_payment: numOrNull(editData.monthly_payment),
+        includes_escrow: !!editData.includes_escrow,  
       };
 
       // drop undefined keys
@@ -97,6 +99,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
       term_months: parseInt(editData.term_months) || 360,
       start_date: new Date(editData.start_date || new Date()),
       monthly_payment: parseFloat(editData.monthly_payment) || 0,
+      includes_escrow: !!editData.includes_escrow,
     } as Omit<Mortgage, "id">);
     setIsAdding(false);
     setEditData({});
@@ -187,6 +190,17 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                         onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                         className="h-8"
                       />
+                    </TableCell>
+                    {/* NEW: Escrow checkbox (edit mode) */}
+                    <TableCell className="px-4 py-3">
+                      <label className="inline-flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={!!editData.includes_escrow}
+                          onChange={(e) => setEditData({ ...editData, includes_escrow: e.target.checked })}
+                        />
+                        In mortgage
+                      </label>
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <Input
@@ -314,6 +328,17 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                     className="h-8"
                   />
+                </TableCell>
+                {/* NEW: Escrow toggle (add mode) */}
+                <TableCell className="px-4 py-3">
+                  <label className="inline-flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={!!editData.includes_escrow}
+                      onChange={(e) => setEditData({ ...editData, includes_escrow: e.target.checked })}
+                    />
+                    In mortgage
+                  </label>
                 </TableCell>
                 <TableCell className="px-4 py-3">
                   <Input
