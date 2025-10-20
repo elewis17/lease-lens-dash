@@ -115,6 +115,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
               <TableHead className="font-semibold px-4 py-3">Rate (%)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Term (months)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Start Date</TableHead>
+              <TableHead className="px-4 py-2">Escrow (T&amp;I)</TableHead> {/* NEW */}
               <TableHead className="font-semibold px-4 py-3">Monthly Payment</TableHead>
               <TableHead className="font-semibold px-4 py-3 text-center">Actions</TableHead>
             </TableRow>
@@ -216,6 +217,16 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">{mortgage.interest_rate}%</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.term_months}</TableCell>
                     <TableCell className="px-4 py-3">{new Date(mortgage.start_date).toLocaleDateString()}</TableCell>
+                    <TableCell className="px-4 py-3">
+                      <label className="inline-flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={!!mortgage.includes_escrow}
+                          onChange={(e) => onUpdate(mortgage.id, { includes_escrow: e.target.checked })}
+                        />
+                        In mortgage
+                      </label>
+                    </TableCell>
                     <TableCell className="px-4 py-3">${mortgage.monthly_payment.toLocaleString()}</TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="flex gap-2 justify-end">

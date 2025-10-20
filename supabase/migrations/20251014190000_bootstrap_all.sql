@@ -123,6 +123,9 @@ CREATE TABLE IF NOT EXISTS public.mortgages (
   monthly_payment NUMERIC(14,2)
 );
 
+ALTER TABLE public.mortgages
+  ADD COLUMN IF NOT EXISTS includes_escrow boolean DEFAULT false;
+  
 -- ✅ Non-destructive schema updates
 ALTER TABLE public.mortgages
   ADD COLUMN IF NOT EXISTS principal_original NUMERIC(14,2),

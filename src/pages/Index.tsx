@@ -5,6 +5,8 @@ import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, I
 import { MetricCard } from "@/components/MetricCard";
 import { PropertyFilter } from "@/components/PropertyFilter";
 import PropertiesTable, { type Property } from "@/components/PropertiesTable";
+import { OpexCalculator } from "@/domain/finance/OpexCalculator";
+import { MetricsCalculator } from "@/domain/finance/MetricsCalculator";
 import { LeaseTable } from "@/components/LeaseTable";
 import { LeaseUploader } from "@/components/LeaseUploader";
 import { ExpensesForm } from "@/components/ExpensesForm";
@@ -236,6 +238,8 @@ const Index = () => {
       else expensesByCategory.misc += amount;
     });
 
+    const rentByProperty = new Map<string, number>(); // adjusted (vacancy) monthly rent per property
+
     setExpenses(expensesByCategory);
     setCurrentProperty(propertyData);
 
@@ -255,7 +259,15 @@ const Index = () => {
       term_months: Number(mtg.term_months ?? 0),
       start_date: mtg.start_date ? new Date(mtg.start_date) : null,
       monthly_payment: Number(mtg.monthly_payment ?? 0),
+      includes_escrow: Boolean(mtg.includes_escrow ?? false),   // NEW
     }));
+
+    // Build a quick lookup: does this property have any escrowed mortgage?
+    const escrowByProperty = new Map<string, boolean>();
+    processedMortgages.forEach(m => {
+      if (!m.property_id) return;
+      if (m.includes_escrow) escrowByProperty.set(m.property_id, true);
+    });
 
     setMortgages(processedMortgages);
 
@@ -275,6 +287,9 @@ const Index = () => {
       const pid = lease?.unit?.property_id as string | undefined;
       const propVacancyPct = getPropVacancy(pid);
       const adjustedRent = monthlyRent * (1 - propVacancyPct / 100);
+      // AFTER: track adjusted rent per property
+      if (pid) rentByProperty.set(pid, (rentByProperty.get(pid) ?? 0) + adjustedRent);
+
       totalMRR += adjustedRent;
       totalExpected += monthlyRent;
 
@@ -319,36 +334,54 @@ const Index = () => {
         : (properties ?? []).reduce((s, p: any) => s + Number(p?.sale_price ?? p?.purchase_price ?? 0), 0)
     );
 
-    // Calculate total OPEX (excluding mortgage - that's debt service)
-    const totalMonthlyOpex = Object.values(expensesByCategory).reduce((sum, val) => sum + Number(val || 0), 0);
-    const noi = (totalMRR * 12) - (totalMonthlyOpex * 12);
-    const cashFlow = noi - (totalDebtService * 12);
-    const purchasePrice = parseFloat((propertyData?.purchase_price || 1).toString());
-
-    // Cap Rate = Annual NOI / Property Value
-    const capRate = propertyValue > 0 ? (noi / propertyValue) * 100 : 0;
-
-    //Core coverage
+    // --- OPEX & Metrics via domain calculators ---
     const annualDebt = totalDebtService * 12;
-    const dcr = annualDebt > 0 ? (noi / annualDebt) : 0;
 
-    // ---- Equity and return bases ----
-    // Use original principals as a proxy for debt; if that overstates leverage, fall back to 25% equity.
+    // (A) Compute OPEX/NOI in single vs portfolio mode
+    let noiAnnual = 0;
+
+    if (selectedProperty && propertyData) {
+      const pid = selectedProperty;
+      const rentThisProperty = rentByProperty.get(pid) ?? 0;
+
+      const escrow = escrowByProperty.get(selectedProperty) ?? false;
+
+      const opexMonthly = OpexCalculator.monthlyForProperty(propertyData, {
+        monthlyRent: rentThisProperty,
+        mortgageIncludesEscrow: escrow,
+      });
+      noiAnnual = MetricsCalculator.noiAnnual(rentThisProperty, propertyData, {
+        monthlyRent: rentThisProperty,
+        mortgageIncludesEscrow: escrow,
+      });
+
+    } else {
+      // "All properties" – sum per-property NOI
+      noiAnnual = (properties ?? []).reduce((sum, p) => {
+        const rent = rentByProperty.get(p.id) ?? 0;
+        const escrow = escrowByProperty.get(p.id) ?? false;
+        return sum + MetricsCalculator.noiAnnual(rent, p, {
+          monthlyRent: rent,
+          mortgageIncludesEscrow: escrow,
+        });
+      }, 0);
+    }
+
+    // Cash flow (annual) = NOI - debt service
+    const cashFlowAnnual = noiAnnual - annualDebt;
+
+    // Estimate equity (same approach you had)
     const totalOriginalPrincipal = processedMortgages.reduce((s, m) => s + Number(m.principal || 0), 0);
     let equityEstimate = propertyValue - totalOriginalPrincipal;
     if (equityEstimate <= 0) equityEstimate = propertyValue * 0.25;
 
-    // ROI ~ annual cash return on property value (distinct from Cap Rate which uses NOI, no debt)
-    const roi = propertyValue > 0 ? (cashFlow / propertyValue) * 100 : 0;
+    // KPIs via MetricsCalculator
+    const capRate     = MetricsCalculator.capRate(noiAnnual, propertyValue);
+    const dcr         = MetricsCalculator.dcr(noiAnnual, annualDebt);
+    const roi         = MetricsCalculator.roiAnnual(cashFlowAnnual, propertyValue);
+    const cashOnCash  = MetricsCalculator.cashOnCash(cashFlowAnnual, equityEstimate);
+    const irr10Year   = MetricsCalculator.irr10Year(propertyValue, cashFlowAnnual, equityEstimate);
 
-    // Cash-on-Cash = Annual Cash Flow / Equity Invested
-    const cashOnCash = equityEstimate > 0 ? (cashFlow / equityEstimate) * 100 : 0;
-
-    // ---- 10-year IRR (simple proxy; appreciation + cash flows) ----
-    const futureValue = propertyValue * Math.pow(1.03, 10); // 3%/yr appreciation
-    const totalCashFlows = cashFlow * 10;
-    const basis = Math.max(equityEstimate, 1);              // avoid /0
-    const irr10Year = (Math.pow((futureValue + totalCashFlows) / basis, 1 / 10) - 1) * 100;
 
     // Guard helper
     const safe = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -376,8 +409,8 @@ const Index = () => {
       totalUnits,
       arr: totalMRR * 12,
       mrr: totalMRR,
-      noi: noi / 12,
-      cashFlow: cashFlow / 12,
+      noi: noiAnnual / 12,
+      cashFlow: cashFlowAnnual / 12,
       capRate,
       dcr,
       roi,
