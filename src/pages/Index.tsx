@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info} from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
+import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
 import { PropertyFilter } from "@/components/PropertyFilter";
 import PropertiesTable, { type Property } from "@/components/PropertiesTable";
 import { OpexCalculator } from "@/domain/finance/OpexCalculator";
@@ -82,6 +83,7 @@ const Index = () => {
     cashOnCash: 0,
     irr10Year: 0,
   });
+  const [opexMonthly, setOpexMonthly] = useState(0);
   const [currentProperty, setCurrentProperty] = useState<any>(null);
   const { toast } = useToast();
   const propertyOptions = (properties ?? []).map(p => ({ id: p.id, name: p.alias || "Property" }));
@@ -341,23 +343,34 @@ const Index = () => {
 
     // (A) Compute OPEX/NOI in single vs portfolio mode
     let noiAnnual = 0;
+    let opexMonthlyCalc = 0;
 
     if (selectedProperty && propertyData) {
       const pid = selectedProperty;
       const rentThisProperty = rentByProperty.get(pid) ?? 0;
-
       const escrow = escrowByProperty.get(selectedProperty) ?? false;
 
-      const opexMonthly = OpexCalculator.monthlyForProperty(propertyData, {
+      opexMonthlyCalc = OpexCalculator.monthlyForProperty(propertyData, {
         monthlyRent: rentThisProperty,
         mortgageIncludesEscrow: escrow,
       });
+
       noiAnnual = MetricsCalculator.noiAnnual(rentThisProperty, propertyData, {
         monthlyRent: rentThisProperty,
         mortgageIncludesEscrow: escrow,
       });
 
     } else {
+      // "All properties" – sum per-property OPEX and NOI
+      opexMonthlyCalc = (properties ?? []).reduce((sum, p) => {
+        const rent = rentByProperty.get(p.id) ?? 0;
+        const escrow = escrowByProperty.get(p.id) ?? false;
+        return sum + OpexCalculator.monthlyForProperty(p, {
+          monthlyRent: rent,
+          mortgageIncludesEscrow: escrow,
+        });
+      }, 0);
+
       // "All properties" – sum per-property NOI
       noiAnnual = (properties ?? []).reduce((sum, p) => {
         const rent = rentByProperty.get(p.id) ?? 0;
@@ -402,7 +415,7 @@ const Index = () => {
     }
 
     const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
-
+    setOpexMonthly(opexMonthlyCalc);
     setLeases(processedLeases);
     setMetrics({
       expectedRent: totalExpected,
@@ -960,130 +973,56 @@ const Index = () => {
           <div className="rounded-2xl bg-gradient-to-br from-white to-gray-50 p-8 shadow-sm border border-gray-100">
             <div className="mb-6 flex items-center gap-2">
               <h2 className="text-lg font-semibold text-gray-900">Property Financials Summary</h2>
-
-              {/* Standard info icon + tooltip */}
-              <div className="relative group">
-                <button
-                  type="button"
-                  aria-label="About Property Financials"
-                  className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:text-gray-700"
-                >
-                  <Info className="h-5 w-5" />
-                </button>
-                <div
-                  className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition
-                            absolute z-10 mt-2 w-[30rem] max-w-[90vw] rounded-xl border border-gray-200
-                            bg-white p-4 text-[13px] shadow-lg"
-                >
-                  <p className="mb-2 font-medium text-gray-900">What these mean (and why they matter)</p>
-                  <ul className="list-disc pl-5 space-y-1 text-gray-600">
-                    <li><strong>Contracted Monthly Rent</strong> — total rent due from current leases; your top-line rental revenue.</li>
-                    <li><strong>Total Monthly Expense</strong> — all operating costs; tracking this keeps spending in check.</li>
-                    <li><strong>Net Operating Income (NOI)</strong> — revenue minus operating expenses (no debt); core profitability metric.</li>
-                    <li><strong>Monthly Cash Flow</strong> — money left after all expenses & debt; positive flow builds reserves.</li>
-                    <li><strong>Occupancy Rate</strong> — % of units leased; steadier income at higher occupancy.</li>
-                    <li><strong>DCR</strong> — debt coverage ratio (NOI ÷ debt payments); <em>healthy is typically ≥ 1.25</em>.</li>
-                  </ul>
-                  <div className="mt-3 pt-3 border-t text-gray-500">
-                    <p className="mb-1 font-medium text-gray-900">Samples (Investment Performance terms):</p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li><strong>ROI</strong> — Return on Investment: profitability vs. total investment.</li>
-                      <li><strong>Cap Rate</strong> — net income ÷ property value.</li>
-                      <li><strong>10-Year IRR</strong> — Internal Rate of Return over ten years.</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* P&L order: 3×2 grid (no mini cards) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-8">
               {/* 1) Contracted Monthly Rent */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                  <DollarSign className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">Contracted Monthly Rent</p>
-                  <div className="text-2xl font-semibold leading-tight">
-                    ${metrics.expectedRent.toLocaleString()}
-                  </div>
-                </div>
-              </div>
+              <MetricCardWithInfo
+                icon={DollarSign}
+                title="Contracted Monthly Rent"
+                value={`$${metrics.expectedRent.toLocaleString()}`}
+                tooltip="Total rent due from current leases; your top-line rental revenue."
+              />
 
-              {/* 2) Total Monthly Expense */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50">
-                  <Calculator className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">Operating Expenses (OPEX)</p>
-                  <div className="text-2xl font-semibold leading-tight">
-                    ${totalMonthlyExpense.toLocaleString()}
-                  </div>
-                    <p className="text-xs text-muted-foreground">*excludes debt</p>
-                </div>
-              </div>
+              {/* 2) Operating Expenses (OPEX) */}
+              <MetricCardWithInfo
+                icon={Calculator}
+                title="Operating Expenses (OPEX)"
+                value={`$${opexMonthly.toLocaleString()}`}
+                tooltip="All monthly operating costs excluding debt; uses property-level rules (taxes, insurance, mgmt %, maintenance %, escrow)."
+              />
 
               {/* 3) Net Operating Income (NOI) */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
-                  <Wallet className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">Net Operating Income (NOI)</p>
-                  <div className="text-2xl font-semibold leading-tight">
-                    ${metrics.noi.toLocaleString()}
-                  </div>
-                </div>
-              </div>
+              <MetricCardWithInfo
+                icon={Wallet}
+                title="Net Operating Income (NOI)"
+                value={`$${metrics.noi.toLocaleString()}`}
+                tooltip="NOI = Rent − Operating Expenses; excludes debt service."
+              />
 
               {/* 4) Monthly Cash Flow */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
-                  <LineChart className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">Monthly Cash Flow</p>
-                  <div className="text-2xl font-semibold leading-tight">
-                    ${metrics.cashFlow.toLocaleString()}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                  </p>
-                </div>
-              </div>
+              <MetricCardWithInfo
+                icon={LineChart}
+                title="Monthly Cash Flow"
+                value={`$${metrics.cashFlow.toLocaleString()}`}
+                tooltip="Cash Flow = NOI − Debt Service; positive means surplus after paying mortgages."
+              />
 
               {/* 5) Occupancy Rate */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50">
-                  <Home className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">Occupancy Rate</p>
-                  <div className="text-2xl font-semibold leading-tight">
-                    {metrics.occupancyRate.toFixed(1)}%
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {metrics.activeLeases} of {metrics.totalUnits} units filled
-                  </p>
-                </div>
-              </div>
-
+              <MetricCardWithInfo
+                icon={Home}
+                title="Occupancy Rate"
+                value={`${metrics.occupancyRate.toFixed(1)}%`}
+                tooltip={`${metrics.activeLeases} of ${metrics.totalUnits} units filled.`}
+              />
               {/* 6) DCR */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50">
-                  <Calculator className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-muted-foreground">Debt Coverage Ratio (DCR)</p>
-                  <div className="text-2xl font-semibold leading-tight">
-                    {metrics.dcr.toFixed(2)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {metrics.dcr >= 1.25 ? "Healthy coverage" : "Low coverage"}
-                  </p>
-                </div>
-              </div>
+              <MetricCardWithInfo
+                icon={Calculator}
+                title="Debt Coverage Ratio (DCR)"
+                value={metrics.dcr.toFixed(2)}
+                tooltip="NOI ÷ Annual Debt Service; ≥ 1.25 is typically considered safe."
+              />
             </div>
           </div>
         </section>
@@ -1210,7 +1149,7 @@ const Index = () => {
             currentRent={metrics.mrr}
             rentGrowthRate={getScenarioRates().rentGrowth}
             noi={metrics.noi}
-            opex={Object.values(expenses).reduce((sum, val) => sum + val, 0)}
+            opex={opexMonthly}
             opexInflationRate={getScenarioRates().opexInflation}
             debtService={mortgages.reduce((sum, m) => sum + m.monthly_payment, 0)}
           />
