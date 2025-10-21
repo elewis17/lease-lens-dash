@@ -1186,15 +1186,24 @@ const Index = () => {
         </div>
 
         {/* Income & Safety Chart */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold leading-snug">Cash Flow & Risk (10 Years)</h2>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-                {scenario.charAt(0).toUpperCase() + scenario.slice(1)} scenario: Rent at {getScenarioRates().rentGrowth.toFixed(1)}% growth vs. OPEX at {getScenarioRates().opexInflation.toFixed(1)}% inflation
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            {/* Left side: Title + Scenario description */}
+            <div className="flex flex-col">
+              <h2 className="text-base sm:text-lg font-semibold text-foreground leading-tight">
+                Cash Flow & Risk <span className="text-muted-foreground font-normal">(10 Years)</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-snug sm:whitespace-normal whitespace-pre-wrap">
+                {scenario.charAt(0).toUpperCase() + scenario.slice(1)} scenario: Rent at{" "}
+                {getScenarioRates().rentGrowth.toFixed(1)}% growth vs. OPEX at{" "}
+                {getScenarioRates().opexInflation.toFixed(1)}% inflation
               </p>
             </div>
-            <ScenarioToggle scenario={scenario} onScenarioChange={setScenario} />
+
+            {/* Right side: Scenario Toggle */}
+            <div className="mt-2 sm:mt-0">
+              <ScenarioToggle scenario={scenario} onScenarioChange={setScenario} />
+            </div>
           </div>
 
           <IncomeAndSafetyChart

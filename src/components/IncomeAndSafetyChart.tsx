@@ -1,4 +1,14 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  ReferenceLine,
+} from "recharts";
 import { Card } from "@/components/ui/card";
 
 interface IncomeAndSafetyChartProps {
@@ -10,92 +20,50 @@ interface IncomeAndSafetyChartProps {
   debtService: number;
 }
 
-export const IncomeAndSafetyChart = ({ 
-  currentRent, 
-  rentGrowthRate, 
+export const IncomeAndSafetyChart = ({
+  currentRent,
+  rentGrowthRate,
   noi,
   opex,
   opexInflationRate,
-  debtService 
+  debtService,
 }: IncomeAndSafetyChartProps) => {
-  const generateProjections = () => {
-    const data = [];
-    const inflationRate = 2.5; // Standard inflation rate
-    
-    for (let year = 1; year <= 10; year++) {
-      const projectedRent = (currentRent * 12) * Math.pow(1 + rentGrowthRate / 100, year - 1);
-      const projectedOpex = (opex * 12) * Math.pow(1 + opexInflationRate / 100, year - 1);
-      const projectedNOI = projectedRent - projectedOpex;
-      const annualDebtService = debtService * 12;
-      const cashFlowAfterDebt = projectedNOI - annualDebtService;
-      const breakEvenRent = projectedOpex + annualDebtService;
-      const inflationBenchmark = (currentRent * 12) * Math.pow(1 + inflationRate / 100, year - 1);
-      
-      data.push({
-        year,
-        rent: Math.round(projectedRent),
-        opex: Math.round(projectedOpex),
-        noi: Math.round(projectedNOI),
-        debtService: Math.round(annualDebtService),
-        cashFlow: Math.round(cashFlowAfterDebt),
-        breakEven: Math.round(breakEvenRent),
-        inflation: Math.round(inflationBenchmark),
-      });
-    }
-    
-    return data;
-  };
+  // Build 10-year projection dataset
+  const data = Array.from({ length: 10 }, (_, i) => {
+    const year = i + 1;
 
-  const data = generateProjections();
-  
-  const lastYear = data[data.length - 1];
-  const marginAboveBreakEven = ((lastYear.cashFlow - lastYear.breakEven) / lastYear.breakEven) * 100;
-  
-  let safetyGuidance = "";
-  if (marginAboveBreakEven >= 30) {
-    safetyGuidance = "✓ Safe to refinance (≥30% margin above break-even)";
-  } else if (marginAboveBreakEven >= 20) {
-    safetyGuidance = "✓ Safe to distribute profits (20-30% margin)";
-  } else if (marginAboveBreakEven >= 15) {
-    safetyGuidance = "⚠ Moderate risk (15-20% margin)";
-  } else {
-    safetyGuidance = "⚠ Retain cash; high risk (<15% margin)";
-  }
+    const revenue = currentRent * 12 * Math.pow(1 + rentGrowthRate / 100, i);
+    const opexTotal = opex * 12 * Math.pow(1 + opexInflationRate / 100, i);
+    const totalExpenses = opexTotal + debtService * 12;
+    const freeCashFlow = revenue - totalExpenses;
+    const marginPct = (freeCashFlow / totalExpenses) * 100;
 
-  const getRiskZoneColor = (cashFlow: number, breakEven: number) => {
-    const margin = ((cashFlow - breakEven) / breakEven) * 100;
-    if (margin < 0) return "rgba(220, 38, 38, 0.1)"; // red
-    if (margin < 15) return "rgba(250, 204, 21, 0.1)"; // yellow
-    return "rgba(34, 197, 94, 0.1)"; // green
-  };
+    return { year, revenue, totalExpenses, freeCashFlow, marginPct };
+  });
+
+  // Interpret safety guidance from last-year margin
+  const lastMargin = data[data.length - 1].marginPct;
+  let guidance = "⚠ Retain cash; high risk (<15% margin)";
+  if (lastMargin >= 30) guidance = "✓ Safe to refinance (≥30% margin)";
+  else if (lastMargin >= 20) guidance = "✓ Safe to distribute profits (20–30% margin)";
+  else if (lastMargin >= 15) guidance = "⚠ Moderate risk (15–20% margin)";
 
   return (
-    <Card className="p-6 rounded-xl shadow-sm border-border">
-      <div className="mb-4">
-        <p className="text-sm font-medium text-muted-foreground">{safetyGuidance}</p>
-      </div>
-      <div className="h-[400px] sm:h-[500px]">
+    <Card className="p-5 rounded-xl shadow-sm border-border">
+      <div className="h-[300px] sm:h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-            <defs>
-              <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={getRiskZoneColor(lastYear.cashFlow, lastYear.breakEven)} stopOpacity={0.8}/>
-                <stop offset="100%" stopColor={getRiskZoneColor(lastYear.cashFlow, lastYear.breakEven)} stopOpacity={0.1}/>
-              </linearGradient>
-            </defs>
+          <LineChart data={data} margin={{ top: 10, right: 25, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-            <XAxis 
-              dataKey="year" 
-              stroke="hsl(var(--muted-foreground))"
+
+            <XAxis
+              dataKey="year"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              label={{ value: "Years", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))" }}
             />
-            <YAxis 
-              stroke="hsl(var(--muted-foreground))"
+            <YAxis
+              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-              label={{ value: "Annual Dollars", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))" }}
             />
+
             <Tooltip
               contentStyle={{
                 backgroundColor: "hsl(var(--card))",
@@ -105,50 +73,56 @@ export const IncomeAndSafetyChart = ({
                 fontSize: "14px",
                 padding: "8px 12px",
               }}
-              formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+              formatter={(v, name) => [
+                `$${v.toLocaleString()}`,
+                name === "revenue"
+                  ? "Revenue"
+                  : name === "totalExpenses"
+                  ? "Total Expenses"
+                  : "Free Cash Flow",
+              ]}
               labelFormatter={(label) => `Year ${label}`}
             />
-            <Legend 
-              wrapperStyle={{ fontSize: "12px" }}
-              iconType="line"
-            />
+
+            <Legend verticalAlign="top" height={36} iconType="circle" />
+
+            {/* Break-even baseline */}
+            <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" />
+
+            {/* Revenue (Rent) */}
             <Line
               type="monotone"
-              dataKey="rent"
-              name="Earning Power"
-              stroke="hsl(221, 83%, 53%)"
+              dataKey="revenue"
+              stroke="#3b82f6"
               strokeWidth={2}
               dot={false}
+              name="Revenue"
             />
+
+            {/* Total Expenses */}
             <Line
               type="monotone"
-              dataKey="opex"
-              name="Operating Expenses"
-              stroke="hsl(0, 65%, 45%)"
+              dataKey="totalExpenses"
+              stroke="#ef4444"
               strokeWidth={2}
               dot={false}
+              name="Total Expenses"
             />
+
+            {/* Free Cash Flow */}
             <Line
               type="monotone"
-              dataKey="debtService"
-              name="Debt Service"
-              stroke="hsl(221, 83%, 53%)"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              dot={false}
-              opacity={0.6}
-            />
-            <Line
-              type="monotone"
-              dataKey="cashFlow"
-              name="Free Cash Flow"
-              stroke="hsl(142, 76%, 36%)"
+              dataKey="freeCashFlow"
+              stroke="#16a34a"
               strokeWidth={3}
               dot={false}
+              name="Free Cash Flow"
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      <p className="text-xs text-center text-muted-foreground mt-3">{guidance}</p>
     </Card>
   );
 };
