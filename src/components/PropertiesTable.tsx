@@ -122,7 +122,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
               <TableHead className="px-4 py-2">Property</TableHead>
               <TableHead className="px-4 py-2">Address</TableHead>
               <TableHead className="px-4 py-2">Type</TableHead>
-              <TableHead className="px-4 py-2">Sale Price</TableHead>
+              <TableHead className="px-4 py-2">Purchase Price</TableHead>
 
               {/* Non-OPEX: Vacancy */}
               <TableHead className="px-4 py-2">Vacancy %</TableHead>
@@ -133,7 +133,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                   <span>Taxes</span>
                   <span
                     className="inline-flex items-center ml-1 text-muted-foreground"
-                    title="Defaults to 1.3% of Sale Price unless overridden"
+                    title="Defaults to 1.3% of Purchase Price unless overridden"
                   >
                     <Info className="h-3 w-3" />
                   </span>
@@ -352,7 +352,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                 <TableCell className="px-4 py-2">
                   <Input
                     type="number"
-                    placeholder="Sale price"
+                    placeholder="Purchase price"
                     value={editData.sale_price ?? ""}
                     onChange={(e) => {
                       const v = e.target.value ? Number(e.target.value) : undefined;

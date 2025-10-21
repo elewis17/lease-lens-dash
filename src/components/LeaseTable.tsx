@@ -82,7 +82,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold text-sm sticky left-0 bg-muted/50 backdrop-blur-sm">Tenant</TableHead>
               <TableHead className="font-semibold text-sm">Property</TableHead> {/* ✅ NEW */}
-              <TableHead className="font-semibold text-sm">Unit</TableHead>
+
               <TableHead className="font-semibold text-sm">Monthly Rent</TableHead>
               <TableHead className="font-semibold text-sm">Lease Start</TableHead>
               <TableHead className="font-semibold text-sm">Lease End</TableHead>
@@ -114,13 +114,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                       ))}
                     </select>
                   </TableCell>
-                  <TableCell>
-                    <Input
-                      value={editData.unit || ""}
-                      onChange={(e) => setEditData({ ...editData, unit: e.target.value })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
+
                   <TableCell>
                     <Input
                       type="number"
@@ -168,7 +162,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 <>
                   <TableCell className="font-medium text-sm sticky left-0 bg-card backdrop-blur-sm">{lease.tenant}</TableCell>
                   <TableCell className="text-sm">{propertyOptions.find(p => p.id === lease.property_id)?.name ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{lease.unit}</TableCell>
+                  
                   <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{format(lease.startDate, "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{format(lease.leaseEnd, "MMM d, yyyy")}</TableCell>

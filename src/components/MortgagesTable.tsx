@@ -112,7 +112,6 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
           <TableHeader>
             <TableRow className="bg-muted/50 border-b border-border">
               <TableHead className="px-4 py-3">Property</TableHead> {/* NEW */}
-              <TableHead className="font-semibold px-4 py-3">Loan Name</TableHead>
               <TableHead className="font-semibold px-4 py-3">Original Principal</TableHead> 
               <TableHead className="font-semibold px-4 py-3">Current Balance</TableHead>   
               <TableHead className="font-semibold px-4 py-3">Rate (%)</TableHead>
@@ -140,9 +139,6 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <Input value={editData.loan_name} onChange={(e) => setEditData({ ...editData, loan_name: e.target.value })}className="h-8"/>
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <Input
@@ -270,14 +266,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     ))}
                   </select>
                 </TableCell>
-                <TableCell className="px-4 py-3">
-                  <Input
-                    placeholder="Loan name"
-                    value={editData.loan_name || ""}
-                    onChange={(e) => setEditData({ ...editData, loan_name: e.target.value })}
-                    className="h-8"
-                  />
-                </TableCell>
+
                 <TableCell className="px-4 py-3">
                   <Input
                     type="number"

@@ -771,7 +771,7 @@ const Index = () => {
                 </div>
               }
               value={`${metrics.roi.toFixed(2)}%`}
-              subtitle="What’s my profit % right now?"
+              subtitle="short-term snapshot"
               icon={TrendingUp}
               variant="default"
             />
@@ -830,7 +830,7 @@ const Index = () => {
                 </div>
               }
               value={`${metrics.capRate.toFixed(2)}%`}
-              subtitle="If I bought this in cash, how much would it earn me per year?"
+              subtitle="property efficiency"
               icon={Percent}
               variant="default"
             />
@@ -889,7 +889,7 @@ const Index = () => {
                 </div>
               }
               value={`${metrics.irr10Year.toFixed(2)}%`}
-              subtitle="What’s my total return if I hold and sell later?"
+              subtitle="full long-term wealth picture"
               icon={LineChart}
               variant="default"
             />
@@ -948,7 +948,7 @@ const Index = () => {
                 </div>
               }
               value={`${metrics.cashOnCash.toFixed(2)}%`}
-              subtitle="How much cash am I earning on the cash I invested?"
+              subtitle="current cash flow health"
               icon={DollarSign}
               variant="success"
             />
