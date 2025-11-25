@@ -7,10 +7,14 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   base: mode === "gh" ? "/lease-lens-dash/" : "/",
   server: {
-    host: "::",
-    port: 8080,
+    host: "0.0.0.0",
+    port: 8000,
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+
+  plugins: [
+    react(),
+  ],
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

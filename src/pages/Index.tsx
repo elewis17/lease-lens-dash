@@ -5,7 +5,7 @@ import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, I
 import { MetricCard } from "@/components/MetricCard";
 import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
 import { PropertyFilter } from "@/components/PropertyFilter";
-import PropertiesTable, { type Property } from "@/components/PropertiesTable";
+import PropertiesTable, { type Property } from "@/components/PropertiesTable";window.location.pathname.replace("/lease-lens-dash", "") || "/"
 import { OpexCalculator } from "@/domain/finance/OpexCalculator";
 import { MetricsCalculator } from "@/domain/finance/MetricsCalculator";
 import { LeaseTable } from "@/components/LeaseTable";
@@ -705,26 +705,28 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
       <header className="sticky top-0 z-50 border-b border-border backdrop-blur-sm bg-background/80">
-        <div className="container mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold leading-snug">Landlord Snapshot</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">Instant insights, zero tabs.</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {properties.length > 0 && (
-              <PropertyFilter
-                properties={properties.map(p => ({
-                  id: p.id,
-                  address: p.address ?? "",
-                  alias: p.alias,   // ✅ required by PropertyFilterProps
-                }))}
-                selectedProperty={selectedProperty}
-                onPropertyChange={setSelectedProperty}
-              />
-            )}
-          </div>
+      <div className="container mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+
+        {/* Left side — now empty but preserves structure */}
+        <div className="flex-1" />
+
+        {/* Right side — Property selector left-aligned relative to container */}
+        <div className="flex items-center gap-4">
+          {properties.length > 0 && (
+            <PropertyFilter
+              properties={properties.map(p => ({
+                id: p.id,
+                address: p.address ?? "",
+                alias: p.alias,
+              }))}
+              selectedProperty={selectedProperty}
+              onPropertyChange={setSelectedProperty}
+            />
+          )}
         </div>
-      </header>
+
+      </div>
+    </header>
 
       <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
         {/* ---- Investment Performance ---- */}
@@ -970,9 +972,11 @@ const Index = () => {
 
         {/* ---- Property Financials ---- */}
         <section className="mt-10">
-          <div className="rounded-2xl bg-gradient-to-br from-white to-gray-50 p-8 shadow-sm border border-gray-100">
+          <div className="rounded-2xl bg-card p-8 shadow-sm border border-border transition-colors">
             <div className="mb-6 flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">Property Financials Summary</h2>
+              <h2 className="text-lg font-semibold text-card-foreground">
+                Property Financials Summary
+              </h2>
             </div>
 
             {/* P&L order: 3×2 grid (no mini cards) */}

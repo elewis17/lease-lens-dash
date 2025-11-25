@@ -1,13 +1,13 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "std/http/server.ts";
 
 // Only allow your app to call this function.
 // Add your local dev URL and production domain(s) here.
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "https://<your-prod-domain>",      // e.g. https://lease-lens.app
-  "https://<your-gh-pages-domain>",  // e.g. https://USERNAME.github.io/REPO
+  "https://elewis17.github.io",      // e.g. https://elewis17.github.io
+  "https://elewis17.github.io/lease-lens-dash",  // e.g. "https://elewis17.github.io/lease-lens-dash"
 ]);
 
 function makeCors(origin: string | null) {
@@ -36,12 +36,6 @@ serve(async (req) => {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  }
-
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
   }
 
   try {
