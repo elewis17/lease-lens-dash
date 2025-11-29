@@ -18,6 +18,7 @@ import { ROISummaryCard } from "@/components/ROISummaryCard";
 import { ScenarioToggle, Scenario } from "@/components/ScenarioToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 type ExpensesBreakdown = {
   taxes: number;
@@ -52,6 +53,10 @@ type PropertyRowLegacy = {
   };
 
 const Index = () => {
+  const { user } = useAuth();
+  const DEMO_USER_ID = "b9551384-9050-42c3-b750-b43c676dcf9d";
+  const effectiveUserId: string = (user?.id as string) ?? DEMO_USER_ID;
+  const [unitOptions, setUnitOptions] = useState<any[]>([]);
   const [showUploader, setShowUploader] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>(""); // property_id
@@ -93,8 +98,8 @@ const Index = () => {
   const filteredMortgages = selectedProperty ? mortgages.filter(m => m.property_id === selectedProperty) : mortgages;
   const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (Number(val) ?? 0), 0); // ---- Derived totals for Property Financials ----
   const getScenarioRates = () => {   // Get scenario-adjusted growth rates
-    const baseRent = currentProperty?.rent_growth_rate || 3;
-    const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
+  const baseRent = currentProperty?.rent_growth_rate || 3;
+  const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
     
     switch (scenario) {
       case "conservative":
@@ -115,9 +120,9 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedProperty !== undefined) 
-      loadData(); // runs for "" (All) and for specific property ids
-    }, [selectedProperty]);
+    if (properties.length === 0) return;  // nothing to load yet
+    loadData();
+  }, [selectedProperty, properties]);
 
   // sets default only once on mount
   useEffect(() => {
@@ -127,7 +132,9 @@ const Index = () => {
   const loadProperties = async () => {
     const { data, error } = await supabase
       .from("properties")
-      .select("*"); //.select("id, alias, address, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct");
+      .select("*")
+      .eq("user_id", effectiveUserId);
+      
     if (error) {
       console.error("Error loading properties:", error);
       setProperties([]);
@@ -144,7 +151,7 @@ const Index = () => {
       alias: p.alias ?? p.name ?? p.address ?? "Property",
       address: p.address ?? null,
       type: p.type ?? null,
-      sale_price: p.sale_price ?? p.purchase_price ?? null,
+      sale_price: p.purchase_price ?? p.sale_price ?? null,
       property_taxes: p.property_taxes ?? null,
       mgmt_pct: p.mgmt_pct ?? null,
       vacancy_pct: p.vacancy_pct ?? null,
@@ -167,35 +174,93 @@ const Index = () => {
     );
     const getPropVacancy = (pid?: string) => vacancyPctByProperty.get(pid ?? "") ?? 0;
     
-    // LEASES (inner-join units so property filter works)
-    let leasesQuery = supabase
-      .from('leases')
+    // LEASES (directly by property_id, no units)
+    let leasesQuery: any = supabase
+      .from("leases")
       .select(`
         id, monthly_rent, status, start_date, end_date, deposit,
         tenant:tenants(*),
-        unit:units!inner(id, unit_label, property_id)
+        property_id, 
+        unit_id
       `);
 
+    let unitsQuery = supabase
+      .from("units")
+      .select("id, unit_label, property_id");
+
     if (selectedProperty) {
-      leasesQuery = leasesQuery.eq('unit.property_id', selectedProperty);
+      unitsQuery = unitsQuery.eq("property_id", selectedProperty);
     }
 
-    let { data: leasesData, error: leasesError } = await leasesQuery;
+    const { data: unitsData, error: unitsError } = await unitsQuery;
+    if (unitsError) console.error("Error loading units:", unitsError);
 
-    // Fallback safeguard: if selectedProperty is set, ensure client-side filter too
-    if (!leasesError && selectedProperty) {
-      leasesData = (leasesData ?? []).filter((l: any) => l?.unit?.property_id === selectedProperty);
+    // Build quick lookup map
+    const unitLabelById = new Map<string, string>();
+
+    if (unitsError) {
+      console.error("Error loading units:", unitsError);
+    } else if (unitsData) {
+      setUnitOptions(unitsData);
+
+      unitsData.forEach((u) => {
+        unitLabelById.set(u.id, u.unit_label); // we'll update 'label' once you confirm correct column
+      });
     }
 
-    if (leasesError) console.error("Error loading leases:", leasesError);
+      
+    if (selectedProperty) {
+      // Single property selected
+      leasesQuery = leasesQuery.eq("property_id", selectedProperty as string);
+    } else {
+      // All properties for this user/demo
+      const propertyIds = properties.map((p) => p.id);
+
+      if (propertyIds.length > 0) {
+        leasesQuery = leasesQuery.in("property_id", propertyIds);
+      } else {
+        // No properties → no leases to load
+        leasesQuery = null;
+      }
+    }
+
+    // run query only if we actually built one
+    let leasesData: any[] | null = [];
+    let leasesError: any = null;
+
+    if (leasesQuery) {
+      const { data, error } = await leasesQuery;
+      leasesData = data ?? [];
+      leasesError = error;
+      if (leasesError) console.error("Error loading leases:", leasesError);
+    }
 
     // MORTGAGES
-    let mortgagesQuery = supabase.from('mortgages').select('*');
+    let mortgagesQuery: any = supabase.from('mortgages').select('*');
+
     if (selectedProperty) {
       mortgagesQuery = mortgagesQuery.eq('property_id', selectedProperty);
+    } else {
+      // all properties for this user/demo
+      const propertyIds = properties.map((p) => p.id);
+
+      if (propertyIds.length > 0) {
+        mortgagesQuery = mortgagesQuery.in("property_id", propertyIds);
+      } else {
+        // No properties → no mortgages to load
+        mortgagesQuery = null;
+      }
     }
-    const { data: mortgagesData, error: mortgagesError } = await mortgagesQuery;
-    if (mortgagesError) console.error("Error loading mortgages:", mortgagesError);
+
+    let mortgagesData: any[] | null = [];
+    let mortgagesError: any = null;
+
+    if (mortgagesQuery) {
+      const { data, error } = await mortgagesQuery;
+      mortgagesData = data ?? [];
+      mortgagesError = error;
+      if (mortgagesError) console.error("Error loading mortgages:", mortgagesError);
+    }
 
     // EXPENSES + CURRENT PROPERTY (single-property mode only)
     let expensesData: any[] | null = null;
@@ -283,12 +348,11 @@ const Index = () => {
     let totalExpected = 0;
 
     // ✅ use a set to count unique active unit IDs
-    const activeUnitIds = new Set<string>();
     const now = new Date();
 
     const processedLeases = (leasesData ?? []).map((lease: any) => {
       const monthlyRent = Number(lease?.monthly_rent ?? 0);
-      const pid = lease?.unit?.property_id as string | undefined;
+      const pid = lease?.property_id as string | undefined;
       const propVacancyPct = getPropVacancy(pid);
       const adjustedRent = monthlyRent * (1 - propVacancyPct / 100);
       // AFTER: track adjusted rent per property
@@ -306,30 +370,42 @@ const Index = () => {
       const isActiveByDates  = !!(start && end && start <= now && now <= end);
       const isActive = isActiveByStatus || isActiveByDates;
 
-      // ----- property filter + unique unit counting -----
-      const unitId = lease?.unit?.id as string | undefined;
-      const unitPropertyId = lease?.unit?.property_id as string | undefined;
-      const matchesSelection = selectedProperty ? unitPropertyId === selectedProperty : true;
-
-      if (isActive && unitId && matchesSelection) {
-        activeUnitIds.add(unitId); // ✅ one per unit
-      }
+      // ----- property filter -----
+      const matchesSelection = selectedProperty ? pid === selectedProperty : true;
 
       return {
         id: lease.id,
-        property_id: unitPropertyId ?? "Unknown",
+        property_id: pid ?? "Unknown",
         tenant: lease.tenant?.name || "Unknown",
-        unit: lease.unit?.unit_label || "Unknown",
         monthlyRent,
         //vacancyRate: vacancyRatePct, --- to be removed
         deposit: Number(lease?.deposit ?? 0),
         startDate: start ?? new Date(),
         leaseEnd: end ?? new Date(),
+
+        status: lease.status ?? null,
+  
+        // NEW
+        unit_id: lease.unit_id ?? null,
+        unit_label: lease.unit_id ? unitLabelById.get(lease.unit_id) ?? "—" : "—",
       };
     });
 
+        // ACTIVE LEASES = leases with valid active date window OR active status
+    const activeLeaseCount = (leasesData ?? []).filter((l: any) => {
+      const status = String(l.status ?? "").toLowerCase();
+      const start = l.start_date ? new Date(l.start_date) : null;
+      const end = l.end_date ? new Date(l.end_date) : null;
+      const now = new Date();
+
+      const isActiveStatus = status === "active" || status === "expiring";
+      const isActiveDates  = !!(start && end && start <= now && now <= end);
+
+      return isActiveStatus || isActiveDates;
+    }).length;
+
     // use unique active units as the numerator
-    const activeLeases = activeUnitIds.size
+    const activeLeases = activeLeaseCount;
 
     // ----- Value basis (selected property vs All) -----
     const propertyValue = Number(
@@ -401,26 +477,20 @@ const Index = () => {
     // Guard helper
     const safe = (n: number) => (Number.isFinite(n) ? n : 0);
 
-    // ✅ Derive totalUnits safely for both single-property and "All" modes
-    let totalUnits = 0;
-    const uniqueUnitIds = new Set((leasesData ?? []).map((l: any) => l.unit?.id).filter(Boolean));
+    // TOTAL UNITS = number of properties
+    let totalUnits = selectedProperty ? 1 : properties.length;
 
-    // If a single property is selected, prefer DB total_units; fall back to unique unit IDs
-    if (selectedProperty) {
-      totalUnits = Number(propertyData?.total_units ?? 0);
-      if (!totalUnits) totalUnits = uniqueUnitIds.size;
-    } else {
-      // "All" mode: use the number of unique units seen in leases as the capacity proxy
-      totalUnits = uniqueUnitIds.size;
-    }
+    // OCCUPANCY RATE = active leases / total units
+    const occupancyRate = totalUnits > 0 
+      ? (activeLeaseCount  / totalUnits) * 100 
+      : 0;
 
-    const occupancyRate = totalUnits > 0 ? (activeLeases / totalUnits) * 100 : 0;
     setOpexMonthly(opexMonthlyCalc);
     setLeases(processedLeases);
     setMetrics({
       expectedRent: totalExpected,
       occupancyRate,
-      activeLeases,
+      activeLeases: activeLeaseCount,
       totalUnits,
       arr: totalMRR * 12,
       mrr: totalMRR,
@@ -430,42 +500,80 @@ const Index = () => {
       dcr,
       roi,
       cashOnCash,
-      irr10Year,
+      irr10Year,  
     });
   };
 
-// LEASE HANDLERS
-  const handleUpdateLease = async (id: string, data: Partial<any>) => {
-    if (data.property_id) {
-      const { data: leaseRow } = await supabase
-        .from('leases')
-        .select('unit_id')
-        .eq('id', id)
-        .single();
-      if (leaseRow?.unit_id) {
-        await supabase
-          .from('units')
-          .update({ property_id: data.property_id })
-          .eq('id', leaseRow.unit_id);
-      }
-    }
-    const { error } = await supabase
-      .from('leases')
-      .update({
-        monthly_rent: data.monthlyRent,
-        //vacancy_rate: data.vacancyRate, --- to be removed
-        deposit: data.deposit,
-        start_date: data.startDate instanceof Date ? data.startDate.toISOString() : data.startDate,
-        end_date: data.leaseEnd instanceof Date ? data.leaseEnd.toISOString() : data.leaseEnd,
-      })
-      .eq('id', id);
+  //LEASE HANDLERS
+  const handleUpdateLease = async (leaseId: string, data: any) => {
+    // 1. Load existing lease so we can update tenant/unit
+    const { data: lease, error: fetchErr } = await supabase
+      .from("leases")
+      .select("tenant_id, unit_id")
+      .eq("id", leaseId)
+      .single();
 
-    if (error) {
-      toast({ title: "Error", description: "Failed to update lease", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Lease updated successfully" });
-      loadData();
+    if (fetchErr || !lease) {
+      toast({ title: "Error", description: "Lease not found", variant: "destructive" });
+      return;
     }
+
+    const { tenant_id, unit_id } = lease;
+
+    // 2. Update tenant name
+    if (data.tenant) {
+      await supabase
+        .from("tenants")
+        .update({ name: data.tenant })
+        .eq("id", tenant_id);
+    }
+
+    // 3. Update unit label
+    if (data.unit_label) {
+      await supabase
+        .from("units")
+        .update({ unit_label: data.unit_label })
+        .eq("id", unit_id);
+    }
+
+    // 4. Update lease fields
+    const leasePayload: any = {};
+
+    if (data.monthlyRent !== undefined) leasePayload.monthly_rent = data.monthlyRent;
+    if (data.deposit !== undefined) leasePayload.deposit = data.deposit;
+
+    if (data.startDate) {
+      leasePayload.start_date =
+        data.startDate instanceof Date
+          ? data.startDate.toISOString()
+          : data.startDate;
+    }
+
+    if (data.leaseEnd) {
+      leasePayload.end_date =
+        data.leaseEnd instanceof Date
+          ? data.leaseEnd.toISOString()
+          : data.leaseEnd;
+    }
+
+    if (data.status) leasePayload.status = data.status;
+
+    // Optional: if UI lets you change property/unit
+    if (data.unit_id) leasePayload.unit_id = data.unit_id;
+    if (data.property_id) leasePayload.property_id = data.property_id;
+
+    const { error: leaseError } = await supabase
+      .from("leases")
+      .update(leasePayload)
+      .eq("id", leaseId);
+
+    if (leaseError) {
+      toast({ title: "Error", description: "Failed to update lease", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Success", description: "Lease updated successfully" });
+    loadData();
   };
 
   const handleDeleteLease = async (id: string) => {
@@ -480,49 +588,133 @@ const Index = () => {
   };
 
   const handleAddLease = async (data: any) => {
-    // First, get or create tenant
-    const { data: tenantData, error: tenantError } = await supabase
-      .from('tenants')
-      .insert({ name: data.tenant })
-      .select()
-      .single();
-
-    if (tenantError) {
-      toast({ title: "Error", description: "Failed to create tenant", variant: "destructive" });
-      return;
-    }
-
-    // Get or create unit
+    // 1) Resolve target property
     const targetPropertyId = data.property_id ?? selectedProperty;
-    const { data: unitData, error: unitError } = await supabase
-      .from('units')
-      .insert({ unit_label: data.unit, property_id: targetPropertyId})
-      .select()
-      .single();
-
-    if (unitError) {
-      toast({ title: "Error", description: "Failed to create unit", variant: "destructive" });
+    if (!targetPropertyId) {
+      toast({
+        title: "Select a property",
+        description: "Pick a property before adding a lease.",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Create lease
-    const { error: leaseError } = await supabase.from('leases').insert({
-      tenant_id: tenantData.id,
-      unit_id: unitData.id,
-      monthly_rent: data.monthlyRent,
-      //vacancy_rate: data.vacancyRate ?? 5, --- to be removed
-      deposit: data.deposit,
-      start_date: data.startDate.toISOString(),
-      end_date: data.leaseEnd.toISOString(),
-      status: 'active',
-    });
+    // -------------------------------
+    // 2) TENANT: find or create by name
+    // -------------------------------
+    const tenantName = (data.tenant ?? "").trim();
+    let tenantId: string | null = null;
+
+    if (tenantName) {
+      // Try to reuse an existing tenant with the same name
+      const { data: existingTenant, error: tenantLookupError } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("name", tenantName)
+        .maybeSingle();
+
+      if (tenantLookupError && tenantLookupError.code !== "PGRST116") {
+        console.error("Error looking up tenant:", tenantLookupError);
+      }
+
+      if (existingTenant) {
+        tenantId = existingTenant.id;
+      } else {
+        // Create a new tenant row
+        const { data: insertedTenant, error: tenantInsertError } = await supabase
+          .from("tenants")
+          .insert({ name: tenantName })
+          .select("id")
+          .single();
+
+        if (tenantInsertError || !insertedTenant) {
+          console.error("Error creating tenant:", tenantInsertError);
+          toast({
+            title: "Error",
+            description: "Failed to create tenant",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        tenantId = insertedTenant.id;
+      }
+    }
+
+    // -------------------------------
+    // 3) UNIT: find or create by (property_id + unit_label)
+    // -------------------------------
+    const unitLabel = (data.unit_label ?? "").trim();
+    let unitId: string | null = null;
+
+    if (unitLabel) {
+      // Try to reuse an existing unit with same label on this property
+      const { data: existingUnit, error: unitLookupError } = await supabase
+        .from("units")
+        .select("id")
+        .eq("property_id", targetPropertyId)
+        .eq("unit_label", unitLabel)
+        .maybeSingle();
+
+      if (unitLookupError && unitLookupError.code !== "PGRST116") {
+        console.error("Error looking up unit:", unitLookupError);
+      }
+
+      if (existingUnit) {
+        unitId = existingUnit.id;
+      } else {
+        // Create new unit row
+        const { data: insertedUnit, error: unitInsertError } = await supabase
+          .from("units")
+          .insert({
+            property_id: targetPropertyId,
+            unit_label: unitLabel,
+          })
+          .select("id")
+          .single();
+
+        if (unitInsertError || !insertedUnit) {
+          console.error("Error creating unit:", unitInsertError);
+          toast({
+            title: "Error",
+            description: "Failed to create unit",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        unitId = insertedUnit.id;
+      }
+    }
+
+    // -------------------------------
+    // 4) LEASE: write the foreign keys into leases
+    // -------------------------------
+    const payload = {
+      tenant_id: tenantId,
+      property_id: targetPropertyId,
+      unit_id: unitId,
+      monthly_rent: Number(data.monthlyRent ?? 0),
+      deposit: Number(data.deposit ?? 0),
+      start_date: data.startDate?.toISOString?.() ?? data.startDate,
+      end_date: data.leaseEnd?.toISOString?.() ?? data.leaseEnd,
+      status: data.status ?? "active",
+    };
+
+    const { error: leaseError } = await supabase.from("leases").insert(payload);
 
     if (leaseError) {
-      toast({ title: "Error", description: "Failed to create lease", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Lease added successfully" });
-      loadData();
+      console.error("Error creating lease:", leaseError);
+      toast({
+        title: "Error",
+        description: "Failed to create lease",
+        variant: "destructive",
+      });
+      return;
     }
+
+    toast({ title: "Success", description: "Lease added successfully" });
+    await loadData();
   };
 
   //MORTGAGE HANDLERS
@@ -546,7 +738,6 @@ const Index = () => {
     } : m));
     await loadData();
   };
-
 
   const handleDeleteMortgage = async (id: string) => {
     const { error } = await supabase.from('mortgages').delete().eq('id', id);
@@ -593,7 +784,10 @@ const Index = () => {
 
     const { data: inserted, error } = await supabase
       .from("properties")
-      .insert(payload)
+      .insert({
+        ...payload, 
+        user_id: effectiveUserId
+      })
       .select()
       .single();
 
@@ -618,7 +812,7 @@ const Index = () => {
     // - Only include fields that are not undefined (avoid sending unknown keys)
     const payload: any = {};
     if (patch.address !== undefined) payload.address = patch.address ?? null;
-    if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price ?? null;
+    if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price;
 
     // If your migration with the new columns is applied, these will also succeed (harmless if ignored by types)
     if (patch.alias !== undefined) payload.alias = patch.alias ?? null;
@@ -629,7 +823,6 @@ const Index = () => {
     if (patch.maintenance_pct !== undefined) payload.maintenance_pct = patch.maintenance_pct ?? null;
 
     const prev = properties;
-    setProperties(list => list.map(p => (p.id === id ? { ...p, ...patch } : p)));
 
     const { data: updated, error } = await supabase
       .from("properties")
@@ -652,14 +845,13 @@ const Index = () => {
         p.id === id
           ? {
               ...p,
-              alias: p.alias ?? updated.alias ?? (updated as any).name ?? p.address ?? "Property",
-              address: updated.address ?? null,
-              sale_price: p.sale_price ?? updated.purchase_price ?? null,
-              // leave the rest as-is unless your DB returned them (depends on migration)
-              property_taxes: p.property_taxes ?? null,
-              mgmt_pct: p.mgmt_pct ?? null,
-              vacancy_pct: p.vacancy_pct ?? null,
-              maintenance_pct: p.maintenance_pct ?? null,
+              alias: updated.alias ?? p.alias ?? updated.address ?? "Property",
+              address: updated.address ?? p.address ?? null,
+              sale_price: Number(updated.purchase_price ?? updated.sale_price ?? 0),
+              property_taxes: Number(updated.property_taxes ?? p.property_taxes ?? 0),
+              mgmt_pct: Number(updated.mgmt_pct ?? p.mgmt_pct ?? 0),
+              vacancy_pct: Number(updated.vacancy_pct ?? p.vacancy_pct ?? 0),
+              maintenance_pct: Number(updated.maintenance_pct ?? p.maintenance_pct ?? 0),
             }
           : p
       )
@@ -667,17 +859,51 @@ const Index = () => {
 
     toast({ title: "Property updated" });
   };
+
   const handleDeleteProperty = async (id: string) => {
-    const prev = properties;
+    const prev = [...properties];
+
+    // Optimistic UI update
     setProperties(list => list.filter(p => p.id !== id));
 
-    const { error } = await supabase.from("properties").delete().eq("id", id);
+    // Ask Supabase to return deleted rows so we can see if anything matched
+    const { data, error } = await supabase
+      .from("properties")
+      .delete()
+      .eq("id", id)
+      .select("id");
+
     if (error) {
-      setProperties(prev); // rollback
-      toast({ title: "Error", description: "Failed to delete property", variant: "destructive" });
-    } else if (selectedProperty === id) {
-      setSelectedProperty(""); // clear filter if you deleted the selected one
+      console.error("Failed to delete property:", error);
+      setProperties(prev);
+
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+
+      return;
     }
+
+    // RLS or missing policy → 0 rows deleted, no error
+    if (!data || data.length === 0) {
+      console.warn("Delete matched 0 rows. RLS is probably blocking deletes.");
+      setProperties(prev);
+
+      toast({
+        title: "Delete blocked",
+        description: "No rows were deleted – check RLS policies on the properties table.",
+        variant: "destructive",
+      });
+
+      return;
+    }
+
+    toast({
+      title: "Deleted",
+      description: "Property removed successfully.",
+    });
   };
 
   // Helper to format a property label from the selected/current property
@@ -1096,22 +1322,16 @@ const Index = () => {
           <h2 className="text-xl font-semibold leading-snug">
             Active Leases <span className="text-muted-foreground text-base">({filteredLeases.length})</span>
           </h2>
-          {filteredLeases.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4 shadow-sm animate-fade-in">
-              <div className="text-muted-foreground">
-                <p className="font-medium text-base mb-2">No leases yet</p>
-                <p className="text-sm leading-relaxed">Add your first lease to start tracking rent and occupancy</p>
-              </div>
-            </div>
-          ) : (
-            <LeaseTable
+          <LeaseTable
               leases={filteredLeases}
               onUpdate={handleUpdateLease}
               onDelete={handleDeleteLease}
               onAdd={handleAddLease}
-              propertyOptions={propertyOptions}
+              propertyOptions={properties.map((p: any) => ({id: p.id, 
+                   name: p.alias || p.address || "Untitled Property"
+                                                            }))}
+              unitOptions={unitOptions}
             />
-          )}
         </div>
 
         {/* Mortgages Card */}

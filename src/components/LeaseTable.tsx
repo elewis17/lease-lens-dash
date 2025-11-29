@@ -8,12 +8,14 @@ import { format } from "date-fns";
 interface LeaseData {
   id: string;
   tenant: string;
-  unit: string;
   monthlyRent: number;
   deposit: number;
   startDate: Date;
   leaseEnd: Date;
-  property_id?: string; // ✅ NEW
+  property_id?: string;
+  // NEW FIELDS
+  status?: string;        // from leases table
+  unit_label?: string | null; // from units table (joined in Index.tsx)
 }
 
 type PropertyOption = { id: string; name: string }; // NEW
@@ -23,7 +25,7 @@ interface LeaseTableProps {
   onUpdate: (id: string, data: Partial<LeaseData>) => void;
   onDelete: (id: string) => void;
   onAdd: (data: Omit<LeaseData, "id">) => void;
-  propertyOptions: PropertyOption[]; // NEW
+  propertyOptions: PropertyOption[]; 
 }
 
 export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}: LeaseTableProps) => {
@@ -32,12 +34,11 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
   const [isAdding, setIsAdding] = useState(false);
   const [newLease, setNewLease] = useState<Omit<LeaseData, "id">>({
     tenant: "",
-    unit: "",
     monthlyRent: 0,
     deposit: 0,
     startDate: new Date(),
     leaseEnd: new Date(),
-    property_id: undefined, // ✅ NEW
+    property_id: undefined,
   });
 
   const handleEdit = (lease: LeaseData) => {
@@ -59,19 +60,22 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
   };
 
   const handleAddNew = () => {
-    if (newLease.tenant && newLease.unit) {
-      onAdd(newLease);
-      setNewLease({
-        tenant: "",
-        unit: "",
-        monthlyRent: 0,
-        deposit: 0,
-        startDate: new Date(),
-        leaseEnd: new Date(),
-        property_id: undefined,
-      });
-      setIsAdding(false);
-    }
+    if (!newLease.tenant.trim()) return;          // tenant required
+    if (!newLease.property_id) return;    
+
+    onAdd(newLease);
+    
+    setNewLease({
+      tenant: "",
+      monthlyRent: 0,
+      deposit: 0,
+      startDate: new Date(),
+      leaseEnd: new Date(),
+      property_id: undefined,
+    });
+  
+    setIsAdding(false);
+  
   };
 
   return (
@@ -82,7 +86,8 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold text-sm sticky left-0 bg-muted/50 backdrop-blur-sm">Tenant</TableHead>
               <TableHead className="font-semibold text-sm">Property</TableHead> {/* ✅ NEW */}
-
+              <TableHead className="font-semibold text-sm">Unit</TableHead>
+              <TableHead className="font-semibold text-sm">Status</TableHead>
               <TableHead className="font-semibold text-sm">Monthly Rent</TableHead>
               <TableHead className="font-semibold text-sm">Lease Start</TableHead>
               <TableHead className="font-semibold text-sm">Lease End</TableHead>
@@ -114,7 +119,30 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                       ))}
                     </select>
                   </TableCell>
-
+                  {/* Unit */}
+                  <TableCell>
+                    <Input
+                      placeholder="Unit"
+                      value={editData.unit_label || ""}
+                      onChange={(e) =>
+                        setEditData({ ...editData, unit_label: e.target.value })
+                      }
+                      className="h-8 text-sm"
+                    />
+                  </TableCell>
+                  {/* Status */}
+                  <TableCell>
+                    <select
+                      className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
+                      value={editData.status ?? "active"}
+                      onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                    >
+                      <option value="active">Active</option>
+                      <option value="expiring">Expiring</option>
+                      <option value="vacant">Vacant</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </TableCell>
                   <TableCell>
                     <Input
                       type="number"
@@ -162,7 +190,8 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 <>
                   <TableCell className="font-medium text-sm sticky left-0 bg-card backdrop-blur-sm">{lease.tenant}</TableCell>
                   <TableCell className="text-sm">{propertyOptions.find(p => p.id === lease.property_id)?.name ?? "—"}</TableCell>
-                  
+                  <TableCell className="text-sm">{lease.unit_label ?? "—"}</TableCell>
+                  <TableCell className="text-sm capitalize">{lease.status ?? "—"}</TableCell>
                   <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{format(lease.startDate, "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{format(lease.leaseEnd, "MMM d, yyyy")}</TableCell>
@@ -202,13 +231,32 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   ))}
                 </select>
               </TableCell>
+               {/* Unit */}
               <TableCell>
                 <Input
                   placeholder="Unit"
-                  value={newLease.unit}
-                  onChange={(e) => setNewLease({ ...newLease, unit: e.target.value })}
+                  value={newLease.unit_label || ""}
+                  onChange={(e) =>
+                    setNewLease({ ...newLease, unit_label: e.target.value })
+                  }
                   className="h-8 text-sm"
                 />
+              </TableCell>
+
+              {/* Status */}
+              <TableCell>
+                <select
+                  className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
+                  value={newLease.status ?? "active"}
+                  onChange={(e) =>
+                    setNewLease({ ...newLease, status: e.target.value })
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="expiring">Expiring</option>
+                  <option value="vacant">Vacant</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </TableCell>
               <TableCell>
                 <Input
