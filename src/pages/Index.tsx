@@ -472,18 +472,10 @@ const Index = () => {
     const roi         = MetricsCalculator.roiAnnual(cashFlowAnnual, propertyValue);
     const cashOnCash  = MetricsCalculator.cashOnCash(cashFlowAnnual, equityEstimate);
     const irr10Year   = MetricsCalculator.irr10Year(propertyValue, cashFlowAnnual, equityEstimate);
-
+    const { totalUnits, activeUnits, occupancyRate } = MetricsCalculator.occupancyRate(leasesData, unitsData, selectedProperty, properties.map(p=>p.id));
 
     // Guard helper
     const safe = (n: number) => (Number.isFinite(n) ? n : 0);
-
-    // TOTAL UNITS = number of properties
-    let totalUnits = selectedProperty ? 1 : properties.length;
-
-    // OCCUPANCY RATE = active leases / total units
-    const occupancyRate = totalUnits > 0 
-      ? (activeLeaseCount  / totalUnits) * 100 
-      : 0;
 
     setOpexMonthly(opexMonthlyCalc);
     setLeases(processedLeases);
@@ -712,6 +704,10 @@ const Index = () => {
       });
       return;
     }
+
+    await supabase.rpc("update_property_unit_count", {
+      target_property: targetPropertyId,
+    });
 
     toast({ title: "Success", description: "Lease added successfully" });
     await loadData();

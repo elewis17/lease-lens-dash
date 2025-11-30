@@ -384,7 +384,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_property_unit_count: {
+        Args: { target_property: string };
+        Returns: number;
+      };
+
     }
     Enums: {
       expense_category:

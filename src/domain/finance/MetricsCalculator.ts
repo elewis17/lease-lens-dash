@@ -55,4 +55,40 @@ export class MetricsCalculator {
     const coc = this.cashOnCash(noi, params.investedEquity ?? 0);
     return { noi, cap, dcr, roi, coc };
   }
+
+  static occupancyRate(leases, units, selectedProperty, allowedPropertyIds) {
+    // filter units
+    const filteredUnits = selectedProperty
+      ? units.filter(u => u.property_id === selectedProperty)
+      : units.filter(u => allowedPropertyIds.includes(u.property_id));
+
+    const totalUnits = filteredUnits.length || 1;
+
+    // active leased units
+    const activeUnits = new Set();
+
+    const now = new Date();
+
+    leases.forEach(l => {
+      if (!allowedPropertyIds.includes(l.property_id)) return;
+
+      const start = l.start_date ? new Date(l.start_date) : null;
+      const end   = l.end_date ? new Date(l.end_date) : null;
+
+      const status = String(l.status ?? "").toLowerCase();
+      const isActive = 
+        status === "active" ||
+        (start && end && start <= now && now <= end);
+
+      if (isActive) activeUnits.add(l.unit_id);
+    });
+
+    const activeCount = activeUnits.size;
+
+    return {
+      totalUnits,
+      activeUnits: activeCount,
+      occupancyRate: (activeCount / totalUnits) * 100,
+    };
+  }
 }
