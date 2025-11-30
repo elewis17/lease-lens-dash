@@ -425,10 +425,12 @@ const Index = () => {
       const pid = selectedProperty;
       const rentThisProperty = rentByProperty.get(pid) ?? 0;
       const escrow = escrowByProperty.get(selectedProperty) ?? false;
+      const mtgRow = processedMortgages.find(m => m.property_id === pid) ?? null;
 
       opexMonthlyCalc = OpexCalculator.monthlyForProperty(propertyData, {
         monthlyRent: rentThisProperty,
         mortgageIncludesEscrow: escrow,
+         mortgageRow: mtgRow,
       });
 
       noiAnnual = MetricsCalculator.noiAnnual(rentThisProperty, propertyData, {
@@ -441,9 +443,12 @@ const Index = () => {
       opexMonthlyCalc = (properties ?? []).reduce((sum, p) => {
         const rent = rentByProperty.get(p.id) ?? 0;
         const escrow = escrowByProperty.get(p.id) ?? false;
+        const mtgRowForP = processedMortgages.find(m => m.property_id === p.id) ?? null;
+
         return sum + OpexCalculator.monthlyForProperty(p, {
           monthlyRent: rent,
           mortgageIncludesEscrow: escrow,
+          mortgageRow: mtgRowForP,
         });
       }, 0);
 
