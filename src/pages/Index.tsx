@@ -30,7 +30,6 @@ type ExpensesBreakdown = {
   misc: number;
 };
 
-
 type PropertyRowLegacy = {
     id: string;
     address: string | null;
@@ -718,25 +717,51 @@ const Index = () => {
   };
 
   //MORTGAGE HANDLERS
-  const handleUpdateMortgage = async (id:string, data:any)=>{
-    const clean: Record<string, any> = { ...data };
-    Object.keys(clean).forEach(k => clean[k] === undefined && delete clean[k]); // drop undefined
-    // also drop null for optional fields to avoid wiping DB when user left it blank
-    ["principal_original","current_balance","principal","property_id"].forEach(k=>{
-      if (clean[k] === null) delete clean[k];
-    });
+  const handleUpdateMortgage = async (id: string, data: any) => {
+    const payload: any = {};
 
-    const { data: rows, error } = await supabase.from('mortgages').update(clean).eq('id', id).select();
-    if (error) { /* toast error */ return; }
+    if (data.loan_name !== undefined) payload.loan_name = data.loan_name;
+    if (data.principal !== undefined) payload.principal = Number(data.principal);
+    if (data.principal_original !== undefined) payload.principal_original = Number(data.principal_original);
+    if (data.current_balance !== undefined) payload.current_balance = Number(data.current_balance);
+    if (data.interest_rate !== undefined) payload.interest_rate = Number(data.interest_rate);
+    if (data.term_months !== undefined) payload.term_months = Number(data.term_months);
 
-    // Optimistic merge so UI reflects server truth
+    if (data.start_date !== undefined)
+      payload.start_date = data.start_date instanceof Date 
+        ? data.start_date.toISOString() 
+        : data.start_date;
+
+    if (data.monthly_payment !== undefined) payload.monthly_payment = Number(data.monthly_payment);
+    if (data.includes_escrow !== undefined) payload.includes_escrow = Boolean(data.includes_escrow);
+    if (data.property_id !== undefined) payload.property_id = data.property_id;
+
+    const { data: rows, error } = await supabase
+      .from("mortgages")
+      .update(payload)
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update mortgage",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update UI with server truth
     const updated = rows?.[0];
-    setMortgages(prev => prev.map(m => m.id === id ? {
-      ...m,
-      ...updated,
-      start_date: updated?.start_date ? new Date(updated.start_date) : m.start_date,
-    } : m));
-    await loadData();
+    setMortgages(prev =>
+      prev.map(m => m.id === id ? {
+        ...m,
+        ...updated,
+        start_date: updated.start_date ? new Date(updated.start_date) : m.start_date,
+      } : m)
+    );
+
+    loadData();
   };
 
   const handleDeleteMortgage = async (id: string) => {
@@ -751,22 +776,31 @@ const Index = () => {
   };
 
   const handleAddMortgage = async (data: any) => {
-    const { error } = await supabase.from('mortgages').insert({
+    const payload = {
       property_id: data.property_id ?? selectedProperty,
-      loan_name: data.loan_name,
-      principal: data.principal,
-      interest_rate: data.interest_rate,
-      term_months: data.term_months,
-      start_date: data.start_date instanceof Date ? data.start_date.toISOString() : data.start_date,
-      monthly_payment: data.monthly_payment,
-    });
+      loan_name: data.loan_name ?? null,
+      principal: data.principal !== "" ? Number(data.principal) : null,
+      principal_original: data.principal_original !== "" ? Number(data.principal_original) : null,
+      current_balance: data.current_balance !== "" ? Number(data.current_balance) : null,
+      interest_rate: data.interest_rate !== "" ? Number(data.interest_rate) : null,
+      term_months: data.term_months !== "" ? Number(data.term_months) : null,
+      start_date: data.start_date instanceof Date 
+        ? data.start_date.toISOString() 
+        : data.start_date ?? null,
+      monthly_payment: data.monthly_payment !== "" ? Number(data.monthly_payment) : null,
+      includes_escrow: Boolean(data.includes_escrow),
+    };
+
+    const { error } = await supabase.from("mortgages").insert(payload);
 
     if (error) {
       toast({ title: "Error", description: "Failed to add mortgage", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Mortgage added successfully" });
-      loadData();
-    }
+      return;
+    } 
+
+    toast({ title: "Success", description: "Mortgage added successfully" });
+    loadData();
+    
   };
 
   //PROPERTY HANDLERS
