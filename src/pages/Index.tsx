@@ -49,6 +49,7 @@ type PropertyRowLegacy = {
     mgmt_pct?: number | null;
     vacancy_pct?: number | null;
     maintenance_pct?: number | null;
+    insurance?: number | null; 
   };
 
 const Index = () => {
@@ -814,6 +815,7 @@ const Index = () => {
       mgmt_pct: data.mgmt_pct ?? null,
       vacancy_pct: data.vacancy_pct ?? null,
       maintenance_pct: data.maintenance_pct ?? null,
+      insurance: data.insurance ?? null,    
     };
 
     const { data: inserted, error } = await supabase
@@ -855,6 +857,7 @@ const Index = () => {
     if (patch.mgmt_pct !== undefined) payload.mgmt_pct = patch.mgmt_pct ?? null;
     if (patch.vacancy_pct !== undefined) payload.vacancy_pct = patch.vacancy_pct ?? null;
     if (patch.maintenance_pct !== undefined) payload.maintenance_pct = patch.maintenance_pct ?? null;
+    if (patch.insurance !== undefined) payload.insurance = patch.insurance ?? null;  
 
     const prev = properties;
 
@@ -862,7 +865,7 @@ const Index = () => {
       .from("properties")
       .update(payload)
       .eq("id", id)
-      .select("id, address, purchase_price, alias, name, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct")
+      .select("id, address, purchase_price, alias, name, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct, insurance")
       .single<PropertyRowLegacy>();
 
     if (error || !updated) {
@@ -874,8 +877,8 @@ const Index = () => {
     }
 
     // normalize the returned row back into your UI shape
-    setProperties(list =>
-      list.map(p =>
+    setProperties((list) =>
+      list.map((p) =>
         p.id === id
           ? {
               ...p,
@@ -886,6 +889,7 @@ const Index = () => {
               mgmt_pct: Number(updated.mgmt_pct ?? p.mgmt_pct ?? 0),
               vacancy_pct: Number(updated.vacancy_pct ?? p.vacancy_pct ?? 0),
               maintenance_pct: Number(updated.maintenance_pct ?? p.maintenance_pct ?? 0),
+              insurance: Number(updated.insurance ?? p.insurance ?? 0),
             }
           : p
       )
