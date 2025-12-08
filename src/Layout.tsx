@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import UserMenu from "@/components/ui/UserMenu";
+import { useNavigate } from "react-router-dom";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   // Theme state (light / dark)
   const [theme, setTheme] = useState(
     () => localStorage.getItem("theme") || "light"
@@ -39,15 +45,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {theme === "dark" ? "Dark Mode" : "Light Mode"}
           </button>
 
-          {/* Demo label */}
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
-            Demo Mode
-          </span>
+          {/* Demo Mode label – only when logged out */}
+          {!user && (
+            <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
+              Demo Mode
+            </span>
+          )}
 
-          {/* Log In */}
-          <button className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
-            Log In
-          </button>
+          {/* Log In button – only when logged out */}
+          {!user && (
+            <button
+              onClick={() => navigate("/auth/login")}
+              className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
+            >
+              Log In
+            </button>
+          )}
+
+          {/* User avatar + dropdown – only when logged in */}
+          {user && <UserMenu />}
         </div>
       </header>
 

@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/auth/Login.tsx";
+import AuthCallback from "./pages/auth/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             {/*<Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>}/>*/}
             <Route path="*" element={<NotFound />} />
           </Routes>
