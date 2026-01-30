@@ -5,7 +5,8 @@ import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, I
 import { MetricCard } from "@/components/MetricCard";
 import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
 import { PropertyFilter } from "@/components/PropertyFilter";
-import PropertiesTable, { type Property } from "@/components/PropertiesTable";window.location.pathname.replace("/lease-lens-dash", "") || "/"
+//import PropertiesTable, { type Property } from "@/components/PropertiesTable";window.location.pathname.replace("/lease-lens-dash", "") || "/"
+import PropertiesTable, { type Property } from "@/components/PropertiesTable";
 import { OpexCalculator } from "@/domain/finance/OpexCalculator";
 import { MetricsCalculator } from "@/domain/finance/MetricsCalculator";
 import { LeaseTable } from "@/components/LeaseTable";
@@ -100,6 +101,7 @@ const Index = () => {
   const getScenarioRates = () => {   // Get scenario-adjusted growth rates
   const baseRent = currentProperty?.rent_growth_rate || 3;
   const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
+
     
     switch (scenario) {
       case "conservative":
@@ -967,19 +969,167 @@ const Index = () => {
     );
   }
 
+  const [navCollapsed, setNavCollapsed] = useState(false);
+
+   /**
+ * UI-only: Left navigation shell (collapsible).
+ * - Collapsed: icon-only rail
+ * - Expanded: icon + label
+ */
+const LeftNav = ({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) => {
+  const items = [
+    { key: "cashflow", label: "Cash Flow & Risk", icon: LineChart },
+    { key: "equity", label: "Equity & Tax Strategy", icon: TrendingUp },
+    { key: "deals", label: "Deals & Scenarios", icon: Calculator },
+  ];
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
-      <header className="sticky top-0 z-50 border-b border-border backdrop-blur-sm bg-background/80">
-      <div className="container mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <aside
+      className={[
+        "hidden lg:flex shrink-0 flex-col border-r border-border bg-background/70 backdrop-blur-sm transition-all duration-200",
+        collapsed ? "w-16" : "w-64",
+      ].join(" ")}
 
-        {/* Left side — now empty but preserves structure */}
-        <div className="flex-1" />
+    >
 
-        {/* Right side — Property selector left-aligned relative to container */}
-        <div className="flex items-center gap-4">
+      {/* Nav items */}
+      <nav className="px-2 pt-1 pb-3 space-y-1">
+        <div className="flex items-center justify-between px-2 py-2">
+          {/* Left: Overview label (matches nav styling) */}
+          <button
+            type="button"
+            className={[
+              "w-full rounded-lg px-2 py-2 text-sm transition",
+              "bg-primary/10 text-foreground font-medium",
+            ].join(" ")}
+            title={collapsed ? "Overview" : undefined}
+          >
+            <div className={collapsed ? "flex justify-center" : "flex items-center gap-2"}>
+              <span className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Home className="h-4 w-4 text-primary" />
+              </span>
+              {!collapsed && <span className="truncate">Overview</span>}
+            </div>
+          </button>
+
+          {/* Right: collapse toggle */}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="ml-2 h-8 w-8 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground grid place-items-center"
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+            title={collapsed ? "Expand" : "Collapse"}
+          >
+            {collapsed ? "»" : "«"}
+          </button>
+        </div>
+
+        {items.map((it, idx) => {
+          const Icon = it.icon;
+          const active = false; // routing will handle this later
+          return (
+            <button
+              key={it.key}
+              type="button"
+              className={[
+                "w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
+                active
+                  ? "bg-primary/10 text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                collapsed ? "justify-center" : "",
+              ].join(" ")}
+              title={collapsed ? it.label : undefined}
+            >
+              <span className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Icon className="h-4 w-4 text-primary" />
+              </span>
+              {!collapsed && <span className="truncate">{it.label}</span>}
+            </button>
+
+            
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto px-3 py-3 border-t border-border text-[11px] text-muted-foreground">
+        {!collapsed ? "Demo-ready layout" : "—"}
+      </div>
+    </aside>
+  );
+};
+
+  /**
+   * UI-only: AI Brief container.
+   * This is intentionally “dumb” for now; we’ll plug synthesis/modeling later.
+   */
+  const AIBriefShell = () => (
+    <section className="rounded-2xl border border-border bg-card/70 backdrop-blur-sm shadow-sm p-6">
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="text-lg font-semibold">AI Investment Brief</div>
+            <span className="text-xs text-muted-foreground">UI placeholder</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium">
+              Verdict: HOLD + REFINANCE
+            </span>
+            <span className="text-xs text-muted-foreground">
+              We’ll compute this from cash flow, DCR, and IRR.
+            </span>
+          </div>
+
+          <ul className="text-sm text-muted-foreground space-y-2 mb-4">
+            <li>• Risk: (placeholder) debt coverage / vacancy / expenses</li>
+            <li>• Next move: (placeholder) refi / rent / cost seg</li>
+            <li>• Confidence: (placeholder) based on data completeness</li>
+          </ul>
+
+          <div className="rounded-xl bg-muted/30 border border-border p-4">
+            <div className="text-sm font-medium mb-1">AI Insight</div>
+            <div className="text-sm text-muted-foreground">
+              Placeholder copy only. We’ll replace with real synthesis next.
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full lg:w-80 rounded-xl border border-border bg-background p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold">AI What-If</div>
+            <span className="text-xs text-muted-foreground">soon</span>
+          </div>
+
+          <div className="space-y-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="h-4 w-4" disabled />
+              Refinance at 6.25%
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="h-4 w-4" disabled />
+              Raise rents 5%
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="h-4 w-4" disabled />
+              Bonus depreciation / cost seg
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Property row UNDER the brief (matches the mock) */}
+      <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="text-sm font-medium">Portfolio Scope</div>
+        <div className="flex items-center gap-3">
           {properties.length > 0 && (
             <PropertyFilter
-              properties={properties.map(p => ({
+              properties={properties.map((p) => ({
                 id: p.id,
                 address: p.address ?? "",
                 alias: p.alias,
@@ -989,11 +1139,19 @@ const Index = () => {
             />
           )}
         </div>
-
       </div>
-    </header>
+    </section>
+  );
+
+  return (
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background flex">
+      <LeftNav collapsed={navCollapsed} onToggle={() => setNavCollapsed(v => !v)} />
+
+    <div className="flex-1 min-w-0">
 
       <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
+        <AIBriefShell />
+        
         {/* ---- Investment Performance ---- */}
         <section className="space-y-3">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
@@ -1436,6 +1594,9 @@ const Index = () => {
 
       {/*<QuickActions onUploadClick={() => setShowUploader(true)} /> //Floating footer with buttons*/}
     </div>
+
+    </div>
+
   );
 };
 
