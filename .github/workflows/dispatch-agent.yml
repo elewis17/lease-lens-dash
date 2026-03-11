@@ -15,68 +15,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout product repo
+      - name: Checkout lease-lens-dash
         uses: actions/checkout@v4
-        with:
-          path: product
 
-      - name: Checkout AI company OS
+      - name: Checkout AI Company OS
         uses: actions/checkout@v4
         with:
           repository: elewis17/ai-company-os
-          path: os
+          path: ai-company-os
 
       - name: Build task packet
         run: |
-          mkdir -p .agent-out
-          {
-            echo "# Task Packet"
-            echo
-            echo "## Issue"
-            echo "Title: ${{ github.event.issue.title }}"
-            echo "Number: #${{ github.event.issue.number }}"
-            echo
-            echo "## Description"
-            echo '${{ github.event.issue.body }}'
-            echo
-            echo "## Context Files"
-            echo "- agents/software_engineer.md"
-            echo "- agents/qa_analyst.md"
-            echo "- architecture/system_architecture.md"
-            echo "- architecture/repo_structure.md"
-            echo "- architecture/coding_standards.md"
-            echo "- architecture/security_principles.md"
-            echo "- workflows/feature_development.md"
-            echo "- workflows/handoff_standard.md"
-            echo "- workflows/pull_request_review.md"
-          } > .agent-out/task-packet.md
+          mkdir -p agent
 
-      - name: Append context docs
-        run: |
-          for file in \
-            agents/software_engineer.md \
-            agents/qa_analyst.md \
-            architecture/system_architecture.md \
-            architecture/repo_structure.md \
-            architecture/coding_standards.md \
-            architecture/security_principles.md \
-            workflows/feature_development.md \
-            workflows/handoff_standard.md \
-            workflows/pull_request_review.md
-          do
-            if [ -f "$file" ]; then
-              {
-                echo
-                echo "---"
-                echo
-                echo "# FILE: $file"
-                echo
-                cat "$file"
-              } >> .agent-out/task-packet.md
-            fi
-          done
+          echo "# Task Packet" > agent/task.md
+          echo "" >> agent/task.md
+          echo "Issue: #${{ github.event.issue.number }}" >> agent/task.md
+          echo "Title: ${{ github.event.issue.title }}" >> agent/task.md
+          echo "" >> agent/task.md
+          echo "Description:" >> agent/task.md
+          echo "${{ github.event.issue.body }}" >> agent/task.md
 
-      - name: Comment that dispatch started
+      - name: Upload task packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-packet
+          path: agent/task.md
+
+      - name: Comment on issue
         uses: actions/github-script@v7
         with:
           script: |
@@ -84,18 +50,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: [
-                "Dispatcher started.",
-                "",
-                "- Task packet assembled",
-                "- Ready for coding worker handoff",
-                "",
-                "Next step: assign this issue to the coding worker or call your agent runner."
-              ].join("\n")
+              body: "Dispatcher ran successfully and created a task packet."
             })
-
-      - name: Upload task packet artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: task-packet-${{ github.event.issue.number }}
-          path: .agent-out/task-packet.md
