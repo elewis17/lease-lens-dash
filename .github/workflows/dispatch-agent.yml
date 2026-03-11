@@ -1,0 +1,93 @@
+name: Dispatch Agent
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  dispatch:
+    if: github.event.label.name == 'agent-ready'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build task packet
+        run: |
+          mkdir -p .agent-out
+          {
+            echo "# Task Packet"
+            echo
+            echo "## Issue"
+            echo "Title: ${{ github.event.issue.title }}"
+            echo "Number: #${{ github.event.issue.number }}"
+            echo
+            echo "## Description"
+            echo '${{ github.event.issue.body }}'
+            echo
+            echo "## Context Files"
+            echo "- agents/software_engineer.md"
+            echo "- agents/qa_analyst.md"
+            echo "- architecture/system_architecture.md"
+            echo "- architecture/repo_structure.md"
+            echo "- architecture/coding_standards.md"
+            echo "- architecture/security_principles.md"
+            echo "- workflows/feature_development.md"
+            echo "- workflows/handoff_standard.md"
+            echo "- workflows/pull_request_review.md"
+          } > .agent-out/task-packet.md
+
+      - name: Append context docs
+        run: |
+          for file in \
+            agents/software_engineer.md \
+            agents/qa_analyst.md \
+            architecture/system_architecture.md \
+            architecture/repo_structure.md \
+            architecture/coding_standards.md \
+            architecture/security_principles.md \
+            workflows/feature_development.md \
+            workflows/handoff_standard.md \
+            workflows/pull_request_review.md
+          do
+            if [ -f "$file" ]; then
+              {
+                echo
+                echo "---"
+                echo
+                echo "# FILE: $file"
+                echo
+                cat "$file"
+              } >> .agent-out/task-packet.md
+            fi
+          done
+
+      - name: Comment that dispatch started
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                "Dispatcher started.",
+                "",
+                "- Task packet assembled",
+                "- Ready for coding worker handoff",
+                "",
+                "Next step: assign this issue to the coding worker or call your agent runner."
+              ].join("\n")
+            })
+
+      - name: Upload task packet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-packet-${{ github.event.issue.number }}
+          path: .agent-out/task-packet.md
