@@ -28,13 +28,43 @@ jobs:
         run: |
           mkdir -p agent
 
-          echo "# Task Packet" > agent/task.md
-          echo "" >> agent/task.md
-          echo "Issue: #${{ github.event.issue.number }}" >> agent/task.md
-          echo "Title: ${{ github.event.issue.title }}" >> agent/task.md
-          echo "" >> agent/task.md
-          echo "Description:" >> agent/task.md
-          echo "${{ github.event.issue.body }}" >> agent/task.md
+          {
+            echo "# Task Packet"
+            echo
+            echo "Issue: #${{ github.event.issue.number }}"
+            echo "Title: ${{ github.event.issue.title }}"
+            echo
+            echo "Description:"
+            echo "${{ github.event.issue.body }}"
+            echo
+            echo "---"
+            echo
+            echo "# OS Context"
+          } > agent/task.md
+
+      - name: Append OS context files
+        run: |
+          for file in \
+            ai-company-os/agents/software_engineer.md \
+            ai-company-os/agents/qa_analyst.md \
+            ai-company-os/architecture/system_architecture.md \
+            ai-company-os/architecture/repo_structure.md \
+            ai-company-os/architecture/coding_standards.md \
+            ai-company-os/architecture/security_principles.md \
+            ai-company-os/workflows/feature_development.md \
+            ai-company-os/workflows/handoff_standard.md
+          do
+            if [ -f "$file" ]; then
+              {
+                echo
+                echo "---"
+                echo
+                echo "FILE: $file"
+                echo
+                cat "$file"
+              } >> agent/task.md
+            fi
+          done
 
       - name: Upload task packet
         uses: actions/upload-artifact@v4
@@ -50,5 +80,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "Dispatcher ran successfully and created a task packet."
+              body: "Dispatcher ran successfully and created a task packet with OS context."
             })
