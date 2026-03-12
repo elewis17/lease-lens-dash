@@ -24,6 +24,43 @@ jobs:
           repository: elewis17/ai-company-os
           path: ai-company-os
 
+          - name: Extract issue image URLs
+        shell: bash
+        run: |
+          mkdir -p agent/images
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          body = os.environ.get("ISSUE_BODY", "") or ""
+          urls = re.findall(r'https://github\.com/user-attachments/assets/[^\s)>\]"]+', body)
+
+          out = Path("agent/image-urls.txt")
+          out.write_text("\n".join(urls), encoding="utf-8")
+
+          print(f"Found {len(urls)} image URL(s)")
+          PY
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+
+      - name: Download issue images
+        shell: bash
+        run: |
+          if [ ! -f agent/image-urls.txt ] || [ ! -s agent/image-urls.txt ]; then
+            echo "No image URLs found"
+            exit 0
+          fi
+
+          count=0
+          while IFS= read -r url; do
+            [ -z "$url" ] && continue
+            count=$((count+1))
+            curl -L "$url" -o "agent/images/issue-image-$count.png"
+          done < agent/image-urls.txt
+
+          ls -la agent/images
+          
       - name: Build task packet
         run: |
           mkdir -p agent
@@ -70,7 +107,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: task-packet
-          path: agent/task.md
+          path: |
+            agent/task.md
+            agent/image-urls.txt
+            agent/images/
 
       - name: Comment on issue
         uses: actions/github-script@v7
