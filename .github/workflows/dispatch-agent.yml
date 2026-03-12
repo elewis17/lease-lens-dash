@@ -24,7 +24,7 @@ jobs:
           repository: elewis17/ai-company-os
           path: ai-company-os
 
-          - name: Extract issue image URLs
+      - name: Extract issue image URLs
         shell: bash
         run: |
           mkdir -p agent/images
