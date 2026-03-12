@@ -47,6 +47,8 @@ jobs:
       - name: Download issue images
         shell: bash
         run: |
+          mkdir -p agent/images
+
           if [ ! -f agent/image-urls.txt ] || [ ! -s agent/image-urls.txt ]; then
             echo "No image URLs found"
             exit 0
@@ -56,10 +58,22 @@ jobs:
           while IFS= read -r url; do
             [ -z "$url" ] && continue
             count=$((count+1))
-            curl -L "$url" -o "agent/images/issue-image-$count.png"
+            out="agent/images/issue-image-$count.png"
+
+            echo "Downloading: $url"
+            curl -L --fail --show-error --silent "$url" -o "$out"
+
+            if [ ! -s "$out" ]; then
+              echo "Download failed or file is empty: $out"
+              exit 1
+            fi
+
+            echo "Saved: $out"
+            ls -lh "$out"
           done < agent/image-urls.txt
 
-          ls -la agent/images
+          echo "Final image folder contents:"
+          ls -R agent/images
           
       - name: Build task packet
         run: |
