@@ -55,7 +55,7 @@ jobs:
           fi
 
           count=0
-          while IFS= read -r url; do
+           while IFS= read -r url || [ -n "$url" ]; do
             [ -z "$url" ] && continue
             count=$((count+1))
             out="agent/images/issue-image-$count.png"
