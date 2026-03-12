@@ -24,6 +24,16 @@ jobs:
           repository: elewis17/ai-company-os
           path: ai-company-os
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install retrieval dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai numpy
+
       - name: Extract issue image URLs
         shell: bash
         run: |
@@ -34,12 +44,14 @@ jobs:
           from pathlib import Path
 
           body = os.environ.get("ISSUE_BODY", "") or ""
-          urls = re.findall(r'https://github\.com/user-attachments/assets/[^\s)>\]"]+', body)
+          pattern = r'https://(?:github\.com/user-attachments/assets|user-images\.githubusercontent\.com)/[^\s)>\]"]+'
+          urls = re.findall(pattern, body)
 
           out = Path("agent/image-urls.txt")
           out.write_text("\n".join(urls), encoding="utf-8")
 
           print(f"Found {len(urls)} image URL(s)")
+          print(urls)
           PY
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -55,7 +67,7 @@ jobs:
           fi
 
           count=0
-           while IFS= read -r url || [ -n "$url" ]; do
+          while IFS= read -r url || [ -n "$url" ]; do
             [ -z "$url" ] && continue
             count=$((count+1))
             out="agent/images/issue-image-$count.png"
@@ -74,7 +86,16 @@ jobs:
 
           echo "Final image folder contents:"
           ls -R agent/images
-          
+
+      - name: Run retrieval
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ISSUE_QUERY: ${{ github.event.issue.title }} ${{ github.event.issue.body }}
+        run: |
+          mkdir -p agent
+          python ai-company-os/runtime/indexer/retrieve.py "$ISSUE_QUERY"
+          cp ai-company-os/runtime/indexer/retrieved_paths.json agent/retrieved_paths.json
+
       - name: Build task packet
         run: |
           mkdir -p agent
@@ -90,32 +111,40 @@ jobs:
             echo
             echo "---"
             echo
-            echo "# OS Context"
+            echo "# Retrieved OS Context"
           } > agent/task.md
 
-      - name: Append OS context files
+      - name: Append retrieved OS context files
         run: |
-          for file in \
-            ai-company-os/agents/software_engineer.md \
-            ai-company-os/agents/qa_analyst.md \
-            ai-company-os/architecture/system_architecture.md \
-            ai-company-os/architecture/repo_structure.md \
-            ai-company-os/architecture/coding_standards.md \
-            ai-company-os/architecture/security_principles.md \
-            ai-company-os/workflows/feature_development.md \
-            ai-company-os/workflows/handoff_standard.md
-          do
-            if [ -f "$file" ]; then
-              {
-                echo
-                echo "---"
-                echo
-                echo "FILE: $file"
-                echo
-                cat "$file"
-              } >> agent/task.md
-            fi
-          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          retrieved = Path("agent/retrieved_paths.json")
+          task = Path("agent/task.md")
+          os_root = Path("ai-company-os")
+
+          if not retrieved.exists():
+              print("No retrieved_paths.json found")
+              raise SystemExit(1)
+
+          results = json.loads(retrieved.read_text(encoding="utf-8"))
+
+          with task.open("a", encoding="utf-8") as f:
+              for item in results:
+                  rel_path = item["path"]
+                  full_path = os_root / rel_path
+
+                  f.write("\n---\n\n")
+                  f.write(f"FILE: {rel_path}\n")
+                  f.write(f"PURPOSE: {item.get('purpose', '')}\n")
+                  f.write(f"SUMMARY: {item.get('summary', '')}\n\n")
+
+                  if full_path.exists():
+                      f.write(full_path.read_text(encoding="utf-8", errors="ignore"))
+                  else:
+                      f.write("[File not found]\n")
+          PY
 
       - name: Upload task packet
         uses: actions/upload-artifact@v4
@@ -125,6 +154,7 @@ jobs:
             agent/task.md
             agent/image-urls.txt
             agent/images/
+            agent/retrieved_paths.json
 
       - name: Comment on issue
         uses: actions/github-script@v7
@@ -134,5 +164,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "Dispatcher ran successfully and created a task packet with OS context."
+              body: "Dispatcher ran successfully and created a task packet with retrieved OS context."
             })
