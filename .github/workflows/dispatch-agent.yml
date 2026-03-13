@@ -36,6 +36,8 @@ jobs:
 
       - name: Extract issue image URLs
         shell: bash
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           mkdir -p agent/images
           python - <<'PY'
@@ -44,17 +46,16 @@ jobs:
           from pathlib import Path
 
           body = os.environ.get("ISSUE_BODY", "") or ""
-          pattern = r'https://(?:github\.com/user-attachments/assets|user-images\.githubusercontent\.com)/[^\s)>\]"]+'
-          urls = re.findall(pattern, body)
+          urls = re.findall(
+              r'https://(?:github\.com/user-attachments/assets|user-images\.githubusercontent\.com)/[^\s)>\]"]+',
+              body
+          )
 
           out = Path("agent/image-urls.txt")
           out.write_text("\n".join(urls), encoding="utf-8")
 
           print(f"Found {len(urls)} image URL(s)")
-          print(urls)
           PY
-        env:
-          ISSUE_BODY: ${{ github.event.issue.body }}
 
       - name: Download issue images
         shell: bash
@@ -125,14 +126,16 @@ jobs:
           os_root = Path("ai-company-os")
 
           if not retrieved.exists():
-              print("No retrieved_paths.json found")
-              raise SystemExit(1)
+              raise FileNotFoundError("agent/retrieved_paths.json not found")
 
           results = json.loads(retrieved.read_text(encoding="utf-8"))
 
           with task.open("a", encoding="utf-8") as f:
               for item in results:
-                  rel_path = item["path"]
+                  rel_path = item.get("path", "").strip()
+                  if not rel_path:
+                      continue
+
                   full_path = os_root / rel_path
 
                   f.write("\n---\n\n")
