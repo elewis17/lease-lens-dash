@@ -1,0 +1,41 @@
+name: Coding Worker
+
+on:
+  workflow_run:
+    workflows: ["Dispatch Agent"]
+    types:
+      - completed
+
+jobs:
+  worker:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download task packet
+        uses: actions/download-artifact@v4
+        with:
+          name: task-packet
+          path: task
+
+      - name: Show task
+        run: |
+          echo "---- TASK PACKET ----"
+          cat task/task.md
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenAI
+        run: pip install openai
+
+      - name: Run coding agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/run_agent.py task/task.md
