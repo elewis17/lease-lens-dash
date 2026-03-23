@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info, Database} from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
-import { PropertyFilter } from "@/components/PropertyFilter";
+import { PropertyFilter } from "@/features/properties/PropertyFilter";
 //import PropertiesTable, { type Property } from "@/components/PropertiesTable";window.location.pathname.replace("/lease-lens-dash", "") || "/"
-import PropertiesTable, { type Property } from "@/components/PropertiesTable";
+import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { OpexCalculator } from "@/domain/finance/OpexCalculator";
 import { MetricsCalculator } from "@/domain/finance/MetricsCalculator";
-import { LeaseTable } from "@/components/LeaseTable";
-import { LeaseUploader } from "@/components/LeaseUploader";
+import { LeaseTable } from "@/features/leases/LeaseTable";
+import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { IncomeAndSafetyChart } from "@/components/IncomeAndSafetyChart";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { MortgagesTable } from "@/components/MortgagesTable";
@@ -20,6 +20,7 @@ import { ScenarioToggle, Scenario } from "@/components/ScenarioToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import DealsScenarios from "@/pages/DealsScenarios";
 
 type ExpensesBreakdown = {
   taxes: number;
@@ -976,7 +977,7 @@ const Index = () => {
  * - Collapsed: icon-only rail
  * - Expanded: icon + label
  */
-const [view, setView] = useState<"overview" | "database" | "cashflow" | "equity">("overview");
+const [view, setView] = useState<"overview" | "database" | "cashflow" | "equity"| "deals">("overview");
 
 const LeftNav = ({
   collapsed,
@@ -1901,6 +1902,8 @@ const formatNum = (n: number) =>
             />
           </div>          
         )}
+
+        {view === "deals" && <DealsScenarios />}
 
       </main>
 
