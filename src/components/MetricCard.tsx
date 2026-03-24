@@ -32,7 +32,7 @@ export const MetricCard = ({ title, value, subtitle, icon: Icon, variant = "defa
     <Card className={`p-6 ${gradientClass} border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-200 animate-fade-in`}>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2 flex-1 min-w-0">
-          <p className="text-sm font-medium text-muted-foreground leading-snug">{title}</p>
+          <div className="text-sm font-medium text-muted-foreground leading-snug">{title}</div>
           <h3 className="text-3xl font-extrabold text-foreground leading-tight">{value}</h3>
           {subtitle && <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>}
         </div>

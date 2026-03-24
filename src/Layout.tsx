@@ -29,13 +29,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground transition-colors">
       {/* --- Top Bar --- */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+         {/* LEFT: brand + sidebar toggle (aligned to sidebar width) */}
         <div>
-          <h1 className="text-2xl font-bold">Pocket CFO</h1>
-          <p className="text-sm text-muted-foreground -mt-1">
-            Real Estate AI Advisor
-          </p>
+          <div>
+            <h1 className="text-2xl font-bold">Pocket CFO</h1>
+            <p className="text-sm text-muted-foreground -mt-1">
+              AI Co-Pilot for Investors
+            </p>
+          </div>
         </div>
-
+        {/* RIGHT: controls */}
         <div className="flex items-center gap-3">
           {/* THEME TOGGLE (pill shaped) */}
           <button
@@ -68,7 +71,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* --- Main Content --- */}
-      <main className="p-6">{children}</main>
+      <main>{children}</main>
     </div>
   );
 }
