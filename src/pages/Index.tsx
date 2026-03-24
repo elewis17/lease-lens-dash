@@ -98,7 +98,7 @@ const Index = () => {
   const filteredProperties = selectedProperty ? properties.filter(p => p.id === selectedProperty) : properties;
   const filteredLeases = selectedProperty ? leases.filter(l => l.property_id === selectedProperty) : leases;
   const filteredMortgages = selectedProperty ? mortgages.filter(m => m.property_id === selectedProperty) : mortgages;
-  const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + (Number(val) ?? 0), 0); // ---- Derived totals for Property Financials ----
+  const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + Number(val ?? 0), 0); // ---- Derived totals for Property Financials ----
   const getScenarioRates = () => {   // Get scenario-adjusted growth rates
   const baseRent = currentProperty?.rent_growth_rate || 3;
   const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
@@ -951,6 +951,25 @@ const Index = () => {
   // Helper to format a property label from the selected/current property
   const formatPropertyLabel = (p: any | null) => String(p?.alias ?? p?.name ?? "Property");
 
+  const [navCollapsed, setNavCollapsed] = useState(false);
+
+  /**
+   * UI-only: Left navigation shell (collapsible).
+   * - Collapsed: icon-only rail
+   * - Expanded: icon + label
+   */
+  const [view, setView] = useState<"overview" | "database" | "cashflow" | "equity"| "deals">("overview");
+
+  /**
+   * UI-only: AI Brief container.
+   * This is intentionally “dumb” for now; we’ll plug synthesis/modeling later.
+   */
+  const [whatIf, setWhatIf] = useState<{
+    refi: boolean;
+    rent: boolean;
+    costSeg: boolean;
+  }>({ refi: false, rent: false, costSeg: false });
+
   if (showUploader) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -969,15 +988,6 @@ const Index = () => {
       </div>
     );
   }
-
-  const [navCollapsed, setNavCollapsed] = useState(false);
-
-   /**
- * UI-only: Left navigation shell (collapsible).
- * - Collapsed: icon-only rail
- * - Expanded: icon + label
- */
-const [view, setView] = useState<"overview" | "database" | "cashflow" | "equity"| "deals">("overview");
 
 const LeftNav = ({
   collapsed,
@@ -1071,17 +1081,6 @@ const LeftNav = ({
     </aside>
   );
 };
-
-  /**
-   * UI-only: AI Brief container.
-   * This is intentionally “dumb” for now; we’ll plug synthesis/modeling later.
-   */
-  const [whatIf, setWhatIf] = useState<{
-  refi: boolean;
-  rent: boolean;
-  costSeg: boolean;
-}>({ refi: false, rent: false, costSeg: false });
-
 
 const formatMoney = (n: number) =>
   Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—";
@@ -1613,7 +1612,7 @@ const formatNum = (n: number) =>
                             </div>
 
                             <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
-                              <li><strong>Formula:</strong> IRR=Discount rate where NPV(10-year cash flows + sale proceeds)=0</li>
+                              <li><strong>Formula:</strong> IRR=Discount rate where NPV(10-year cash flows + sale proceeds)=0</li>
                               <li><strong>What it measures:</strong> IRR shows your average annual return over time, factoring in both cash flow and appreciation. It accounts for when money goes in and when it comes back — through rent, loan paydown, or eventual sale.</li>
                               <li><strong>Why you see what you see:</strong> A higher IRR usually means the property is benefiting from appreciation, equity growth, or strong long-term performance. It combines all return sources into one time-weighted rate.</li>
                               <li><strong>When to look at it:</strong> Use IRR to evaluate long-term investment performance or compare potential returns across different properties and hold periods.</li>
