@@ -19,6 +19,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: task-packet
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: task
 
       - name: Show task
@@ -37,5 +39,6 @@ jobs:
       - name: Run coding agent
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LEASE_LENS_REPO_ROOT: .
         run: |
           python scripts/run_agent.py task/task.md
