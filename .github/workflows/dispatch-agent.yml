@@ -97,6 +97,17 @@ jobs:
           python ai-company-os/runtime/indexer/retrieve.py "$ISSUE_QUERY"
           cp ai-company-os/runtime/indexer/retrieved_paths.json agent/retrieved_paths.json
 
+      - name: Write issue metadata
+        run: |
+          mkdir -p agent
+          cat > agent/issue_metadata.json <<'JSON'
+          {
+            "issue_number": "${{ github.event.issue.number }}",
+            "issue_title": "${{ github.event.issue.title }}",
+            "issue_body": ${ toJson(github.event.issue.body) }
+          }
+          JSON
+
       - name: Build task packet
         run: |
           mkdir -p agent
@@ -155,6 +166,7 @@ jobs:
           name: task-packet
           path: |
             agent/task.md
+            agent/issue_metadata.json
             agent/image-urls.txt
             agent/images/
             agent/retrieved_paths.json
