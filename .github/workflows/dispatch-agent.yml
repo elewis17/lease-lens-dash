@@ -82,11 +82,7 @@ jobs:
             fi
 
             echo "Saved: $out"
-            ls -lh "$out"
           done < agent/image-urls.txt
-
-          echo "Final image folder contents:"
-          ls -R agent/images
 
       - name: Run retrieval
         env:
@@ -97,16 +93,33 @@ jobs:
           python ai-company-os/runtime/indexer/retrieve.py "$ISSUE_QUERY"
           cp ai-company-os/runtime/indexer/retrieved_paths.json agent/retrieved_paths.json
 
-      - name: Write issue metadata
+      # ✅ FIXED STEP (this was your bug)
+      - name: Write issue metadata JSON safely
+        shell: bash
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_REPO: ${{ github.repository }}
         run: |
           mkdir -p agent
-          cat > agent/issue_metadata.json <<'JSON'
-          {
-            "issue_number": "${{ github.event.issue.number }}",
-            "issue_title": "${{ github.event.issue.title }}",
-            "issue_body": ${ toJson(github.event.issue.body) }
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "issue_number": int(os.environ["ISSUE_NUMBER"]),
+              "issue_title": os.environ.get("ISSUE_TITLE", ""),
+              "issue_body": os.environ.get("ISSUE_BODY", ""),
+              "repo": os.environ.get("ISSUE_REPO", "")
           }
-          JSON
+
+          Path("agent/issue_metadata.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2),
+              encoding="utf-8"
+          )
+          PY
 
       - name: Build task packet
         run: |
@@ -135,9 +148,6 @@ jobs:
           retrieved = Path("agent/retrieved_paths.json")
           task = Path("agent/task.md")
           os_root = Path("ai-company-os")
-
-          if not retrieved.exists():
-              raise FileNotFoundError("agent/retrieved_paths.json not found")
 
           results = json.loads(retrieved.read_text(encoding="utf-8"))
 
