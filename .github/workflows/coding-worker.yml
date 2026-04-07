@@ -73,7 +73,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # ✅ FIXED STEP (added pyyaml)
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -86,15 +85,40 @@ jobs:
         run: |
           python ai-company-os/scripts/run_task_packet.py task
 
+      - name: Upload runtime runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-runtime-runs
+          path: ai-company-os/runtime/runs
+
+      - name: Debug workflow outputs
+        if: always()
+        shell: bash
+        run: |
+          echo "---- git status ----"
+          git status --short
+          echo
+          echo "---- runtime runs ----"
+          find ai-company-os/runtime/runs -maxdepth 2 -type f 2>/dev/null || true
+          echo
+          echo "---- software engineer step ----"
+          latest=$(find ai-company-os/runtime/runs -maxdepth 1 -name 'step_*_software_engineer.json' | sort | tail -n 1)
+          if [ -n "$latest" ]; then
+            cat "$latest"
+          else
+            echo "No software engineer step file found"
+          fi
+
       - name: Check for repository changes
         id: changes
         shell: bash
         run: |
-          if git diff --quiet; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-          else
+          if [ -n "$(git status --porcelain)" ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
             git status --short
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create Pull Request
