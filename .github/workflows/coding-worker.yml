@@ -80,7 +80,9 @@ jobs:
 
       - name: Reset runtime runs
         run: |
+          rm -rf runtime/runs
           rm -rf ai-company-os/runtime/runs
+          mkdir -p runtime/runs
           mkdir -p ai-company-os/runtime/runs
 
       - name: Run AI Company OS coding workflow against Lease Lens
@@ -95,24 +97,41 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: worker-runtime-runs
-          path: ai-company-os/runtime/runs
+          path: |
+            runtime/runs
+            ai-company-os/runtime/runs
+          if-no-files-found: warn
 
       - name: Debug workflow outputs
         if: always()
         shell: bash
         run: |
+          echo "---- pwd ----"
+          pwd
+          echo
           echo "---- git status ----"
           git status --short
           echo
-          echo "---- runtime runs ----"
+          echo "---- root runtime/runs ----"
+          find runtime/runs -maxdepth 2 -type f 2>/dev/null || true
+          echo
+          echo "---- ai-company-os/runtime/runs ----"
           find ai-company-os/runtime/runs -maxdepth 2 -type f 2>/dev/null || true
           echo
-          echo "---- software engineer step ----"
-          latest=$(find ai-company-os/runtime/runs -maxdepth 1 -name 'step_*_software_engineer.json' | sort | tail -n 1)
-          if [ -n "$latest" ]; then
-            cat "$latest"
+          echo "---- latest software engineer step (root) ----"
+          latest_root=$(find runtime/runs -maxdepth 1 -name 'step_*_software_engineer.json' | sort | tail -n 1)
+          if [ -n "$latest_root" ]; then
+            cat "$latest_root"
           else
-            echo "No software engineer step file found"
+            echo "No software engineer step file found in root runtime/runs"
+          fi
+          echo
+          echo "---- latest software engineer step (ai-company-os) ----"
+          latest_repo=$(find ai-company-os/runtime/runs -maxdepth 1 -name 'step_*_software_engineer.json' | sort | tail -n 1)
+          if [ -n "$latest_repo" ]; then
+            cat "$latest_repo"
+          else
+            echo "No software engineer step file found in ai-company-os/runtime/runs"
           fi
 
       - name: Check for repository changes
