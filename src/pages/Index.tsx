@@ -1158,7 +1158,7 @@ const formatNum = (n: number) =>
       <div className="flex flex-col lg:flex-row gap-6 items-stretch">
         <div className="flex-1 flex flex-col">
          <div className="flex items-center justify-between mb-3">
-          <div className="text-lg font-semibold">AI Investment Brief</div>
+          <div className="text-lg font-semibold">AI Investment Brief (Demo)</div>
 
           <details className="relative">
             <summary

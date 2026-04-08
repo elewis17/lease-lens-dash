@@ -1,0 +1,6 @@
+{
+  "issue_number": 29,
+  "issue_title": "Test agent PR flow with one safe text change",
+  "issue_body": "In src/pages/Index.tsx, change one clearly visible non-functional text string only. Do not change logic, styling, layout, behavior, or imports. Create a new branch, commit the change, and open a Pull Request.",
+  "repo": "elewis17/lease-lens-dash"
+}

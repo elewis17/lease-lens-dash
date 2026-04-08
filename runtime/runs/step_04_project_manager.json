@@ -1,0 +1,54 @@
+{
+  "agent": "project_manager",
+  "status": "ready for next stage",
+  "workflow_outcome": "continue",
+  "execution_mode": "planning",
+  "summary": "The single safe text change is prepared by engineering. Next: create a feature branch, commit, push, and open a PR for review to validate the PR workflow.",
+  "completed_work": [
+    "Defined acceptance criteria and Definition of Done for this one-line, non-functional text change.",
+    "Prepared PR title/body template with before/after snippet and reviewer assignments.",
+    "Sequenced workflow steps and owners for branch creation, commit, push, and PR review."
+  ],
+  "artifacts_updated": [
+    "No repository artifacts updated in this stage"
+  ],
+  "decision_or_outcome": [
+    "Branch name: chore/test-pr-flow-index-text",
+    "PR title: Test PR flow: safe text-only change in Index.tsx",
+    "Reviewers: technical_architect and qa_analyst",
+    "Labels: chore, test, safe-change",
+    "Scope is strictly one visible string change; no logic, styling, imports, or behavior changes."
+  ],
+  "next_required_action": "Software Engineer to create the feature branch, commit, push, and open the PR per the instructions below.",
+  "blockers_or_risks": [
+    "If snapshot tests assert on the old text, snapshots may fail until updated (do not update until reviewer approval).",
+    "Any unrelated CI/lint issues should be surfaced to PM immediately."
+  ],
+  "implementation_plan": {
+    "goal": "Create a PR to validate the PR workflow using a single, visible, non-functional text change in src/pages/Index.tsx.",
+    "issue_body": "Summary\\n- Change type: Chore/Test PR flow\\n- Scope: One visible, non-functional text change only.\\n\\nChange Details\\n- Updated heading in AIBriefShell from:\\n  AI Investment Brief -> AI Investment Brief (Demo)\\n\\nBefore/After Snippet\\n- Before: <div className=\"text-lg font-semibold\">AI Investment Brief</div>\\n- After:  <div className=\"text-lg font-semibold\">AI Investment Brief (Demo)</div>\\n\\nValidation Steps\\n- Build app and load the dashboard.\\n- Verify the heading now reads \"AI Investment Brief (Demo)\".\\n- Confirm no layout, styling, or behavior changes.\\n\\nChecklist\\n- [x] Changed exactly one visible string in src/pages/Index.tsx\\n- [x] No logic, imports, styling, or layout changed\\n- [x] CI pipeline green (lint/typecheck/tests)\\n- [ ] If snapshot tests fail, update snapshots only after reviewer approval\\n\\nReviewers\\n- technical_architect, qa_analyst",
+    "recommended_first_changes": [
+      "git checkout -b chore/test-pr-flow-index-text",
+      "git add src/pages/Index.tsx",
+      "git commit -m \"chore: test PR flow \u2014 safe text-only change in Index.tsx\"",
+      "git push -u origin chore/test-pr-flow-index-text",
+      "Open PR: title \"Test PR flow: safe text-only change in Index.tsx\"; body per template; request reviews from technical_architect and qa_analyst; apply labels chore,test,safe-change"
+    ],
+    "notes": [
+      "Do not introduce any other file changes in this PR.",
+      "If CI snapshot tests fail due to the text change, coordinate with reviewers before updating snapshots.",
+      "Reference workflows/pull_request_review.md for review steps."
+    ]
+  },
+  "file_operations": [],
+  "handoff": {
+    "next_owner": "software_engineer",
+    "next_required_action": "Create branch chore/test-pr-flow-index-text, commit the one-line change already prepared, push, and open the PR with the provided title/body; request reviews from technical_architect and qa_analyst and monitor CI."
+  },
+  "debug": {
+    "instructions_loaded": true,
+    "retrieved_file_count": 6,
+    "context_mode": "summary",
+    "artifact_bundle_file": null
+  }
+}

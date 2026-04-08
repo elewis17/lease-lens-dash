@@ -1,0 +1,43 @@
+{
+  "issue_title": "Test agent PR flow with one safe text change",
+  "issue_body": "In src/pages/Index.tsx, change one clearly visible non-functional text string only. Do not change logic, styling, layout, behavior, or imports. Create a new branch, commit the change, and open a Pull Request.",
+  "workflow": "feature_development",
+  "retrieved_files": [
+    {
+      "score": 0.3706013848887771,
+      "path": "scripts/bootstrap_notes.md",
+      "purpose": "general_project_file",
+      "summary": "bootstrap_notes.md is a general project file file. Main sections: Bootstrap Notes, First implementation steps, Recommended next docs. Opening content: 1. Put this repo in GitHub as your AI Company OS repo. 2. Add your preferred coding agent instructions to each agent file."
+    },
+    {
+      "score": 0.3606178304677808,
+      "path": "agents/project_manager.md",
+      "purpose": "agent_role_definition",
+      "summary": "project_manager.md is a agent role definition file. Main sections: Implementation Project Manager Role, Mission, Responsibilities, Authority Boundaries. Opening content: Convert approved product requirements into clear tasks, coordinate specialists, track delivery, and report to the founder. Manage project execution, coordinate tasks among agents and report progress to stakeholders. - break PRDs into executable and actionable tasks"
+    },
+    {
+      "score": 0.35556567840107733,
+      "path": "workflows/release_process.md",
+      "purpose": "workflow_definition",
+      "summary": "release_process.md is a workflow definition file. Main sections: Workflow: Release Process, Purpose, Core Principles, Roles in this Workflow. Opening content: Define the controlled process for deploying validated software changes to production. This workflow ensures:"
+    },
+    {
+      "score": 0.3285457905265406,
+      "path": "workflows/pull_request_review.md",
+      "purpose": "workflow_definition",
+      "summary": "pull_request_review.md is a workflow definition file. Main sections: Workflow: Pull Request Review, Purpose, Core Principles, Roles in this Workflow. Opening content: Define the standard process for reviewing pull requests before code is merged into the repository. This workflow ensures:"
+    },
+    {
+      "score": 0.32714142071364993,
+      "path": "agents/product_manager.md",
+      "purpose": "agent_role_definition",
+      "summary": "product_manager.md is a agent role definition file. Main sections: Product Manager Role, Mission, Responsibilities, Inputs. Opening content: Translate founder direction into a commercially strong product roadmap and clear PRDs. - Clarify product direction from founder conversations"
+    },
+    {
+      "path": "src/pages/Index.tsx",
+      "purpose": "target_repo_file",
+      "summary": "Explicitly referenced in the issue and injected as direct implementation context."
+    }
+  ],
+  "issue_number": "29"
+}

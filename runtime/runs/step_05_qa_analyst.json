@@ -1,0 +1,52 @@
+{
+  "agent": "qa_analyst",
+  "status": "blocked",
+  "workflow_outcome": "blocked",
+  "execution_mode": "review",
+  "summary": "Blocked: No PR or file diffs were provided. QA cannot review without a branch/commit/PR containing the one-line text change in src/pages/Index.tsx.",
+  "completed_work": [
+    "Checked artifact bundle: no changed_paths and no files to review.",
+    "Verified acceptance criteria and scope from PM: single non-functional visible text change only in src/pages/Index.tsx."
+  ],
+  "artifacts_updated": [
+    "No repository artifacts updated in this stage"
+  ],
+  "decision_or_outcome": [
+    "Review Result: Reject (no changes to review)",
+    "Risk Level: low",
+    "Required Fixes: Provide a PR with exactly one visible text-string change in src/pages/Index.tsx; no logic/styling/layout/import changes; include clear before/after in PR body; ensure CI passes."
+  ],
+  "next_required_action": "Software Engineer must create a feature branch, make the single text-only change in src/pages/Index.tsx, push, and open a PR for review.",
+  "blockers_or_risks": [
+    "No PR opened and no diffs present; QA cannot validate acceptance criteria or quality without artifacts.",
+    "Potential snapshot test failures if the changed string is asserted; coordinate snapshot updates after reviewer approval."
+  ],
+  "implementation_plan": {
+    "goal": "Produce a minimal PR to validate PR workflow using one safe, visible text change in src/pages/Index.tsx.",
+    "issue_body": "Summary\\n- Change type: Chore/Test PR flow\\n- Scope: One visible, non-functional text change only.\\n\\nChange Details\\n- Update a clearly visible heading string in src/pages/Index.tsx from:\\n  \"AI Investment Brief\" -> \"AI Investment Brief (Demo)\" (or equivalent top-level visible string found in file)\\n\\nValidation Steps\\n- Build and load the page to confirm the new text renders as expected.\\n- Confirm no layout, styling, imports, or behavior changed.\\n\\nChecklist\\n- [x] Exactly one visible string changed in src/pages/Index.tsx\\n- [x] No logic, imports, styling, or layout changed\\n- [x] CI pipeline green (lint/typecheck/tests)\\n- [ ] If snapshot tests fail, update snapshots only after reviewer approval\\n\\nReviewers\\n- technical_architect, qa_analyst",
+    "recommended_first_changes": [
+      "git checkout -b chore/test-pr-flow-index-text",
+      "Apply the single text change in src/pages/Index.tsx",
+      "git add src/pages/Index.tsx",
+      "git commit -m \"chore: test PR flow \u2014 safe text-only change in Index.tsx\"",
+      "git push -u origin chore/test-pr-flow-index-text",
+      "Open PR titled: \"Test PR flow: safe text-only change in Index.tsx\" with the prepared body; request reviews; add labels chore,test,safe-change"
+    ],
+    "notes": [
+      "Do not modify any files other than src/pages/Index.tsx.",
+      "Avoid formatting-only diffs or import reordering.",
+      "If snapshots fail, wait for reviewer guidance before updating them."
+    ]
+  },
+  "file_operations": [],
+  "handoff": {
+    "next_owner": "software_engineer",
+    "next_required_action": "Create branch chore/test-pr-flow-index-text, apply exactly one visible text-string change in src/pages/Index.tsx, commit, push, and open the PR for QA/TA review."
+  },
+  "debug": {
+    "instructions_loaded": true,
+    "retrieved_file_count": 6,
+    "context_mode": "review_bundle",
+    "artifact_bundle_file": "runtime/runs/context_bundle_qa_analyst.json"
+  }
+}
