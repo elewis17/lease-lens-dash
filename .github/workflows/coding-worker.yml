@@ -78,6 +78,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install openai numpy pyyaml
 
+      - name: Reset runtime runs
+        run: |
+          rm -rf ai-company-os/runtime/runs
+          mkdir -p ai-company-os/runtime/runs
+
       - name: Run AI Company OS coding workflow against Lease Lens
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
