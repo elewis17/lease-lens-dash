@@ -1,0 +1,11 @@
+{
+  "qa_issues": [
+    "Unknown UI framework/utility system in use; engineer should apply the closest equivalent using current project standards",
+    "Potential one-off styles on the screen may override alignment; confirm no regressions across breakpoints",
+    "Safari/Firefox baseline alignment quirks; verify align-items choice visually across major browsers",
+    "Do not introduce new dependencies; use existing CSS/utilities",
+    "Wrap Address input and Analyze Deal button in a single row container using flex with gap and align-items to bottom or baseline to match input height"
+  ],
+  "target_paths": [],
+  "files": []
+}
