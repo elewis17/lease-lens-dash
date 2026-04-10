@@ -1,0 +1,38 @@
+{
+  "issue_title": "In the deals and scenarios screen, place the analyze deal button in line with the adress input box.",
+  "issue_body": "<img width=1812 height=378 alt=Image src=https://github.com/user-attachments/assets/eb1c2119-4f37-4a0a-91a8-7166758a1802 />\n\nThe idea is that the blue button for the analyze deal should be in line witht he adress input box making it look symmetrical and intentional",
+  "workflow": "process_change",
+  "retrieved_files": [
+    {
+      "score": 0.29116236489814074,
+      "path": "company/product_strategy.md",
+      "purpose": "company_strategy",
+      "summary": "product_strategy.md is a company strategy file. Main sections: Product Strategy, Objective, Product manager goals, Prioritization framework. Opening content: Build products that are commercially viable, technically maintainable, and scalable with a lean team of AI agents. - Find problems worth solving"
+    },
+    {
+      "score": 0.28683780386016644,
+      "path": "workflows/feature_development.md",
+      "purpose": "workflow_definition",
+      "summary": "feature_development.md is a workflow definition file. Main sections: Workflow: Feature Development, Purpose, Core Principles, Roles in this Workflow. Opening content: Define the standard process for converting approved product scope into implemented, validated, and documented features. This workflow ensures:"
+    },
+    {
+      "score": 0.28269374052640733,
+      "path": "agents/qa_analyst.md",
+      "purpose": "agent_role_definition",
+      "summary": "qa_analyst.md is a agent role definition file. Main sections: Quality Control Analyst Role, Mission, Responsibilities, Inputs. Opening content: - Protect product quality, code quality, and system integrity. - The Quality Control Analyst ensures that all delivered work is clear, testable, maintainable, consistent with architectural standards, and safe to merge."
+    },
+    {
+      "score": 0.2784051263778917,
+      "path": "scripts/bootstrap_notes.md",
+      "purpose": "general_project_file",
+      "summary": "bootstrap_notes.md is a general project file file. Main sections: Bootstrap Notes, First implementation steps, Recommended next docs. Opening content: 1. Put this repo in GitHub as your AI Company OS repo. 2. Add your preferred coding agent instructions to each agent file."
+    },
+    {
+      "score": 0.27046265595356794,
+      "path": "company/operating_principles.md",
+      "purpose": "company_strategy",
+      "summary": "operating_principles.md is a company strategy file. Main sections: Operating Principles. Opening content: 1. Process beats heroics. 2. Architecture is deliberate, not improvised."
+    }
+  ],
+  "issue_number": "25"
+}
