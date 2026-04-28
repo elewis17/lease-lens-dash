@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info, Database} from "lucide-react";
+import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info, Database, FileText, Building2} from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
 import { PropertyFilter } from "@/features/properties/PropertyFilter";
@@ -21,6 +21,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import DealsScenarios from "@/pages/DealsScenarios";
+import Memo from "@/pages/Memo";
+import PortfolioCommandCenter from "@/pages/PortfolioCommandCenter";
 
 type ExpensesBreakdown = {
   taxes: number;
@@ -958,7 +960,7 @@ const Index = () => {
    * - Collapsed: icon-only rail
    * - Expanded: icon + label
    */
-  const [view, setView] = useState<"overview" | "database" | "cashflow" | "equity"| "deals">("overview");
+  const [view, setView] = useState<"overview" | "portfolio" | "database" | "cashflow" | "equity"| "deals" | "memo">("overview");
 
   /**
    * UI-only: AI Brief container.
@@ -997,10 +999,12 @@ const LeftNav = ({
   onToggle: () => void;
 }) => {
   const items = [
+    { key: "deals", label: "Deals & Scenarios", icon: Calculator },
+    { key: "portfolio", label: "Portfolio Overview", icon: Building2 },
     { key: "cashflow", label: "Cash Flow & Risk", icon: LineChart },
     { key: "equity", label: "Equity & Tax Strategy", icon: TrendingUp },
-    { key: "deals", label: "Deals & Scenarios", icon: Calculator },
     { key: "database", label: "Database", icon: Database },
+    { key: "memo", label: "IC Memo", icon: FileText },
   ];
 
   return (
@@ -1014,38 +1018,37 @@ const LeftNav = ({
 
       {/* Nav items */}
       <nav className="px-2 pt-1 pb-3 space-y-1">
-        <div className="flex items-center justify-between px-2 py-2">
-          {/* Left: Overview label (matches nav styling) */}
-          <button
-            type="button"
-            onClick={() => setView("overview")}
-            className={[
-              "w-full rounded-lg px-2 py-2 text-sm transition",
-              view === "overview"
-                ? "bg-primary/10 text-foreground font-medium"
-                : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-            ].join(" ")}
-            title={collapsed ? "Overview" : undefined}
-          >
-            <div className={collapsed ? "flex justify-center" : "flex items-center gap-2"}>
-              <span className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Home className="h-4 w-4 text-primary" />
-              </span>
-              {!collapsed && <span className="truncate">Overview</span>}
-            </div>
-          </button>
-
-          {/* Right: collapse toggle */}
+        {/* Collapse toggle (separate row) */}
+        <div className="flex justify-end px-2">
           <button
             type="button"
             onClick={onToggle}
-            className="ml-2 h-8 w-8 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground grid place-items-center"
+            className="h-8 w-8 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground grid place-items-center"
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             title={collapsed ? "Expand" : "Collapse"}
           >
             {collapsed ? "»" : "«"}
           </button>
         </div>
+
+        {/* Overview */}
+        <button
+          type="button"
+          onClick={() => setView("overview")}
+          className={[
+            "w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
+            view === "overview"
+              ? "bg-primary/10 text-foreground font-medium"
+              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+            collapsed ? "justify-center" : "",
+          ].join(" ")}
+          title={collapsed ? "Overview" : undefined}
+        >
+          <span className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Home className="h-4 w-4 text-primary" />
+          </span>
+          {!collapsed && <span className="truncate">Overview</span>}
+        </button>
 
         {items.map((it, idx) => {
           const Icon = it.icon;
@@ -1904,6 +1907,17 @@ const formatNum = (n: number) =>
 
         {view === "deals" && <DealsScenarios />}
 
+        {view === "memo" && <Memo />}
+
+        {view === "portfolio" && (
+          <PortfolioCommandCenter
+            properties={properties}
+            leases={leases}
+            mortgages={mortgages}
+            metrics={metrics}
+          />
+        )}
+        
       </main>
 
       {/*<QuickActions onUploadClick={() => setShowUploader(true)} /> //Floating footer with buttons*/}
