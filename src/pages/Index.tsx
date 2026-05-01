@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info, Database, FileText, Building2} from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
 import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
-import { PropertyFilter } from "@/features/properties/PropertyFilter";
+import { PropertyFilter } from "@/features/properties/PropertyFilter"
 //import PropertiesTable, { type Property } from "@/components/PropertiesTable";window.location.pathname.replace("/lease-lens-dash", "") || "/"
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { OpexCalculator } from "@/domain/finance/OpexCalculator";
@@ -22,7 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import DealsScenarios from "@/pages/DealsScenarios";
 import Memo from "@/pages/Memo";
-import PortfolioCommandCenter from "@/pages/PortfolioCommandCenter";
+import PortfolioDecisions from "@/pages/PortfolioDecisions";
+import PortfolioSnapshot from "@/pages/PortfolioSnapshot";
+import DataRoom from "@/pages/DataRoom";
 
 type ExpensesBreakdown = {
   taxes: number;
@@ -960,7 +962,7 @@ const Index = () => {
    * - Collapsed: icon-only rail
    * - Expanded: icon + label
    */
-  const [view, setView] = useState<"overview" | "portfolio" | "database" | "cashflow" | "equity"| "deals" | "memo">("overview");
+  const [view, setView] = useState<"snapshot" | "portfolio" | "database" | "deals" | "memo">("snapshot");
 
   /**
    * UI-only: AI Brief container.
@@ -999,12 +1001,12 @@ const LeftNav = ({
   onToggle: () => void;
 }) => {
   const items = [
-    { key: "deals", label: "Deals & Scenarios", icon: Calculator },
-    { key: "portfolio", label: "Portfolio Overview", icon: Building2 },
-    { key: "cashflow", label: "Cash Flow & Risk", icon: LineChart },
-    { key: "equity", label: "Equity & Tax Strategy", icon: TrendingUp },
-    { key: "database", label: "Database", icon: Database },
-    { key: "memo", label: "IC Memo", icon: FileText },
+    { key: "snapshot", label: "Portfolio Snapshot", icon: Home },
+    { key: "portfolio", label: "Portfolio Decisions", icon: TrendingUp },
+    { key: "deals", label: "Deal Underwriting", icon: Calculator },
+    { key: "memo", label: "Investment Memo", icon: FileText },
+    { key: "database", label: "Data Room", icon: Database },
+    
   ];
 
   return (
@@ -1030,25 +1032,6 @@ const LeftNav = ({
             {collapsed ? "»" : "«"}
           </button>
         </div>
-
-        {/* Overview */}
-        <button
-          type="button"
-          onClick={() => setView("overview")}
-          className={[
-            "w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
-            view === "overview"
-              ? "bg-primary/10 text-foreground font-medium"
-              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-            collapsed ? "justify-center" : "",
-          ].join(" ")}
-          title={collapsed ? "Overview" : undefined}
-        >
-          <span className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Home className="h-4 w-4 text-primary" />
-          </span>
-          {!collapsed && <span className="truncate">Overview</span>}
-        </button>
 
         {items.map((it, idx) => {
           const Icon = it.icon;
@@ -1448,461 +1431,35 @@ const formatNum = (n: number) =>
 
       <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
         
-        {view === "overview" && (
-          <>
-            <AIBriefShell />  
-
-            {/* ---- Investment Performance ---- */}
-            <section className="space-y-3">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-                {/* ROI with centered, mobile-friendly popover beside title */}
-                <MetricCard
-                  title={
-                    <div className="flex items-center gap-1.5">
-                      <span>ROI</span>
-
-                      {/* Click/tap to open; ESC or click backdrop to close */}
-                      <details className="relative">
-                        <summary
-                          className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
-                          aria-label="About ROI"
-                        >
-                          <Info className="h-4 w-4" />
-                        </summary>
-
-                        {/* Backdrop + centered sheet (prevents cutoff) */}
-                        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
-                          {/* Backdrop */}
-                          <button
-                            aria-label="Close"
-                            className="absolute inset-0 bg-black/20"
-                            onClick={(e) => {
-                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                              if (d) d.open = false;
-                            }}
-                          />
-                          {/* Sheet */}
-                          <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-semibold text-gray-900">ROI (Return on Investment)</p>
-                              <button
-                                className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
-                                aria-label="Close"
-                                onClick={(e) => {
-                                  const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                                  if (d) d.open = false;
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-
-                            <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
-                              <li><strong>What it measures:</strong> ROI shows your total return compared to what you’ve invested. It includes income, appreciation, and costs, giving a snapshot of your overall profitability.</li>
-                              <li><strong>Why you see what you see:</strong> A lower ROI often means you’ve recently spent on upgrades, had high upfront costs, or are early in ownership. As rents rise and expenses stabilize, ROI typically improves.</li>
-                              <li><strong>When to look at it:</strong> Use ROI to evaluate your overall performance or to compare your property against other types of investments.</li>
-                              <li><strong>How to improve it:</strong> Increase income, reduce expenses, or refinance to lower financing costs.</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </details>
-                    </div>
-                  }
-                  value={`${metrics.roi.toFixed(2)}%`}
-                  subtitle="short-term snapshot"
-                  icon={TrendingUp}
-                  variant="default"
-                />
-                {/* Cap Rate with centered, mobile-friendly popover beside title */}
-                <MetricCard
-                  title={
-                    <div className="flex items-center gap-1.5">
-                      <span>Cap Rate</span>
-
-                      {/* Click/tap to open; ESC or click backdrop to close */}
-                      <details className="relative">
-                        <summary
-                          className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
-                          aria-label="About Cap Rate"
-                        >
-                          <Info className="h-4 w-4" />
-                        </summary>
-
-                        {/* Backdrop + centered sheet (prevents cutoff) */}
-                        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
-                          {/* Backdrop */}
-                          <button
-                            aria-label="Close"
-                            className="absolute inset-0 bg-black/20"
-                            onClick={(e) => {
-                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                              if (d) d.open = false;
-                            }}
-                          />
-                          {/* Sheet */}
-                          <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-semibold text-gray-900">Cap Rate (Capitalization Rate)</p>
-                              <button
-                                className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
-                                aria-label="Close"
-                                onClick={(e) => {
-                                  const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                                  if (d) d.open = false;
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-
-                            <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
-                              <li><strong>Formula:</strong> NOI/Property Value</li>
-                              <li><strong>What it measures:</strong> Cap Rate = Net Operating Income ÷ Property Value. It measures how efficiently a property generates income relative to its value, ignoring financing or debt structure.</li>
-                              <li><strong>Why you see what you see:</strong> A higher cap rate can mean stronger income potential or higher market risk. A lower one means a more stable property or a higher-value area where prices outpace rent.</li>
-                              <li><strong>When to look at it:</strong> Check the cap rate when comparing properties or evaluating how effective your property is at producing income at its market value.</li>
-                              <li><strong>How to improve it:</strong> Increase rent, reduce operating expenses, or acquire properties below market value to raise your cap rate.</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </details>
-                    </div>
-                  }
-                  value={`${metrics.capRate.toFixed(2)}%`}
-                  subtitle="property efficiency"
-                  icon={Percent}
-                  variant="default"
-                />
-                {/* 10-Year IRR with centered, mobile-friendly popover beside title */}
-                <MetricCard
-                  title={
-                    <div className="flex items-center gap-1.5">
-                      <span>10-Year IRR</span>
-
-                      {/* Click/tap to open; ESC or click backdrop to close */}
-                      <details className="relative">
-                        <summary
-                          className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
-                          aria-label="About 10-Year IRR"
-                        >
-                          <Info className="h-4 w-4" />
-                        </summary>
-
-                        {/* Backdrop + centered sheet (prevents cutoff) */}
-                        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
-                          {/* Backdrop */}
-                          <button
-                            aria-label="Close"
-                            className="absolute inset-0 bg-black/20"
-                            onClick={(e) => {
-                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                              if (d) d.open = false;
-                            }}
-                          />
-                          {/* Sheet */}
-                          <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-semibold text-gray-900">10-Year IRR (Internal Rate of Return)</p>
-                              <button
-                                className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
-                                aria-label="Close"
-                                onClick={(e) => {
-                                  const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                                  if (d) d.open = false;
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-
-                            <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
-                              <li><strong>Formula:</strong> IRR=Discount rate where NPV(10-year cash flows + sale proceeds)=0</li>
-                              <li><strong>What it measures:</strong> IRR shows your average annual return over time, factoring in both cash flow and appreciation. It accounts for when money goes in and when it comes back — through rent, loan paydown, or eventual sale.</li>
-                              <li><strong>Why you see what you see:</strong> A higher IRR usually means the property is benefiting from appreciation, equity growth, or strong long-term performance. It combines all return sources into one time-weighted rate.</li>
-                              <li><strong>When to look at it:</strong> Use IRR to evaluate long-term investment performance or compare potential returns across different properties and hold periods.</li>
-                              <li><strong>How to improve it:</strong> Add value through renovations, increase equity by paying down principal faster, or time your sale to capture peak market appreciation.</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </details>
-                    </div>
-                  }
-                  value={`${metrics.irr10Year.toFixed(2)}%`}
-                  subtitle="full long-term wealth picture"
-                  icon={LineChart}
-                  variant="default"
-                />
-                {/* Cash-on-Cash Return with centered, mobile-friendly popover beside title */}
-                <MetricCard
-                  title={
-                    <div className="flex items-center gap-1.5">
-                      <span>Cash-on-Cash Return</span>
-
-                      {/* Click/tap to open; ESC or click backdrop to close */}
-                      <details className="relative">
-                        <summary
-                          className="list-none inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:text-gray-700 cursor-pointer"
-                          aria-label="About Cash-on-Cash Return"
-                        >
-                          <Info className="h-4 w-4" />
-                        </summary>
-
-                        {/* Backdrop + centered sheet (prevents cutoff) */}
-                        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
-                          {/* Backdrop */}
-                          <button
-                            aria-label="Close"
-                            className="absolute inset-0 bg-black/20"
-                            onClick={(e) => {
-                              const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                              if (d) d.open = false;
-                            }}
-                          />
-                          {/* Sheet */}
-                          <div className="relative z-10 w-full max-w-xl rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-semibold text-gray-900">Cash-on-Cash Return</p>
-                              <button
-                                className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
-                                aria-label="Close"
-                                onClick={(e) => {
-                                  const d = (e.currentTarget.closest('details') as HTMLDetailsElement | null);
-                                  if (d) d.open = false;
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-
-                            <ul className="mt-2 list-disc pl-5 space-y-2 text-gray-700">
-                              <li><strong>Formula:</strong> Cash Return/Cash Invested</li>
-                              <li><strong>What it measures:</strong> Cash-on-cash return shows how much annual cash flow you earn compared to the cash you invested. It reflects the property’s actual cash performance after financing.</li>
-                              <li><strong>Why you see what you see:</strong> This number changes with loan terms, rent levels, and expenses. A lower return may mean high upfront costs or conservative leverage, while a higher one signals stronger cash flow efficiency.</li>
-                              <li><strong>When to look at it:</strong> Use cash-on-cash return to assess short-term income performance or compare how different properties perform when leverage is involved.</li>
-                              <li><strong>How to improve it:</strong> Increase rent, lower expenses, refinance for better loan terms, or reduce vacancy to improve annual cash flow.</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </details>
-                    </div>
-                  }
-                  value={`${metrics.cashOnCash.toFixed(2)}%`}
-                  subtitle="current cash flow health"
-                  icon={DollarSign}
-                  variant="success"
-                />
-              </div>
-            </section>
-
-            {/* ---- Property Financials ---- */}
-            <section className="mt-10">
-              <div className="rounded-2xl bg-card p-8 shadow-sm border border-border transition-colors">
-                <div className="mb-6 flex items-center gap-2">
-                  <h2 className="text-lg font-semibold text-card-foreground">
-                    Current Operating Reality
-                  </h2>
-                </div>
-
-                {/* P&L order: 3×2 grid (no mini cards) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-1">
-                  {/* 1) Contracted Monthly Rent */}
-                  <MetricCardWithInfo
-                    icon={DollarSign}
-                    title="Contracted Monthly Rent"
-                    value={`$${metrics.expectedRent.toLocaleString()}`}
-                    tooltip="Total rent due from current leases; your top-line rental revenue."
-                  />
-
-                  {/* 2) Operating Expenses (OPEX) */}
-                  <MetricCardWithInfo
-                    icon={Calculator}
-                    title="Operating Expenses (OPEX)"
-                    value={`$${opexMonthly.toLocaleString()}`}
-                    tooltip="All monthly operating costs excluding debt; uses property-level rules (taxes, insurance, mgmt %, maintenance %, escrow)."
-                  />
-
-                  {/* 3) Net Operating Income (NOI) */}
-                  <MetricCardWithInfo
-                    icon={Wallet}
-                    title="Net Operating Income (NOI)"
-                    value={`$${metrics.noi.toLocaleString()}`}
-                    tooltip="NOI = Rent − Operating Expenses; excludes debt service."
-                  />
-
-                  {/* 4) Monthly Cash Flow */}
-                  <MetricCardWithInfo
-                    icon={LineChart}
-                    title="Monthly Cash Flow"
-                    value={`$${metrics.cashFlow.toLocaleString()}`}
-                    tooltip="Cash Flow = NOI − Debt Service; positive means surplus after paying mortgages."
-                  />
-
-                  {/* 5) Occupancy Rate */}
-                  <MetricCardWithInfo
-                    icon={Home}
-                    title="Occupancy Rate"
-                    value={`${metrics.occupancyRate.toFixed(1)}%`}
-                    tooltip={`${metrics.activeLeases} of ${metrics.totalUnits} units filled.`}
-                  />
-                  {/* 6) DCR */}
-                  <MetricCardWithInfo
-                    icon={Calculator}
-                    title="Debt Coverage Ratio (DCR)"
-                    value={metrics.dcr.toFixed(2)}
-                    tooltip="NOI ÷ Annual Debt Service; ≥ 1.25 is typically considered safe."
-                  />
-                </div>
-              </div>
-            </section>
-          
-          </>
-        )} 
-
-        {view === "database" && ( 
-          <div className="space-y-10">
-
-            {/* Properties Card */}
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold leading-snug">
-                Properties <span className="text-muted-foreground text-base">({filteredProperties.length})</span>
-              </h2>
-              {/* Floating OPEX pill aligned over the Taxes column (left aligned) */}
-              {(() => {
-                const OpexOverTaxes = () => {
-                  const wrapRef = useRef<HTMLDivElement | null>(null);
-                  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-
-                  useEffect(() => {
-                    const el = wrapRef.current;
-                    if (!el) return;
-
-                    const compute = () => {
-                      // Grab the Taxes header only (first rose-colored column)
-                      const th = el.querySelector<HTMLElement>('th.bg-rose-50\\/60, th.bg-rose-50\\/40');
-                      if (!th) return;
-
-                      const thRect = th.getBoundingClientRect();
-                      const containerRect = el.getBoundingClientRect();
-
-                      // Align left edge of the Taxes column
-                      const left = thRect.left - containerRect.left + 4; // +4 for a little padding
-                      const top = thRect.top - containerRect.top - 6;   // hover slightly above header
-
-                      setPos({ left, top });
-                    };
-
-                    compute();
-                    window.addEventListener("resize", compute);
-                    return () => window.removeEventListener("resize", compute);
-                  }, [filteredProperties.length]);
-
-                  return (
-                    <div ref={wrapRef} className="relative">
-                      {pos && (
-                        <span
-                          className="absolute -translate-y-full z-20 inline-flex items-center rounded-t-lg bg-rose-100 text-rose-700 px-3 py-0.5 text-xs font-medium shadow-sm pointer-events-none"
-                          style={{ left: pos.left, top: pos.top }}
-                        >
-                          OPEX
-                        </span>
-                      )}
-
-                      <PropertiesTable
-                        properties={filteredProperties}
-                        onAdd={handleAddProperty}
-                        onUpdate={handleUpdateProperty}
-                        onDelete={handleDeleteProperty}
-                        escrowByProperty={Object.fromEntries(escrowByProperty ?? new Map())}
-                      />
-                    </div>
-                  );
-                };
-                return <OpexOverTaxes />;
-              })()}
-            </div>
-
-            {/* Lease Table Card */}
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold leading-snug">
-                Active Leases <span className="text-muted-foreground text-base">({filteredLeases.length})</span>
-              </h2>
-              <LeaseTable
-                  leases={filteredLeases}
-                  onUpdate={handleUpdateLease}
-                  onDelete={handleDeleteLease}
-                  onAdd={handleAddLease}
-                  propertyOptions={properties.map((p: any) => ({id: p.id, 
-                      name: p.alias || p.address || "Untitled Property"
-                                                                }))}
-                  unitOptions={unitOptions}
-                />
-            </div>
-
-            {/* Mortgages Card */}
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold leading-snug">
-                Mortgages <span className="text-muted-foreground text-base">({mortgages.length})</span>
-              </h2>
-              <MortgagesTable
-                mortgages={filteredMortgages}
-                onUpdate={handleUpdateMortgage}
-                onDelete={handleDeleteMortgage}
-                onAdd={handleAddMortgage}
-                propertyOptions={propertyOptions}
-              />
-            </div>
-
-          </div> 
+        {view === "snapshot" && (
+          <PortfolioSnapshot
+            properties={properties}
+            leases={leases}
+            mortgages={mortgages}
+            metrics={metrics}
+          />
         )}
 
-        {view === "cashflow" && (
-          <div className="space-y-3">
-            {/* Income & Safety Chart */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              {/* Left side: Title + Scenario description */}
-              <div className="flex flex-col">
-                <h2 className="text-base sm:text-lg font-semibold text-foreground leading-tight">
-                  Cash Flow & Risk <span className="text-muted-foreground font-normal">(10 Years)</span>
-                </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground leading-snug sm:whitespace-normal whitespace-pre-wrap">
-                  {scenario.charAt(0).toUpperCase() + scenario.slice(1)} scenario: Rent at{" "}
-                  {getScenarioRates().rentGrowth.toFixed(1)}% growth vs. OPEX at{" "}
-                  {getScenarioRates().opexInflation.toFixed(1)}% inflation
-                </p>
-              </div>
-
-              <div className="mt-2 sm:mt-0">
-                {/* Right side: Scenario Toggle */}
-                <ScenarioToggle scenario={scenario} onScenarioChange={setScenario} />
-              </div>
-            </div>
-
-            <IncomeAndSafetyChart
-              currentRent={metrics.mrr}
-              rentGrowthRate={getScenarioRates().rentGrowth}
-              noi={metrics.noi}
-              opex={opexMonthly}
-              opexInflationRate={getScenarioRates().opexInflation}
-              debtService={mortgages.reduce((sum, m) => sum + m.monthly_payment, 0)}
-            />
-          </div>
-
-        )}
-        
-        {view === "equity" && (
-          <div className="space-y-2">
-            {/* Wealth Build Chart */}
-            <div>
-              <h2 className="text-xl font-semibold leading-snug">Equity Growth Engine (10 Years)</h2>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-                Long-term wealth building through appreciation and debt paydown
-              </p>
-            </div>
-            <WealthBuildChart
-              noi={metrics.noi}
-              capRate={metrics.capRate}
-              mortgages={mortgages}
-            />
-          </div>          
+        {view === "database" && (
+          <DataRoom
+            filteredProperties={filteredProperties}
+            filteredLeases={filteredLeases}
+            filteredMortgages={filteredMortgages}
+            mortgages={mortgages}
+            properties={properties}
+            propertyOptions={propertyOptions}
+            unitOptions={unitOptions}
+            escrowByProperty={escrowByProperty}
+            onAddProperty={handleAddProperty}
+            onUpdateProperty={handleUpdateProperty}
+            onDeleteProperty={handleDeleteProperty}
+            onAddLease={handleAddLease}
+            onUpdateLease={handleUpdateLease}
+            onDeleteLease={handleDeleteLease}
+            onAddMortgage={handleAddMortgage}
+            onUpdateMortgage={handleUpdateMortgage}
+            onDeleteMortgage={handleDeleteMortgage}
+          />
         )}
 
         {view === "deals" && <DealsScenarios />}
@@ -1910,7 +1467,7 @@ const formatNum = (n: number) =>
         {view === "memo" && <Memo />}
 
         {view === "portfolio" && (
-          <PortfolioCommandCenter
+          <PortfolioDecisions
             properties={properties}
             leases={leases}
             mortgages={mortgages}
