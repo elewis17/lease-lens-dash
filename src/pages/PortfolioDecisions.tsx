@@ -10,7 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-type PortfolioCommandCenterProps = {
+type PortfolioDecisionsProps = {
   properties?: any[];
   leases?: any[];
   mortgages?: any[];
@@ -64,12 +64,12 @@ const shortMoney = (value: number) => {
   return money(value);
 };
 
-const PortfolioCommandCenter = ({
+const PortfolioDecisions = ({
   properties = [],
   leases = [],
   mortgages = [],
   metrics = {},
-}: PortfolioCommandCenterProps) => {
+}: PortfolioDecisionsProps) => {
   const hasRealProperties = properties.length > 0;
 
   const portfolioValue = hasRealProperties
@@ -413,4 +413,4 @@ const PortfolioCommandCenter = ({
   );
 };
 
-export default PortfolioCommandCenter;
+export default PortfolioDecisions;

@@ -32,7 +32,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
          {/* LEFT: brand + sidebar toggle (aligned to sidebar width) */}
         <div>
           <div>
-            <h1 className="text-2xl font-bold">Pocket CFO</h1>
+            <h1 className="text-2xl font-bold">DealStack</h1>
             <p className="text-sm text-muted-foreground -mt-1">
               AI Co-Pilot for Investors
             </p>

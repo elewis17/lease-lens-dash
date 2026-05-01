@@ -54,26 +54,51 @@ const Memo = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Investment Committee</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">One-Click IC Memo</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Turn underwriting assumptions into a PE-style decision memo that explains the recommendation, risks, return profile, and next diligence steps.
-          </p>
+      <section className="rounded-[1.75rem] bg-slate-950 text-white p-6 sm:p-8 shadow-sm">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium">
+              <FileText className="h-3.5 w-3.5" />
+              Investment Committee
+            </div>
+
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight">
+              One-Click IC Memo
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-sm text-slate-200">
+              Turn underwriting assumptions into a PE-style decision memo that explains the recommendation, risks, return profile, and next diligence steps.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white/10 p-4 grid grid-cols-3 gap-5 min-w-[320px]">
+            <div>
+              <p className="text-xs text-slate-300">Projected IRR</p>
+              <p className="mt-1 text-2xl font-bold">{pct(projectedIrr)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-300">DSCR</p>
+              <p className="mt-1 text-2xl font-bold">{dscr.toFixed(2)}x</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-300">Max Offer</p>
+              <p className="mt-1 text-2xl font-bold">{money(maxOffer)}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={copyMemo}>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button variant="secondary" onClick={copyMemo}>
             <Clipboard className="mr-2 h-4 w-4" />
             Copy memo
           </Button>
-          <Button>
+
+          <Button variant="secondary">
             <Download className="mr-2 h-4 w-4" />
             Export later
           </Button>
         </div>
-      </div>
+      </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card className="rounded-2xl border-border p-6 shadow-sm xl:col-span-1">
