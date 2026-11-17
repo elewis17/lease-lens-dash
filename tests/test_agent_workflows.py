@@ -37,6 +37,25 @@ class WorkerWorkflowTests(unittest.TestCase):
             git('add', '--', *paths)
             self.assertEqual(git('diff', '--cached', '--name-only'), 'docs/note.md')
 
+    def test_code_gate_runs_tests_and_blocks_missing_or_failed_tests(self):
+        gate = next(s for s in self.steps if s['name'] == 'Run automated code tests')
+        names = [s['name'] for s in self.steps]
+        self.assertLess(names.index('Run automated code tests'), names.index('Create Pull Request'))
+        with tempfile.TemporaryDirectory() as directory:
+            subprocess.run(['git', 'init', '-q', directory], check=True)
+            root = Path(directory)
+            (root / 'src').mkdir()
+            (root / 'src/example.js').write_text('export const value = 1;')
+            def run():
+                return subprocess.run(['bash', '-e', '-c', gate['run']], cwd=root, capture_output=True).returncode
+            self.assertNotEqual(run(), 0, 'source without tests must fail')
+            (root / 'tests').mkdir()
+            test = root / 'tests/example.test.mjs'
+            test.write_text("import test from 'node:test'; test('deliberate failure', () => { throw Error('failure'); });")
+            self.assertNotEqual(run(), 0, 'failing tests must prevent PR publication')
+            test.write_text("import test from 'node:test'; test('pass', () => {});")
+            self.assertEqual(run(), 0)
+
     def test_dispatch_packet_does_not_interpolate_issue_into_shell(self):
         dispatcher = yaml.safe_load((ROOT / '.github/workflows/dispatch-agent.yml').read_text())
         for step in dispatcher['jobs']['dispatch']['steps']:
