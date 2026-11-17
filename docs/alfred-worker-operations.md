@@ -64,3 +64,25 @@ The earlier patched retry correctly failed on a handoff loop. QA received the
 implemented file, but agents attempted to delegate PR publication before
 completion. The corrected instructions assign branch/PR publication to Actions
 after QA completes. Revalidate the normal label path after approved merges.
+
+## Executable code checks (proposed in PR 37)
+
+The existing merged worker's QA is model review. PR 37 adds real Node 24 test
+execution before PR publication. Put dependency-free executable checks in
+`tests/*.test.mjs` using `node:test`. The worker runs them with `node --test`.
+A failing test stops publication; changes under `src` without such tests also
+stop publication. This is the initial test contract, not a substitute for
+application-specific build, integration or browser checks.
+
+The worker posts a completed/blocked comment and run link on the original issue.
+Generated PRs include their evidence run. Source and test changes remain in a
+review branch; no worker merges or deploys them.
+
+Code validation issue: https://github.com/elewis17/lease-lens-dash/issues/36
+Code and test PR: https://github.com/elewis17/lease-lens-dash/pull/38
+Test-execution gate PR: https://github.com/elewis17/lease-lens-dash/pull/37
+
+The first test-gated attempt caught an ES-module import error and posted a
+blocked outcome: https://github.com/elewis17/lease-lens-dash/actions/runs/44199308041
+The task was corrected to include package.json and its `type: module` setting;
+its utility and test must use matching ES-module named exports/imports.
