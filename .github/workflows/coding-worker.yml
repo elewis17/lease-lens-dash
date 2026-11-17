@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: elewis17/ai-company-os
-          ref: e18bc41b1a460c83b4991d2b5ad5a6a9484b647b
+          ref: 466b40c296c3b49d27e7b642cf7c4e7562bfe03f
           path: ai-company-os
 
       - name: Download task packet
