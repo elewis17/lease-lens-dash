@@ -1,6 +1,12 @@
 name: Coding Worker
 
 on:
+  workflow_dispatch:
+    inputs:
+      dispatcher_run_id:
+        description: Successful Dispatch Agent run containing the task packet to retry
+        required: true
+        type: string
   workflow_run:
     workflows: ["Dispatch Agent"]
     types:
@@ -12,24 +18,31 @@ permissions:
 
 jobs:
   worker:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: coding-worker
+      cancel-in-progress: false
 
     steps:
       - name: Checkout lease-lens repo
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Checkout AI Company OS
         uses: actions/checkout@v4
         with:
           repository: elewis17/ai-company-os
+          ref: 466b40c296c3b49d27e7b642cf7c4e7562bfe03f
           path: ai-company-os
 
       - name: Download task packet
         uses: actions/download-artifact@v4
         with:
           name: task-packet
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ inputs.dispatcher_run_id || github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: task
 
@@ -134,11 +147,23 @@ jobs:
             echo "No software engineer step file found in ai-company-os/runtime/runs"
           fi
 
+      - name: Require successful QA
+        run: |
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          result = json.loads(Path("ai-company-os/runtime/runs/workflow_result.json").read_text())
+          qa = result.get("result") or {}
+          if not (result.get("passed") is True and qa.get("agent") == "qa_analyst"
+                  and qa.get("status") == "completed" and qa.get("workflow_outcome") == "completed"):
+              raise SystemExit("QA did not approve; pull request creation stopped")
+          PYCODE
+
       - name: Check for repository changes
         id: changes
         shell: bash
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
+          if [ -n "$(git status --porcelain -- . ':(exclude)runtime/runs' ':(exclude)task' ':(exclude)agent' ':(exclude)ai-company-os' ':(exclude)issue_outputs.txt')" ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
             git status --short
           else
@@ -150,6 +175,13 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          add-paths: |
+            .
+            :(exclude)runtime/runs
+            :(exclude)task
+            :(exclude)agent
+            :(exclude)ai-company-os
+            :(exclude)issue_outputs.txt
           commit-message: ${{ steps.issue.outputs.pr_title }}
           branch: ${{ steps.issue.outputs.branch_name }}
           title: ${{ steps.issue.outputs.pr_title }}
@@ -160,7 +192,7 @@ jobs:
             - Issue #${{ steps.issue.outputs.issue_number }}
 
             Validation run in workflow:
-            - AI Company OS workflow execution completed
+            - QA completed successfully; blocked or incomplete reviews fail the worker
             - Review the diff and run repo CI before merge
           base: main
           delete-branch: true

@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   dispatch:
-    if: github.event.label.name == 'agent-ready'
+    if: github.event.label.name == 'agent-ready' && github.event.issue.author_association == 'OWNER'
     runs-on: ubuntu-latest
 
     steps:
@@ -125,19 +125,19 @@ jobs:
         run: |
           mkdir -p agent
 
-          {
-            echo "# Task Packet"
-            echo
-            echo "Issue: #${{ github.event.issue.number }}"
-            echo "Title: ${{ github.event.issue.title }}"
-            echo
-            echo "Description:"
-            echo "${{ github.event.issue.body }}"
-            echo
-            echo "---"
-            echo
-            echo "# Retrieved OS Context"
-          } > agent/task.md
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          metadata = json.loads(Path("agent/issue_metadata.json").read_text(encoding="utf-8"))
+          Path("agent/task.md").write_text(
+              "# Task Packet\n\n"
+              + f"Issue: #{metadata['issue_number']}\n"
+              + f"Title: {metadata['issue_title']}\n\n"
+              + "Description:\n" + metadata['issue_body']
+              + "\n\n---\n\n# Retrieved OS Context\n",
+              encoding="utf-8",
+          )
+          PYCODE
 
       - name: Append retrieved OS context files
         run: |
