@@ -50,3 +50,17 @@ generated files. Treat that run as diagnostic evidence, not milestone success.
 The patched workflow must be reviewed and approved before it becomes the
 normal label-triggered path. Projects-board permissions are not required for
 this label mechanism; no board-status trigger has been verified.
+
+## Patched worker verification
+
+The final isolated retry passed QA and the explicit QA gate, then automatically
+updated PR 34. Its diff contains only docs/alfred-agent-validation.md.
+
+- Successful retry: https://github.com/elewis17/lease-lens-dash/actions/runs/44195518392
+- Engine regression CI (8 tests): https://github.com/elewis17/ai-company-os/actions/runs/44195471881
+- Worker regression CI (3 tests): https://github.com/elewis17/lease-lens-dash/actions/runs/44195508420
+
+The earlier patched retry correctly failed on a handoff loop. QA received the
+implemented file, but agents attempted to delegate PR publication before
+completion. The corrected instructions assign branch/PR publication to Actions
+after QA completes. Revalidate the normal label path after approved merges.
