@@ -159,6 +159,26 @@ jobs:
               raise SystemExit("QA did not approve; pull request creation stopped")
           PYCODE
 
+      - name: Set up Node for code validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run automated code tests
+        shell: bash
+        run: |
+          shopt -s nullglob
+          tests=(tests/*.test.mjs)
+          code_changes=$(git status --porcelain -- src)
+          if [ ${#tests[@]} -gt 0 ]; then
+            node --test "${tests[@]}"
+          elif [ -n "$code_changes" ]; then
+            echo "Source code changed without executable tests; stopping PR creation"
+            exit 1
+          else
+            echo "No source changes or Node tests for this task"
+          fi
+
       - name: Check for repository changes
         id: changes
         shell: bash
@@ -193,7 +213,8 @@ jobs:
 
             Validation run in workflow:
             - QA completed successfully; blocked or incomplete reviews fail the worker
-            - Review the diff and run repo CI before merge
+            - Executable Node tests passed, or this task changed no application source
+            - Review the diff before merge
           base: main
           delete-branch: true
 
