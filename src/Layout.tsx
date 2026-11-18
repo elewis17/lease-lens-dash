@@ -54,7 +54,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={() => navigate("/auth/login")}
               className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
             >
-              Log In
+              Sign in
             </button>
           )}
 

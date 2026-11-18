@@ -4,9 +4,10 @@ import { useAuth } from "@/context/AuthContext";
 
 type ProtectedRouteProps = {
   children: (userId: string) => ReactNode;
+  signedOut?: ReactNode;
 };
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, signedOut }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
@@ -17,7 +18,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return <Navigate to="/auth/login" replace />;
+    return signedOut ?? <Navigate to="/auth/login" replace />;
   }
 
   return <>{children(user.id)}</>;

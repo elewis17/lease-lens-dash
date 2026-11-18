@@ -78,7 +78,12 @@ Copy `.env.example` to `.env.local` and set the project URL and a browser-safe
 publishable key. Supply the same two Vite variables to the GitHub Pages build.
 Keep privileged keys in the relevant server-side configuration.
 
-Portfolio access requires a Supabase session. Allow the deployed app's
+Signed-out visitors see a read-only demo of the illustrative DealStack
+portfolio. It is bundled separately from private records and makes no
+portfolio requests. Signing in opens the signed-in owner's portfolio, and
+signing out returns to the demo.
+
+Private portfolio access requires a Supabase session. Allow the deployed app's
 `auth/callback` URL under Supabase Authentication → URL Configuration, including
 the GitHub Pages project path. For local sign-in, also allow
 `http://localhost:8000/auth/callback`.
