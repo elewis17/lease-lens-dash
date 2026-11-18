@@ -35,7 +35,7 @@ export const WealthBuildChart = ({ noi, capRate, mortgages }: WealthBuildChartPr
   };
 
   const generateProjections = () => {
-    const data = [];
+    const data: { year: number; propertyValue: number; loanBalance: number; equity: number }[] = [];
     const monthlyNOI = noi;
     const annualNOI = monthlyNOI * 12;
     

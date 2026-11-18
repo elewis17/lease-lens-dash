@@ -56,21 +56,32 @@ export class MetricsCalculator {
     return { noi, cap, dcr, roi, coc };
   }
 
-  static occupancyRate(leases, units, selectedProperty, allowedPropertyIds) {
+  static occupancyRate(
+    leases: readonly {
+      property_id: string | null;
+      unit_id: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      status: string | null;
+    }[],
+    units: readonly { property_id: string | null }[],
+    selectedProperty: string,
+    allowedPropertyIds: readonly string[],
+  ) {
     // filter units
     const filteredUnits = selectedProperty
       ? units.filter(u => u.property_id === selectedProperty)
-      : units.filter(u => allowedPropertyIds.includes(u.property_id));
+      : units.filter(u => u.property_id !== null && allowedPropertyIds.includes(u.property_id));
 
     const totalUnits = filteredUnits.length || 1;
 
     // active leased units
-    const activeUnits = new Set();
+    const activeUnits = new Set<string | null>();
 
     const now = new Date();
 
     leases.forEach(l => {
-      if (!allowedPropertyIds.includes(l.property_id)) return;
+      if (l.property_id === null || !allowedPropertyIds.includes(l.property_id)) return;
 
       const start = l.start_date ? new Date(l.start_date) : null;
       const end   = l.end_date ? new Date(l.end_date) : null;

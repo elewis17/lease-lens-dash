@@ -13,10 +13,12 @@ import { LeaseTable } from "@/features/leases/LeaseTable";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { IncomeAndSafetyChart } from "@/components/IncomeAndSafetyChart";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
-import { MortgagesTable } from "@/components/MortgagesTable";
+import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
 import { QuickActions } from "@/components/QuickActions";
 import { ROISummaryCard } from "@/components/ROISummaryCard";
 import { ScenarioToggle, Scenario } from "@/components/ScenarioToggle";
+import type { LeaseData } from "@/features/leases/LeaseTable";
+import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DealsScenarios from "@/pages/DealsScenarios";
@@ -35,36 +37,13 @@ type ExpensesBreakdown = {
   misc: number;
 };
 
-type PropertyRowLegacy = {
-    id: string;
-    address: string | null;
-    created_at?: string | null;
-    mortgage_payment?: number | null;
-    opex_inflation_rate?: number | null;
-    property_value?: number | null;
-    purchase_price?: number | null;
-    rent_growth_rate?: number | null;
-    total_units?: number | null;
-    updated_at?: string | null;
-    // tolerate "new" columns if/when your migration is live
-    alias?: string | null;
-    type?: string | null;
-    sale_price?: number | null;
-    property_taxes?: number | null;
-    mgmt_pct?: number | null;
-    vacancy_pct?: number | null;
-    maintenance_pct?: number | null;
-    insurance?: number | null; 
-  };
-
 const Index = ({ userId }: { userId: string }) => {
-  const [unitOptions, setUnitOptions] = useState<any[]>([]);
   const [showUploader, setShowUploader] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>(""); // property_id
   const [scenario, setScenario] = useState<Scenario>("base");
-  const [leases, setLeases] = useState<any[]>([]);
-  const [mortgages, setMortgages] = useState<any[]>([]);
+  const [leases, setLeases] = useState<LeaseData[]>([]);
+  const [mortgages, setMortgages] = useState<Mortgage[]>([]);
   const [expenses, setExpenses] = useState<ExpensesBreakdown>({ 
     taxes: 0,
     insurance: 0,
@@ -91,7 +70,7 @@ const Index = ({ userId }: { userId: string }) => {
     irr10Year: 0,
   });
   const [opexMonthly, setOpexMonthly] = useState(0);
-  const [currentProperty, setCurrentProperty] = useState<any>(null);
+  const [currentProperty, setCurrentProperty] = useState<Tables<"properties"> | null>(null);
   const { toast } = useToast();
   const propertyOptions = (properties ?? []).map(p => ({ id: p.id, name: p.alias || "Property" }));
   const propertyFilterList = (properties ?? []).map(p => ({ id: p.id, address: p.address ?? p.alias ?? "Property" }));
@@ -146,10 +125,8 @@ const Index = ({ userId }: { userId: string }) => {
       return;
     }
 
-    const rows = (data ?? []) as any[];
-
     // normalize to PropertiesTable’s shape
-    const list: Property[] = rows.map((p: any) => ({
+    const list: Property[] = (data ?? []).map((p) => ({
       id: p.id,
       alias: p.alias ?? p.name ?? p.address ?? "Property",
       address: p.address ?? null,
@@ -175,7 +152,7 @@ const Index = ({ userId }: { userId: string }) => {
     const vacancyPctByProperty = new Map<string, number>(
       (properties ?? []).map(p => [p.id, Number(p.vacancy_pct ?? 0)])
     );
-    const getPropVacancy = (pid?: string) => vacancyPctByProperty.get(pid ?? "") ?? 0;
+    const getPropVacancy = (pid?: string | null) => vacancyPctByProperty.get(pid ?? "") ?? 0;
     
     const propertyIds = properties
       .filter((property) => !selectedProperty || property.id === selectedProperty)
@@ -191,17 +168,15 @@ const Index = ({ userId }: { userId: string }) => {
     const unitLabelById = new Map<string, string>();
     if (unitsError) {
       console.error("Error loading units:", unitsError);
-      setUnitOptions([]);
     } else {
-      setUnitOptions(unitsData ?? []);
       for (const unit of unitsData ?? []) {
-        unitLabelById.set(unit.id, unit.unit_label);
+        if (unit.unit_label !== null) unitLabelById.set(unit.id, unit.unit_label);
       }
     }
 
     const { data: leasesData, error: leasesError } = await supabase
       .from("leases")
-      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(*), property_id, unit_id")
+      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), property_id, unit_id")
       .eq("user_id", userId)
       .in("property_id", propertyIds);
     if (leasesError) console.error("Error loading leases:", leasesError);
@@ -238,13 +213,13 @@ const Index = ({ userId }: { userId: string }) => {
       hoa: 0,
       misc: 0,
     };
-    (expensesData ?? []).forEach((exp: any) => {
+    (expensesData ?? []).forEach((exp) => {
       const amount = Number(exp?.amount) || 0;
       const category = exp?.category;
       if (category === 'tax') expensesByCategory.taxes += amount;
       else if (category === 'insurance') expensesByCategory.insurance += amount;
       else if (category === 'repairs') expensesByCategory.maintenance += amount;
-      else if (category === 'management') expensesByCategory.management += amount;
+      else if (String(category) === 'management') expensesByCategory.management += amount;
       else if (category === 'utilities') expensesByCategory.utilities += amount;
       else if (category === 'hoa') expensesByCategory.hoa += amount;
       else expensesByCategory.misc += amount;
@@ -257,7 +232,7 @@ const Index = ({ userId }: { userId: string }) => {
 
 
     // Process mortgages
-    const processedMortgages = (mortgagesData ?? []).map((mtg:any)=>({
+    const processedMortgages = (mortgagesData ?? []).map((mtg) => ({
       id: mtg.id,
       property_id: mtg.property_id,
       loan_name: mtg.loan_name,
@@ -295,9 +270,9 @@ const Index = ({ userId }: { userId: string }) => {
     // ✅ use a set to count unique active unit IDs
     const now = new Date();
 
-    const processedLeases = (leasesData ?? []).map((lease: any) => {
+    const processedLeases = (leasesData ?? []).map((lease) => {
       const monthlyRent = Number(lease?.monthly_rent ?? 0);
-      const pid = lease?.property_id as string | undefined;
+      const pid = lease.property_id;
       const propVacancyPct = getPropVacancy(pid);
       const adjustedRent = monthlyRent * (1 - propVacancyPct / 100);
       // AFTER: track adjusted rent per property
@@ -337,7 +312,7 @@ const Index = ({ userId }: { userId: string }) => {
     });
 
         // ACTIVE LEASES = leases with valid active date window OR active status
-    const activeLeaseCount = (leasesData ?? []).filter((l: any) => {
+    const activeLeaseCount = (leasesData ?? []).filter((l) => {
       const status = String(l.status ?? "").toLowerCase();
       const start = l.start_date ? new Date(l.start_date) : null;
       const end = l.end_date ? new Date(l.end_date) : null;
@@ -422,7 +397,7 @@ const Index = ({ userId }: { userId: string }) => {
     const roi         = MetricsCalculator.roiAnnual(cashFlowAnnual, propertyValue);
     const cashOnCash  = MetricsCalculator.cashOnCash(cashFlowAnnual, equityEstimate);
     const irr10Year   = MetricsCalculator.irr10Year(propertyValue, cashFlowAnnual, equityEstimate);
-    const { totalUnits, activeUnits, occupancyRate } = MetricsCalculator.occupancyRate(leasesData, unitsData, selectedProperty, properties.map(p=>p.id));
+    const { totalUnits, activeUnits, occupancyRate } = MetricsCalculator.occupancyRate(leasesData ?? [], unitsData ?? [], selectedProperty, properties.map(p=>p.id));
 
     // Guard helper
     const safe = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -447,7 +422,7 @@ const Index = ({ userId }: { userId: string }) => {
   };
 
   //LEASE HANDLERS
-  const handleUpdateLease = async (leaseId: string, data: any) => {
+  const handleUpdateLease = async (leaseId: string, data: Partial<LeaseData>) => {
     // 1. Load existing lease so we can update tenant/unit
     const { data: lease, error: fetchErr } = await supabase
       .from("leases")
@@ -464,7 +439,7 @@ const Index = ({ userId }: { userId: string }) => {
     const { tenant_id, unit_id } = lease;
 
     // 2. Update tenant name
-    if (data.tenant) {
+    if (data.tenant && tenant_id) {
       await supabase
         .from("tenants")
         .update({ name: data.tenant })
@@ -473,7 +448,7 @@ const Index = ({ userId }: { userId: string }) => {
     }
 
     // 3. Update unit label
-    if (data.unit_label) {
+    if (data.unit_label && unit_id) {
       await supabase
         .from("units")
         .update({ unit_label: data.unit_label })
@@ -482,7 +457,7 @@ const Index = ({ userId }: { userId: string }) => {
     }
 
     // 4. Update lease fields
-    const leasePayload: any = {};
+    const leasePayload: TablesUpdate<"leases"> = {};
 
     if (data.monthlyRent !== undefined) leasePayload.monthly_rent = data.monthlyRent;
     if (data.deposit !== undefined) leasePayload.deposit = data.deposit;
@@ -535,7 +510,7 @@ const Index = ({ userId }: { userId: string }) => {
     }
   };
 
-  const handleAddLease = async (data: any) => {
+  const handleAddLease = async (data: Omit<LeaseData, "id">) => {
     // 1) Resolve target property
     const targetPropertyId = data.property_id ?? selectedProperty;
     if (!properties.some((property) => property.id === targetPropertyId)) {
@@ -551,6 +526,12 @@ const Index = ({ userId }: { userId: string }) => {
     // 2) TENANT: find or create by name
     // -------------------------------
     const tenantName = (data.tenant ?? "").trim();
+    const unitLabel = (data.unit_label ?? "").trim();
+    if (!tenantName || !unitLabel) {
+      toast({ title: "Tenant and unit required", description: "Enter a tenant and unit before saving the lease.", variant: "destructive" });
+      return;
+    }
+
     let tenantId: string | null = null;
 
     if (tenantName) {
@@ -593,7 +574,6 @@ const Index = ({ userId }: { userId: string }) => {
     // -------------------------------
     // 3) UNIT: find or create by (property_id + unit_label)
     // -------------------------------
-    const unitLabel = (data.unit_label ?? "").trim();
     let unitId: string | null = null;
 
     if (unitLabel) {
@@ -641,15 +621,17 @@ const Index = ({ userId }: { userId: string }) => {
     // -------------------------------
     // 4) LEASE: write the foreign keys into leases
     // -------------------------------
-    const payload = {
+    if (!tenantId || !unitId) return;
+
+    const payload: TablesInsert<"leases"> = {
       user_id: userId,
       tenant_id: tenantId,
       property_id: targetPropertyId,
       unit_id: unitId,
       monthly_rent: Number(data.monthlyRent ?? 0),
       deposit: Number(data.deposit ?? 0),
-      start_date: data.startDate?.toISOString?.() ?? data.startDate,
-      end_date: data.leaseEnd?.toISOString?.() ?? data.leaseEnd,
+      start_date: data.startDate.toISOString(),
+      end_date: data.leaseEnd.toISOString(),
       status: data.status ?? "active",
     };
 
@@ -674,24 +656,35 @@ const Index = ({ userId }: { userId: string }) => {
   };
 
   //MORTGAGE HANDLERS
-  const handleUpdateMortgage = async (id: string, data: any) => {
-    const payload: any = {};
+  const mortgageNumberMissing = (value: string | number | null | undefined) =>
+    value == null || value === "" || !Number.isFinite(Number(value));
 
-    if (data.loan_name !== undefined) payload.loan_name = data.loan_name;
+  const handleUpdateMortgage = async (id: string, data: MortgageInput) => {
+    const { property_id, loan_name, start_date, principal, interest_rate, term_months, monthly_payment } = data;
+    if ([property_id, loan_name, start_date].some((field) => field === null || field === "") ||
+        [principal, interest_rate, term_months, monthly_payment].some((value) =>
+          value !== undefined && mortgageNumberMissing(value))) {
+      toast({ title: "Required mortgage details missing", description: "Enter the property, loan name, principal, terms, start date and payment.", variant: "destructive" });
+      return;
+    }
+
+    const payload: TablesUpdate<"mortgages"> = {};
+
+    if (data.loan_name != null) payload.loan_name = data.loan_name;
     if (data.principal !== undefined) payload.principal = Number(data.principal);
     if (data.principal_original !== undefined) payload.principal_original = Number(data.principal_original);
     if (data.current_balance !== undefined) payload.current_balance = Number(data.current_balance);
     if (data.interest_rate !== undefined) payload.interest_rate = Number(data.interest_rate);
     if (data.term_months !== undefined) payload.term_months = Number(data.term_months);
 
-    if (data.start_date !== undefined)
+    if (data.start_date != null)
       payload.start_date = data.start_date instanceof Date 
         ? data.start_date.toISOString() 
         : data.start_date;
 
     if (data.monthly_payment !== undefined) payload.monthly_payment = Number(data.monthly_payment);
     if (data.includes_escrow !== undefined) payload.includes_escrow = Boolean(data.includes_escrow);
-    if (data.property_id !== undefined) payload.property_id = data.property_id;
+    if (data.property_id != null) payload.property_id = data.property_id;
 
     const { data: rows, error } = await supabase
       .from("mortgages")
@@ -715,6 +708,9 @@ const Index = ({ userId }: { userId: string }) => {
       prev.map(m => m.id === id ? {
         ...m,
         ...updated,
+        interest_rate: Number(updated.interest_rate ?? 0),
+        term_months: Number(updated.term_months ?? 0),
+        monthly_payment: Number(updated.monthly_payment ?? 0),
         start_date: updated.start_date ? new Date(updated.start_date) : m.start_date,
       } : m)
     );
@@ -733,20 +729,28 @@ const Index = ({ userId }: { userId: string }) => {
     }
   };
 
-  const handleAddMortgage = async (data: any) => {
-    const payload = {
+  const handleAddMortgage = async (data: MortgageInput) => {
+    const propertyId = data.property_id ?? selectedProperty;
+    const startDate = data.start_date instanceof Date
+      ? data.start_date.toISOString()
+      : data.start_date;
+    if (!propertyId || !startDate ||
+        [data.principal, data.interest_rate, data.term_months, data.monthly_payment].some(mortgageNumberMissing)) {
+      toast({ title: "Required mortgage details missing", description: "Enter the property, principal, terms, start date and payment.", variant: "destructive" });
+      return;
+    }
+
+    const payload: TablesInsert<"mortgages"> = {
       user_id: userId,
-      property_id: data.property_id ?? selectedProperty,
-      loan_name: data.loan_name ?? null,
-      principal: data.principal !== "" ? Number(data.principal) : null,
+      property_id: propertyId,
+      loan_name: data.loan_name ?? undefined,
+      principal: Number(data.principal),
       principal_original: data.principal_original !== "" ? Number(data.principal_original) : null,
       current_balance: data.current_balance !== "" ? Number(data.current_balance) : null,
-      interest_rate: data.interest_rate !== "" ? Number(data.interest_rate) : null,
-      term_months: data.term_months !== "" ? Number(data.term_months) : null,
-      start_date: data.start_date instanceof Date 
-        ? data.start_date.toISOString() 
-        : data.start_date ?? null,
-      monthly_payment: data.monthly_payment !== "" ? Number(data.monthly_payment) : null,
+      interest_rate: Number(data.interest_rate),
+      term_months: Number(data.term_months),
+      start_date: startDate,
+      monthly_payment: Number(data.monthly_payment),
       includes_escrow: Boolean(data.includes_escrow),
     };
 
@@ -764,9 +768,14 @@ const Index = ({ userId }: { userId: string }) => {
 
   //PROPERTY HANDLERS
   const handleAddProperty = async (data: Omit<Property, "id">) => {
-    const payload = {
+    if (!data.address?.trim()) {
+      toast({ title: "Address required", description: "Enter a property address before saving.", variant: "destructive" });
+      return;
+    }
+
+    const payload: TablesInsert<"properties"> = {
       alias: data.alias,
-      address: data.address ?? null,
+      address: data.address,
       type: data.type ?? null,
       sale_price: data.sale_price ?? null,
       property_taxes: data.property_taxes ?? null,
@@ -804,8 +813,14 @@ const Index = ({ userId }: { userId: string }) => {
     // - Always allow address
     // - Map sale_price -> purchase_price (legacy column) if provided
     // - Only include fields that are not undefined (avoid sending unknown keys)
-    const payload: any = {};
-    if (patch.address !== undefined) payload.address = patch.address ?? null;
+    const payload: TablesUpdate<"properties"> = {};
+    if (patch.address !== undefined) {
+      if (!patch.address?.trim()) {
+        toast({ title: "Address required", description: "Enter a property address before saving.", variant: "destructive" });
+        return;
+      }
+      payload.address = patch.address;
+    }
     if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price;
 
     // If your migration with the new columns is applied, these will also succeed (harmless if ignored by types)
@@ -825,7 +840,7 @@ const Index = ({ userId }: { userId: string }) => {
       .eq("user_id", userId)
       .eq("id", id)
       .select("id, address, purchase_price, alias, name, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct, insurance")
-      .single<PropertyRowLegacy>();
+      .single();
 
     if (error || !updated) {
       // rollback optimistic change
@@ -1400,7 +1415,6 @@ const formatNum = (n: number) =>
             mortgages={mortgages}
             properties={properties}
             propertyOptions={propertyOptions}
-            unitOptions={unitOptions}
             escrowByProperty={escrowByProperty}
             onAddProperty={handleAddProperty}
             onUpdateProperty={handleUpdateProperty}

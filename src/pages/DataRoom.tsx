@@ -1,28 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Database, FileText, Home, Landmark, ShieldCheck } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
-import { LeaseTable } from "@/features/leases/LeaseTable";
-import { MortgagesTable } from "@/components/MortgagesTable";
+import { LeaseTable, type LeaseData } from "@/features/leases/LeaseTable";
+import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
 
 type PropertyOption = { id: string; name: string };
 
 type DataRoomProps = {
   filteredProperties: Property[];
-  filteredLeases: any[];
-  filteredMortgages: any[];
-  mortgages: any[];
+  filteredLeases: LeaseData[];
+  filteredMortgages: Mortgage[];
+  mortgages: Mortgage[];
   properties: Property[];
   propertyOptions: PropertyOption[];
-  unitOptions: any[];
   escrowByProperty: Map<string, boolean>;
   onAddProperty: (data: Omit<Property, "id">) => void;
   onUpdateProperty: (id: string, data: Partial<Property>) => void;
   onDeleteProperty: (id: string) => void;
-  onAddLease: (data: any) => void;
-  onUpdateLease: (id: string, data: any) => void;
+  onAddLease: (data: Omit<LeaseData, "id">) => void;
+  onUpdateLease: (id: string, data: Partial<LeaseData>) => void;
   onDeleteLease: (id: string) => void;
-  onAddMortgage: (data: any) => void;
-  onUpdateMortgage: (id: string, data: any) => void;
+  onAddMortgage: (data: MortgageInput) => void;
+  onUpdateMortgage: (id: string, data: MortgageInput) => void;
   onDeleteMortgage: (id: string) => void;
 };
 
@@ -64,7 +63,6 @@ export default function DataRoom({
   mortgages,
   properties,
   propertyOptions,
-  unitOptions,
   escrowByProperty,
   onAddProperty,
   onUpdateProperty,
@@ -235,7 +233,6 @@ export default function DataRoom({
             id: p.id,
             name: p.alias || p.address || "Untitled Property",
           }))}
-          unitOptions={unitOptions}
         />
       </section>
 

@@ -8,7 +8,7 @@ interface ProjectionChartProps {
 
 export const ProjectionChart = ({ currentRent, growthRate }: ProjectionChartProps) => {
   const generateProjections = () => {
-    const data = [];
+    const data: { year: number; rent: number }[] = [];
     const currentYear = new Date().getFullYear();
     
     for (let i = 0; i <= 10; i++) {

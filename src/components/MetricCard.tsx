@@ -14,18 +14,21 @@ export const MetricCard = ({ title, value, subtitle, icon: Icon, variant = "defa
     default: "bg-metric-gradient",
     success: "bg-success-gradient",
     warning: "bg-warning-gradient",
+    danger: "",
   }[variant];
 
   const iconBgClass = {
     default: "bg-primary/10",
     success: "bg-success/10",
     warning: "bg-warning/10",
+    danger: "",
   }[variant];
 
   const iconColorClass = {
     default: "text-primary",
     success: "text-success",
     warning: "text-warning",
+    danger: "",
   }[variant];
 
   return (
@@ -36,9 +39,11 @@ export const MetricCard = ({ title, value, subtitle, icon: Icon, variant = "defa
           <h3 className="text-3xl font-extrabold text-foreground leading-tight">{value}</h3>
           {subtitle && <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>}
         </div>
-        <div className={`rounded-md ${iconBgClass} p-2 flex-shrink-0`}>
-          <Icon className={`h-5 w-5 ${iconColorClass}`} />
-        </div>
+        {Icon && (
+          <div className={`rounded-md ${iconBgClass} p-2 flex-shrink-0`}>
+            <Icon className={`h-5 w-5 ${iconColorClass}`} />
+          </div>
+        )}
       </div>
     </Card>
   );

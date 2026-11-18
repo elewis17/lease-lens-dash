@@ -34,6 +34,14 @@ export interface PropertyLike {
 export interface OpexContext {
   monthlyRent: number;
   mortgageIncludesEscrow?: boolean;
+  mortgageRow?: {
+    current_balance?: number | string | null;
+    principal_original?: number | string | null;
+    principal?: number | string | null;
+    term_months?: number | string | null;
+    interest_rate?: number | string | null;
+    monthly_payment?: number | string | null;
+  } | null;
 }
 
 export class OpexCalculator {
@@ -44,11 +52,7 @@ export class OpexCalculator {
    * opts.monthlyRent: rent AFTER vacancy adjustment
    * opts.mortgageIncludesEscrow: boolean
    */
-  static monthlyForProperty(property: any, opts: {
-    monthlyRent: number;
-    mortgageIncludesEscrow: boolean;
-    mortgageRow?: any;
-  }) {
+  static monthlyForProperty(property: PropertyLike, opts: OpexContext) {
     const rent = Number(opts.monthlyRent ?? 0);
 
     // ----- 1) TAX + INSURANCE MONTHLY -----
