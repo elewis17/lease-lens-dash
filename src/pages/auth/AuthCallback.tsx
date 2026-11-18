@@ -1,22 +1,15 @@
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AuthCallback() {
-  const navigate = useNavigate();
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    async function handleAuth() {
-      const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-      if (error) {
-        console.error("Error exchanging code:", error);
-      }
-        // Redirect user to dashboard after login completes
-        navigate("/", { replace: true });
-    }
+  if (loading) return <p role="status">Completing sign-in…</p>;
+  if (user) return <Navigate to="/" replace />;
 
-    handleAuth();
-  }, []);
-
-  return <div>Processing login...</div>;
+  return (
+    <p role="alert">
+      Sign-in could not be completed. <Link to="/auth/login">Return to sign-in</Link>.
+    </p>
+  );
 }

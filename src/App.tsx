@@ -17,13 +17,12 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename={import.meta.env.DEV ? "/" : "/lease-lens-dash"}>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Layout>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<ProtectedRoute>{(userId) => <Index key={userId} userId={userId} />}</ProtectedRoute>} />
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            {/*<Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>}/>*/}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       expenses: {
         Row: {
+          user_id: string | null
           amount: number
           category: Database["public"]["Enums"]["expense_category"]
           created_at: string | null
@@ -28,6 +29,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          user_id?: string | null
           amount: number
           category: Database["public"]["Enums"]["expense_category"]
           created_at?: string | null
@@ -40,6 +42,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          user_id?: string | null
           amount?: number
           category?: Database["public"]["Enums"]["expense_category"]
           created_at?: string | null
@@ -70,6 +73,8 @@ export type Database = {
       }
       leases: {
         Row: {
+          user_id: string | null
+          property_id: string | null
           confidence_scores: Json | null
           created_at: string | null
           deposit: number | null
@@ -89,6 +94,8 @@ export type Database = {
           vacancy_rate: number | null
         }
         Insert: {
+          user_id?: string | null
+          property_id?: string | null
           confidence_scores?: Json | null
           created_at?: string | null
           deposit?: number | null
@@ -108,6 +115,8 @@ export type Database = {
           vacancy_rate?: number | null
         }
         Update: {
+          user_id?: string | null
+          property_id?: string | null
           confidence_scores?: Json | null
           created_at?: string | null
           deposit?: number | null
@@ -145,6 +154,7 @@ export type Database = {
       }
       maintenance: {
         Row: {
+          user_id: string | null
           category: string | null
           created_at: string | null
           description: string | null
@@ -156,6 +166,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          user_id?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -167,6 +178,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          user_id?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -189,6 +201,7 @@ export type Database = {
       }
       mortgages: {
         Row: {
+          user_id: string | null
           created_at: string | null
           id: string
           interest_rate: number
@@ -201,6 +214,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          user_id?: string | null
           created_at?: string | null
           id?: string
           interest_rate: number
@@ -213,6 +227,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          user_id?: string | null
           created_at?: string | null
           id?: string
           interest_rate?: number
@@ -236,6 +251,7 @@ export type Database = {
       }
       payments: {
         Row: {
+          user_id: string | null
           amount_due: number
           created_at: string | null
           due_date: string
@@ -248,6 +264,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          user_id?: string | null
           amount_due: number
           created_at?: string | null
           due_date: string
@@ -260,6 +277,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          user_id?: string | null
           amount_due?: number
           created_at?: string | null
           due_date?: string
@@ -283,6 +301,7 @@ export type Database = {
       }
       properties: {
         Row: {
+          user_id: string | null
           address: string
           created_at: string | null
           id: string
@@ -293,8 +312,14 @@ export type Database = {
           rent_growth_rate: number | null
           total_units: number | null
           updated_at: string | null
+          sale_price: number | null
+          property_taxes: number | null
+          mgmt_pct: number | null
+          vacancy_pct: number | null
+          maintenance_pct: number | null
         }
         Insert: {
+          user_id?: string | null
           address: string
           created_at?: string | null
           id?: string
@@ -305,8 +330,14 @@ export type Database = {
           rent_growth_rate?: number | null
           total_units?: number | null
           updated_at?: string | null
+          sale_price?: number | null
+          property_taxes?: number | null
+          mgmt_pct?: number | null
+          vacancy_pct?: number | null
+          maintenance_pct?: number | null
         }
         Update: {
+          user_id?: string | null
           address?: string
           created_at?: string | null
           id?: string
@@ -317,11 +348,17 @@ export type Database = {
           rent_growth_rate?: number | null
           total_units?: number | null
           updated_at?: string | null
+          sale_price?: number | null
+          property_taxes?: number | null
+          mgmt_pct?: number | null
+          vacancy_pct?: number | null
+          maintenance_pct?: number | null
         }
         Relationships: []
       }
       tenants: {
         Row: {
+          user_id: string | null
           created_at: string | null
           email: string | null
           id: string
@@ -330,6 +367,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          user_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -338,6 +376,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          user_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -349,6 +388,7 @@ export type Database = {
       }
       units: {
         Row: {
+          user_id: string | null
           created_at: string | null
           id: string
           property_id: string
@@ -356,6 +396,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          user_id?: string | null
           created_at?: string | null
           id?: string
           property_id: string
@@ -363,6 +404,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          user_id?: string | null
           created_at?: string | null
           id?: string
           property_id?: string

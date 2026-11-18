@@ -1,22 +1,13 @@
-import { type ReactNode, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 type ProtectedRouteProps = {
-  children: ReactNode;
+  children: (userId: string) => ReactNode;
 };
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth/login", { replace: true});
-    }
-  }, [loading, user, navigate]);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
@@ -26,9 +17,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    // While redirecting, render nothing
-    return null;
+    return <Navigate to="/auth/login" replace />;
   }
 
-  return <>{children}</>;
+  return <>{children(user.id)}</>;
 }
