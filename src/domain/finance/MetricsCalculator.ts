@@ -1,3 +1,4 @@
+import { isActiveLease } from "./activeLeases.ts";
 import { OpexCalculator, PropertyLike, OpexContext } from "./OpexCalculator";
 
 /**
@@ -21,8 +22,8 @@ export class MetricsCalculator {
     return propertyValue > 0 ? (cashFlowAnnual / propertyValue) * 100 : 0;
   }
 
-  /** Debt Coverage Ratio = NOI / Annual Debt Service */
-  static dcr(noiAnnual: number, debtServiceAnnual: number): number {
+  /** Debt Service Coverage Ratio = NOI / Annual Debt Service */
+  static dscr(noiAnnual: number, debtServiceAnnual: number): number {
     return debtServiceAnnual > 0 ? noiAnnual / debtServiceAnnual : 0;
   }
 
@@ -50,56 +51,42 @@ export class MetricsCalculator {
   }) {
     const noi = this.noiAnnual(params.monthlyRent, params.property, params.ctx);
     const cap = this.capRate(noi, params.propertyValue);
-    const dcr = this.dcr(noi, params.debtServiceAnnual ?? 0);
+    const dscr = this.dscr(noi, params.debtServiceAnnual ?? 0);
     const roi = this.roiAnnual(noi, params.propertyValue);
     const coc = this.cashOnCash(noi, params.investedEquity ?? 0);
-    return { noi, cap, dcr, roi, coc };
+    return { noi, cap, dscr, roi, coc };
   }
 
   static occupancyRate(
     leases: readonly {
-      property_id: string | null;
       unit_id: string | null;
       start_date: string | null;
       end_date: string | null;
       status: string | null;
     }[],
-    units: readonly { property_id: string | null }[],
+    units: readonly { id: string; property_id: string | null }[],
     selectedProperty: string,
     allowedPropertyIds: readonly string[],
+    asOf: string,
   ) {
     // filter units
     const filteredUnits = selectedProperty
       ? units.filter(u => u.property_id === selectedProperty)
       : units.filter(u => u.property_id !== null && allowedPropertyIds.includes(u.property_id));
 
-    const totalUnits = filteredUnits.length || 1;
-
-    // active leased units
-    const activeUnits = new Set<string | null>();
-
-    const now = new Date();
-
-    leases.forEach(l => {
-      if (l.property_id === null || !allowedPropertyIds.includes(l.property_id)) return;
-
-      const start = l.start_date ? new Date(l.start_date) : null;
-      const end   = l.end_date ? new Date(l.end_date) : null;
-
-      const status = String(l.status ?? "").toLowerCase();
-      const isActive = 
-        status === "active" ||
-        (start && end && start <= now && now <= end);
-
-      if (isActive) activeUnits.add(l.unit_id);
-    });
-
-    const activeCount = activeUnits.size;
+    const totalUnits = filteredUnits.length;
+    const unitIds = new Set(filteredUnits.map(unit => unit.id));
+    const activeUnitIds = new Set(
+      leases.flatMap(lease => lease.unit_id && unitIds.has(lease.unit_id) && isActiveLease(lease, asOf)
+        ? [lease.unit_id]
+        : [])
+    );
+    const activeCount = activeUnitIds.size;
 
     return {
       totalUnits,
       activeUnits: activeCount,
-      occupancyRate: (activeCount / totalUnits) * 100,
+      occupancyRate: totalUnits > 0 ? (activeCount / totalUnits) * 100 : 0,
     };
   }
 }

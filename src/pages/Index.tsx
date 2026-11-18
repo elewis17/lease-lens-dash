@@ -1,3 +1,5 @@
+import { format } from "date-fns";
+import { isActiveLease } from "@/domain/finance/activeLeases";
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -64,7 +66,7 @@ const Index = ({ userId }: { userId: string }) => {
     noi: 0,
     cashFlow: 0,
     capRate: 0,
-    dcr: 0,
+    dscr: 0,
     roi: 0,
     cashOnCash: 0,
     irr10Year: 0,
@@ -174,11 +176,12 @@ const Index = ({ userId }: { userId: string }) => {
       }
     }
 
-    const { data: leasesData, error: leasesError } = await supabase
+    const unitIds = (unitsData ?? []).map(unit => unit.id);
+    const { data: leasesData, error: leasesError } = unitIds.length > 0 ? await supabase
       .from("leases")
-      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), property_id, unit_id")
+      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), unit_id")
       .eq("user_id", userId)
-      .in("property_id", propertyIds);
+      .in("unit_id", unitIds) : { data: [], error: null };
     if (leasesError) console.error("Error loading leases:", leasesError);
 
     const { data: mortgagesData, error: mortgagesError } = await supabase
@@ -267,65 +270,36 @@ const Index = ({ userId }: { userId: string }) => {
     let totalMRR = 0;
     let totalExpected = 0;
 
-    // ✅ use a set to count unique active unit IDs
     const now = new Date();
+    const asOf = format(now, "yyyy-MM-dd");
+    const propertyIdByUnit = new Map((unitsData ?? []).map(unit => [unit.id, unit.property_id]));
+    let activeLeases = 0;
 
     const processedLeases = (leasesData ?? []).map((lease) => {
-      const monthlyRent = Number(lease?.monthly_rent ?? 0);
-      const pid = lease.property_id;
-      const propVacancyPct = getPropVacancy(pid);
-      const adjustedRent = monthlyRent * (1 - propVacancyPct / 100);
-      // AFTER: track adjusted rent per property
-      if (pid) rentByProperty.set(pid, (rentByProperty.get(pid) ?? 0) + adjustedRent);
+      const monthlyRent = Number(lease.monthly_rent);
+      const propertyId = propertyIdByUnit.get(lease.unit_id);
 
-      totalMRR += adjustedRent;
-      totalExpected += monthlyRent;
-
-      // ----- active check (status OR dates) -----
-      const status = String(lease?.status ?? "").toLowerCase();
-      const start = lease?.start_date ? new Date(lease.start_date) : null;
-      const end   = lease?.end_date ? new Date(lease.end_date) : null;
-
-      const isActiveByStatus = status === "active" || status === "expiring";
-      const isActiveByDates  = !!(start && end && start <= now && now <= end);
-      const isActive = isActiveByStatus || isActiveByDates;
-
-      // ----- property filter -----
-      const matchesSelection = selectedProperty ? pid === selectedProperty : true;
+      if (propertyId && isActiveLease(lease, asOf)) {
+        const adjustedRent = monthlyRent * (1 - getPropVacancy(propertyId) / 100);
+        rentByProperty.set(propertyId, (rentByProperty.get(propertyId) ?? 0) + adjustedRent);
+        totalMRR += adjustedRent;
+        totalExpected += monthlyRent;
+        activeLeases++;
+      }
 
       return {
         id: lease.id,
-        property_id: pid ?? "Unknown",
+        property_id: propertyId ?? undefined,
         tenant: lease.tenant?.name || "Unknown",
         monthlyRent,
-        //vacancyRate: vacancyRatePct, --- to be removed
-        deposit: Number(lease?.deposit ?? 0),
-        startDate: start ?? new Date(),
-        leaseEnd: end ?? new Date(),
-
-        status: lease.status ?? null,
-  
-        // NEW
-        unit_id: lease.unit_id ?? null,
-        unit_label: lease.unit_id ? unitLabelById.get(lease.unit_id) ?? "—" : "—",
+        deposit: Number(lease.deposit ?? 0),
+        startDate: lease.start_date,
+        leaseEnd: lease.end_date,
+        status: lease.status,
+        unit_id: lease.unit_id,
+        unit_label: unitLabelById.get(lease.unit_id) ?? "—",
       };
     });
-
-        // ACTIVE LEASES = leases with valid active date window OR active status
-    const activeLeaseCount = (leasesData ?? []).filter((l) => {
-      const status = String(l.status ?? "").toLowerCase();
-      const start = l.start_date ? new Date(l.start_date) : null;
-      const end = l.end_date ? new Date(l.end_date) : null;
-      const now = new Date();
-
-      const isActiveStatus = status === "active" || status === "expiring";
-      const isActiveDates  = !!(start && end && start <= now && now <= end);
-
-      return isActiveStatus || isActiveDates;
-    }).length;
-
-    // use unique active units as the numerator
-    const activeLeases = activeLeaseCount;
 
     // ----- Value basis (selected property vs All) -----
     const propertyValue = Number(
@@ -393,11 +367,11 @@ const Index = ({ userId }: { userId: string }) => {
 
     // KPIs via MetricsCalculator
     const capRate     = MetricsCalculator.capRate(noiAnnual, propertyValue);
-    const dcr         = MetricsCalculator.dcr(noiAnnual, annualDebt);
+    const dscr         = MetricsCalculator.dscr(noiAnnual, annualDebt);
     const roi         = MetricsCalculator.roiAnnual(cashFlowAnnual, propertyValue);
     const cashOnCash  = MetricsCalculator.cashOnCash(cashFlowAnnual, equityEstimate);
     const irr10Year   = MetricsCalculator.irr10Year(propertyValue, cashFlowAnnual, equityEstimate);
-    const { totalUnits, activeUnits, occupancyRate } = MetricsCalculator.occupancyRate(leasesData ?? [], unitsData ?? [], selectedProperty, properties.map(p=>p.id));
+    const { totalUnits, activeUnits, occupancyRate } = MetricsCalculator.occupancyRate(leasesData ?? [], unitsData ?? [], selectedProperty, properties.map(p=>p.id), asOf);
 
     // Guard helper
     const safe = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -407,14 +381,14 @@ const Index = ({ userId }: { userId: string }) => {
     setMetrics({
       expectedRent: totalExpected,
       occupancyRate,
-      activeLeases: activeLeaseCount,
+      activeLeases,
       totalUnits,
       arr: totalMRR * 12,
       mrr: totalMRR,
       noi: noiAnnual / 12,
       cashFlow: cashFlowAnnual / 12,
       capRate,
-      dcr,
+      dscr,
       roi,
       cashOnCash,
       irr10Year,  
@@ -462,19 +436,8 @@ const Index = ({ userId }: { userId: string }) => {
     if (data.monthlyRent !== undefined) leasePayload.monthly_rent = data.monthlyRent;
     if (data.deposit !== undefined) leasePayload.deposit = data.deposit;
 
-    if (data.startDate) {
-      leasePayload.start_date =
-        data.startDate instanceof Date
-          ? data.startDate.toISOString()
-          : data.startDate;
-    }
-
-    if (data.leaseEnd) {
-      leasePayload.end_date =
-        data.leaseEnd instanceof Date
-          ? data.leaseEnd.toISOString()
-          : data.leaseEnd;
-    }
+    if (data.startDate) leasePayload.start_date = data.startDate;
+    if (data.leaseEnd) leasePayload.end_date = data.leaseEnd;
 
     if (data.status) leasePayload.status = data.status;
 
@@ -511,6 +474,9 @@ const Index = ({ userId }: { userId: string }) => {
   };
 
   const handleAddLease = async (data: Omit<LeaseData, "id">) => {
+    const { startDate, leaseEnd: endDate } = data;
+    if (!startDate || !endDate || endDate < startDate) return;
+
     // 1) Resolve target property
     const targetPropertyId = data.property_id ?? selectedProperty;
     if (!properties.some((property) => property.id === targetPropertyId)) {
@@ -630,8 +596,8 @@ const Index = ({ userId }: { userId: string }) => {
       unit_id: unitId,
       monthly_rent: Number(data.monthlyRent ?? 0),
       deposit: Number(data.deposit ?? 0),
-      start_date: data.startDate.toISOString(),
-      end_date: data.leaseEnd.toISOString(),
+      start_date: startDate,
+      end_date: endDate,
       status: data.status ?? "active",
     };
 
@@ -1080,15 +1046,15 @@ const formatNum = (n: number) =>
 
   const annualCashFlowDelta = (currentDebtService - refiDebtService) * 12;
 
-  // metrics.noi is MONTHLY NOI; DCR needs ANNUAL NOI / ANNUAL debt service
+  // metrics.noi is MONTHLY NOI; DSCR needs ANNUAL NOI / ANNUAL debt service
   const baseNoiAnnual = metrics.noi * 12;
 
-  const refiDcr = MetricsCalculator.dcr(metrics.noi * 12, refiDebtService * 12);
+  const refiDscr = MetricsCalculator.dscr(metrics.noi * 12, refiDebtService * 12);
 
   // What-If: Raise rents 5% (simple, assumes OPEX unchanged)
   const rentDeltaMonthly = metrics.expectedRent * 0.05;
   const rentDeltaAnnual = rentDeltaMonthly * 12;
-  const rentDcr = MetricsCalculator.dcr(baseNoiAnnual + rentDeltaAnnual, currentDebtService * 12);
+  const rentDscr = MetricsCalculator.dscr(baseNoiAnnual + rentDeltaAnnual, currentDebtService * 12);
 
   // What-If: Bonus depreciation / cost seg (tax benefit, not operating cash flow)
   // Assumptions are intentionally explicit + conservative defaults.
@@ -1148,14 +1114,14 @@ const formatNum = (n: number) =>
 
                  <div className="mt-3 space-y-3 text-sm text-gray-700">
                   <p>
-                    We calculate Cash Flow, Debt Coverage (DCR), and 10-Year IRR from your
+                    We calculate Cash Flow, Debt Coverage (DSCR), and 10-Year IRR from your
                     leases, expenses, and mortgage data. A rule-based decision engine then
                     classifies the property using simple financial thresholds:
                   </p>
 
                   <ul className="space-y-2 text-[13px]">
                     <li>
-                      <strong>Distress:</strong> Negative cash flow and DCR below 1.0
+                      <strong>Distress:</strong> Negative cash flow and DSCR below 1.0
                       (not covering debt).
                     </li>
 
@@ -1164,7 +1130,7 @@ const formatNum = (n: number) =>
                     </li>
 
                     <li>
-                      <strong>Refinance:</strong> Strong coverage (DCR ≥ 1.3) and excess
+                      <strong>Refinance:</strong> Strong coverage (DSCR ≥ 1.3) and excess
                       cash flow buffer.
                     </li>
 
@@ -1190,7 +1156,7 @@ const formatNum = (n: number) =>
 
         {(() => {
           // --- Verdict Engine (deterministic) ---
-          const dcr = Number(metrics.dcr ?? 0);
+          const dscr = Number(metrics.dscr ?? 0);
           const irr = Number(metrics.irr10Year ?? 0);
           const cashFlow = Number(metrics.cashFlow ?? 0); // monthly
           const noi = Number(metrics.noi ?? 0);           // monthly
@@ -1209,31 +1175,31 @@ const formatNum = (n: number) =>
             {
               key: "DISTRESS",
               label: "DISTRESS / HIGH RISK",
-              when: cashFlow < 0 && dcr < 1.0,
-              rationale: `Negative cash flow and weak coverage (DCR ${dcr.toFixed(2)}).`,
+              when: cashFlow < 0 && dscr < 1.0,
+              rationale: `Negative cash flow and weak coverage (DSCR ${dscr.toFixed(2)}).`,
             },
             {
               key: "SELL",
               label: "SELL",
-              when: irr < 6 && dcr < 1.05 && marginPct < 5,
+              when: irr < 6 && dscr < 1.05 && marginPct < 5,
               rationale: `Structural underperformance (IRR ${irr.toFixed(2)}%) with limited buffer.`,
             },
             {
               key: "REFINANCE",
               label: "REFINANCE",
-              when: dcr >= 1.3 && marginPct >= 15 && debt > 0,
-              rationale: `Strong coverage (DCR ${dcr.toFixed(2)}) and buffer; optimize debt terms.`,
+              when: dscr >= 1.3 && marginPct >= 15 && debt > 0,
+              rationale: `Strong coverage (DSCR ${dscr.toFixed(2)}) and buffer; optimize debt terms.`,
             },
             {
               key: "HOLD",
               label: "HOLD",
-              when: dcr >= 1.2 && cashFlow > 0 && irr >= 8,
-              rationale: `Stable hold profile (DCR ${dcr.toFixed(2)}, IRR ${irr.toFixed(2)}%).`,
+              when: dscr >= 1.2 && cashFlow > 0 && irr >= 8,
+              rationale: `Stable hold profile (DSCR ${dscr.toFixed(2)}, IRR ${irr.toFixed(2)}%).`,
             },
             {
               key: "HOLD_OPTIMIZE",
               label: "HOLD + OPTIMIZE",
-              when: dcr >= 1.05 && cashFlow >= 0 && irr > 0 && irr < 8,
+              when: dscr >= 1.05 && cashFlow >= 0 && irr > 0 && irr < 8,
               rationale: `Stable but sub-target returns (IRR ${irr.toFixed(2)}%); operational upside exists.`,
             },
           ];
@@ -1267,7 +1233,7 @@ const formatNum = (n: number) =>
           <ul className="space-y-1 text-sm text-muted-foreground">
             <li>
               <strong>Primary risk:</strong>{" "}
-              {metrics.dcr < 1
+              {metrics.dscr < 1
                 ? "Debt coverage is below 1.0, indicating negative leverage."
                 : metrics.cashFlow < 0
                 ? "Property is cash-flow negative at current financing."
@@ -1276,7 +1242,7 @@ const formatNum = (n: number) =>
 
             <li>
               <strong>Recommended action:</strong>{" "}
-              {metrics.cashFlow < 0 && metrics.dcr < 1
+              {metrics.cashFlow < 0 && metrics.dscr < 1
                 ? "Explore refinancing or principal paydown to restore coverage."
                 : metrics.irr10Year < 8
                 ? "Hold and optimize operations; returns are below long-term targets."
@@ -1292,7 +1258,7 @@ const formatNum = (n: number) =>
           </ul>
 
           <div className="mt-4 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
-            {metrics.cashFlow < 0 && metrics.dcr < 1
+            {metrics.cashFlow < 0 && metrics.dscr < 1
               ? "Current loan structure is the primary constraint on performance; improving debt terms would have a larger impact than operational changes."
               : metrics.irr10Year < 8
               ? "Returns are being driven by long-term appreciation rather than near-term cash flow, suggesting a hold-and-optimize strategy."
@@ -1344,7 +1310,7 @@ const formatNum = (n: number) =>
                 ) : (
                   <div>
                     <span className="font-medium text-foreground">Refi @ 6.25%:</span>{" "}
-                    +${formatMoney(annualCashFlowDelta)} / yr cash flow, DCR → {formatNum(refiDcr)}
+                    +${formatMoney(annualCashFlowDelta)} / yr cash flow, DSCR → {formatNum(refiDscr)}
                   </div>
                 )
               )}
@@ -1352,7 +1318,7 @@ const formatNum = (n: number) =>
               {whatIf.rent && (
                 <div>
                   <span className="font-medium text-foreground">Raise rents 5%:</span>{" "}
-                  +${formatMoney(rentDeltaAnnual)} / yr NOI (assumes OPEX unchanged), DCR → {formatNum(rentDcr)}
+                  +${formatMoney(rentDeltaAnnual)} / yr NOI (assumes OPEX unchanged), DSCR → {formatNum(rentDscr)}
                 </div>
               )}
 

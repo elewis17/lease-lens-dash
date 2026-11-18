@@ -58,7 +58,7 @@ const demoMetrics = {
   capRate: 14.31,
   irr10Year: 3.76,
   cashOnCash: 1.03,
-  dcr: 1.08,
+  dscr: 1.08,
   noi: 21468,
   expectedRent: 33300,
   occupancyRate: 100,
@@ -135,7 +135,7 @@ const metricExplanations: Record<string, ExplanationItem[]> = {
       text: "Improve monthly cash flow, reduce upfront cash required, refinance into better terms, or stabilize vacancy and rent collection.",
     },
   ],
-  dcr: [
+  dscr: [
     {
       label: "Formula",
       text: "DSCR = Annual NOI divided by annual debt service.",
@@ -323,7 +323,7 @@ const PortfolioSnapshot = ({
 
   const monthlyCashFlow = Number(m.cashFlow ?? 0);
   const annualCashFlow = monthlyCashFlow * 12;
-  const dcr = Number(m.dcr ?? 0);
+  const dscr = Number(m.dscr ?? 0);
   const capRate = Number(m.capRate ?? 0);
   const irr = Number(m.irr10Year ?? 0);
   const cashOnCash = Number(m.cashOnCash ?? 0);
@@ -334,8 +334,8 @@ const PortfolioSnapshot = ({
   const totalUnits = Number(m.totalUnits ?? portfolioProperties.length ?? 0);
 
   const totalDebtService = mortgages.reduce((sum, mtg) => sum + Number(mtg.monthly_payment ?? 0), 0);
-  const debtHealth = dcr >= 1.25 ? "Healthy" : dcr >= 1.05 ? "Watch" : "Pressure";
-  const debtTone = dcr >= 1.25 ? "good" : "warn";
+  const debtHealth = dscr >= 1.25 ? "Healthy" : dscr >= 1.05 ? "Watch" : "Pressure";
+  const debtTone = dscr >= 1.25 ? "good" : "warn";
 
   const knownDebtBalance = mortgages.reduce(
     (sum, mtg) =>
@@ -346,9 +346,9 @@ const PortfolioSnapshot = ({
   const estimatedEquity = Math.max(portfolioValue - knownDebtBalance, 0);
 
   const refiCapacity =
-    dcr >= 1.25 && estimatedEquity > 0
+    dscr >= 1.25 && estimatedEquity > 0
       ? estimatedEquity * 0.35
-      : dcr >= 1.05 && estimatedEquity > 0
+      : dscr >= 1.05 && estimatedEquity > 0
       ? estimatedEquity * 0.15
       : 0;
 
@@ -363,15 +363,15 @@ const PortfolioSnapshot = ({
     const marginBase = totalDebtService > 0 ? totalDebtService : Math.max(noiMonthly, 1);
     const marginPct = marginBase > 0 ? (monthlyCashFlow / marginBase) * 100 : 0;
 
-    if (monthlyCashFlow < 0 && dcr < 1) {
+    if (monthlyCashFlow < 0 && dscr < 1) {
       return {
         label: "DISTRESS / HIGH RISK",
         tone: "bg-rose-50 text-rose-700",
-        text: `Negative monthly cash flow with DSCR at ${num(dcr)}x. Protect liquidity before extracting equity.`,
+        text: `Negative monthly cash flow with DSCR at ${num(dscr)}x. Protect liquidity before extracting equity.`,
       };
     }
 
-    if (irr < 6 && dcr < 1.05 && marginPct < 5) {
+    if (irr < 6 && dscr < 1.05 && marginPct < 5) {
       return {
         label: "SELL / REPOSITION",
         tone: "bg-rose-50 text-rose-700",
@@ -379,7 +379,7 @@ const PortfolioSnapshot = ({
       };
     }
 
-    if (dcr >= 1.3 && marginPct >= 15 && totalDebtService > 0) {
+    if (dscr >= 1.3 && marginPct >= 15 && totalDebtService > 0) {
       return {
         label: "REFINANCE SCREEN",
         tone: "bg-emerald-50 text-emerald-700",
@@ -387,7 +387,7 @@ const PortfolioSnapshot = ({
       };
     }
 
-    if (dcr >= 1.2 && monthlyCashFlow > 0 && irr >= 8) {
+    if (dscr >= 1.2 && monthlyCashFlow > 0 && irr >= 8) {
       return {
         label: "HOLD",
         tone: "bg-emerald-50 text-emerald-700",
@@ -404,13 +404,13 @@ const PortfolioSnapshot = ({
 
   const riskFlags = [
     {
-      title: dcr < 1.25 ? "Debt coverage needs attention" : "Debt coverage is stable",
+      title: dscr < 1.25 ? "Debt coverage needs attention" : "Debt coverage is stable",
       detail:
-        dcr < 1.25
-          ? `DSCR is ${num(dcr)}x. Underwriting should protect against rate, vacancy, or expense pressure.`
-          : `DSCR is ${num(dcr)}x. Portfolio appears to cover debt service with room to monitor.`,
+        dscr < 1.25
+          ? `DSCR is ${num(dscr)}x. Underwriting should protect against rate, vacancy, or expense pressure.`
+          : `DSCR is ${num(dscr)}x. Portfolio appears to cover debt service with room to monitor.`,
       why: "Debt coverage decides how much stress the portfolio can absorb before owner cash is required.",
-      tone: dcr < 1.25 ? "warn" : "good",
+      tone: dscr < 1.25 ? "warn" : "good",
     },
     {
       title: monthlyCashFlow < 0 ? "Negative cash flow" : "Positive monthly cash flow",
@@ -435,9 +435,9 @@ const PortfolioSnapshot = ({
   const takeaways = [
     {
       label: "Portfolio health",
-      value: dcr >= 1.25 && monthlyCashFlow > 0 ? "Stable" : "Monitor",
+      value: dscr >= 1.25 && monthlyCashFlow > 0 ? "Stable" : "Monitor",
       text:
-        dcr >= 1.25 && monthlyCashFlow > 0
+        dscr >= 1.25 && monthlyCashFlow > 0
           ? "Portfolio is producing positive cash flow with acceptable debt coverage."
           : "Portfolio needs review before aggressive growth or equity extraction.",
       why: "This summarizes whether you can confidently hold, optimize, refinance, or pause new moves.",
@@ -522,7 +522,7 @@ const PortfolioSnapshot = ({
             </div>
             <div>
               <p className="text-xs text-slate-300">DSCR</p>
-              <p className="mt-1 text-2xl font-bold">{num(dcr)}x</p>
+              <p className="mt-1 text-2xl font-bold">{num(dscr)}x</p>
             </div>
           </div>
         </div>
@@ -566,11 +566,11 @@ const PortfolioSnapshot = ({
         />
         <MetricTile
           title="Debt Coverage"
-          value={`${num(dcr)}x`}
+          value={`${num(dscr)}x`}
           subtitle={`${debtHealth} coverage`}
           icon={ShieldCheck}
           explanationTitle="Debt Coverage Ratio (DSCR)"
-          explanationItems={metricExplanations.dcr}
+          explanationItems={metricExplanations.dscr}
           tone={debtTone}
         />
       </section>

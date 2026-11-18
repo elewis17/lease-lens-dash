@@ -80,7 +80,7 @@ const PortfolioDecisions = ({
     : 1_800_000;
 
   const monthlyCashFlow = Number(metrics?.cashFlow ?? 10_400);
-  const avgDscr = Number(metrics?.dcr ?? 1.28);
+  const avgDscr = Number(metrics?.dscr ?? 1.28);
   const avgCapRate = Number(metrics?.capRate ?? 8);
 
   const debtByProperty = mortgages.reduce((map: Record<string, number>, m: any) => {
