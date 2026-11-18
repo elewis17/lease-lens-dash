@@ -6,6 +6,7 @@ import { serve } from "std/http/server.ts";
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://divergentcapitalllc.com",
   "https://elewis17.github.io",      // e.g. https://elewis17.github.io
   "https://elewis17.github.io/lease-lens-dash",  // e.g. "https://elewis17.github.io/lease-lens-dash"
 ]);
