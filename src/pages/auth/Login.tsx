@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const redirectUrl = import.meta.env.DEV
   ? "https://obscure-happiness-x96vq4vxrj43pvp-8000.app.github.dev/auth/callback"
-  : "https://elewis17.github.io/lease-lens-dash/auth/callback"
+  : new URL(`${import.meta.env.BASE_URL}auth/callback`, window.location.origin).href;
 
 export default function Login() {
   return (

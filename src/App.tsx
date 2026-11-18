@@ -17,7 +17,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename={import.meta.env.DEV ? "/" : "/lease-lens-dash"}>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Layout>
           <Routes>
             <Route path="/" element={<Index />} />
