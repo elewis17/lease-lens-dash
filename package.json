@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "build:gh": "vite build --mode gh",
+    "build:company": "vite build --mode company",
     "predeploy": "npm run build:gh && node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "deploy": "gh-pages -d dist -b gh-pages",
     "typecheck": "tsc --noEmit"
