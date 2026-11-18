@@ -7,52 +7,36 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   public: {
     Tables: {
       expenses: {
         Row: {
-          user_id: string | null
-          amount: number
-          category: Database["public"]["Enums"]["expense_category"]
-          created_at: string | null
-          date: string
+          amount: number | null
+          category: string | null
+          date: string | null
           id: string
-          memo: string | null
           property_id: string | null
-          receipt_url: string | null
           unit_id: string | null
-          updated_at: string | null
+          user_id: string | null
         }
+        ComputedFields: never
         Insert: {
-          user_id?: string | null
-          amount: number
-          category: Database["public"]["Enums"]["expense_category"]
-          created_at?: string | null
-          date: string
+          amount?: number | null
+          category?: string | null
+          date?: string | null
           id?: string
-          memo?: string | null
           property_id?: string | null
-          receipt_url?: string | null
           unit_id?: string | null
-          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          user_id?: string | null
-          amount?: number
-          category?: Database["public"]["Enums"]["expense_category"]
-          created_at?: string | null
-          date?: string
+          amount?: number | null
+          category?: string | null
+          date?: string | null
           id?: string
-          memo?: string | null
           property_id?: string | null
-          receipt_url?: string | null
           unit_id?: string | null
-          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -60,6 +44,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_properties"
             referencedColumns: ["id"]
           },
           {
@@ -73,69 +64,69 @@ export type Database = {
       }
       leases: {
         Row: {
-          user_id: string | null
-          property_id: string | null
           confidence_scores: Json | null
-          created_at: string | null
           deposit: number | null
           doc_url: string | null
-          end_date: string
-          grace_period_days: number | null
+          end_date: string | null
           id: string
-          late_fee_amount: number | null
-          monthly_rent: number
-          notice_days: number | null
+          monthly_rent: number | null
           parsed_json: Json | null
-          start_date: string
+          property_id: string | null
+          start_date: string | null
           status: Database["public"]["Enums"]["lease_status"] | null
           tenant_id: string | null
           unit_id: string | null
-          updated_at: string | null
+          user_id: string | null
           vacancy_rate: number | null
         }
+        ComputedFields: never
         Insert: {
-          user_id?: string | null
-          property_id?: string | null
           confidence_scores?: Json | null
-          created_at?: string | null
           deposit?: number | null
           doc_url?: string | null
-          end_date: string
-          grace_period_days?: number | null
+          end_date?: string | null
           id?: string
-          late_fee_amount?: number | null
-          monthly_rent: number
-          notice_days?: number | null
+          monthly_rent?: number | null
           parsed_json?: Json | null
-          start_date: string
-          status?: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id: string | null
-          unit_id: string | null
-          updated_at?: string | null
-          vacancy_rate?: number | null
-        }
-        Update: {
-          user_id?: string | null
           property_id?: string | null
-          confidence_scores?: Json | null
-          created_at?: string | null
-          deposit?: number | null
-          doc_url?: string | null
-          end_date?: string
-          grace_period_days?: number | null
-          id?: string
-          late_fee_amount?: number | null
-          monthly_rent?: number
-          notice_days?: number | null
-          parsed_json?: Json | null
-          start_date?: string
+          start_date?: string | null
           status?: Database["public"]["Enums"]["lease_status"] | null
           tenant_id?: string | null
           unit_id?: string | null
-          updated_at?: string | null
+          user_id?: string | null
+          vacancy_rate?: number | null
+        }
+        Update: {
+          confidence_scores?: Json | null
+          deposit?: number | null
+          doc_url?: string | null
+          end_date?: string | null
+          id?: string
+          monthly_rent?: number | null
+          parsed_json?: Json | null
+          property_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["lease_status"] | null
+          tenant_id?: string | null
+          unit_id?: string | null
+          user_id?: string | null
           vacancy_rate?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "leases_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leases_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_properties"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leases_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -152,101 +143,49 @@ export type Database = {
           },
         ]
       }
-      maintenance: {
-        Row: {
-          user_id: string | null
-          category: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          images: string[] | null
-          status: Database["public"]["Enums"]["maintenance_status"] | null
-          title: string
-          unit_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          user_id?: string | null
-          category?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          images?: string[] | null
-          status?: Database["public"]["Enums"]["maintenance_status"] | null
-          title: string
-          unit_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          user_id?: string | null
-          category?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          images?: string[] | null
-          status?: Database["public"]["Enums"]["maintenance_status"] | null
-          title?: string
-          unit_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "maintenance_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "units"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       mortgages: {
         Row: {
-          includes_escrow: boolean | null
-          principal_original: number | null
           current_balance: number | null
-          user_id: string | null
-          created_at: string | null
           id: string
+          includes_escrow: boolean | null
           interest_rate: number | null
           loan_name: string | null
           monthly_payment: number | null
           principal: number | null
+          principal_original: number | null
           property_id: string | null
           start_date: string | null
           term_months: number | null
-          updated_at: string | null
+          user_id: string | null
         }
+        ComputedFields: never
         Insert: {
-          includes_escrow?: boolean | null
-          principal_original?: number | null
           current_balance?: number | null
-          user_id?: string | null
-          created_at?: string | null
           id?: string
-          interest_rate: number | null
-          loan_name?: string | null
-          monthly_payment: number | null
-          principal: number | null
-          property_id: string | null
-          start_date: string | null
-          term_months: number | null
-          updated_at?: string | null
-        }
-        Update: {
           includes_escrow?: boolean | null
-          principal_original?: number | null
-          current_balance?: number | null
-          user_id?: string | null
-          created_at?: string | null
-          id?: string
           interest_rate?: number | null
           loan_name?: string | null
           monthly_payment?: number | null
           principal?: number | null
+          principal_original?: number | null
           property_id?: string | null
           start_date?: string | null
           term_months?: number | null
-          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          current_balance?: number | null
+          id?: string
+          includes_escrow?: boolean | null
+          interest_rate?: number | null
+          loan_name?: string | null
+          monthly_payment?: number | null
+          principal?: number | null
+          principal_original?: number | null
+          property_id?: string | null
+          start_date?: string | null
+          term_months?: number | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -256,181 +195,114 @@ export type Database = {
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      payments: {
-        Row: {
-          user_id: string | null
-          amount_due: number
-          created_at: string | null
-          due_date: string
-          id: string
-          lease_id: string
-          paid_amount: number | null
-          paid_date: string | null
-          payment_method: string | null
-          status: Database["public"]["Enums"]["payment_status"] | null
-          updated_at: string | null
-        }
-        Insert: {
-          user_id?: string | null
-          amount_due: number
-          created_at?: string | null
-          due_date: string
-          id?: string
-          lease_id: string
-          paid_amount?: number | null
-          paid_date?: string | null
-          payment_method?: string | null
-          status?: Database["public"]["Enums"]["payment_status"] | null
-          updated_at?: string | null
-        }
-        Update: {
-          user_id?: string | null
-          amount_due?: number
-          created_at?: string | null
-          due_date?: string
-          id?: string
-          lease_id?: string
-          paid_amount?: number | null
-          paid_date?: string | null
-          payment_method?: string | null
-          status?: Database["public"]["Enums"]["payment_status"] | null
-          updated_at?: string | null
-        }
-        Relationships: [
           {
-            foreignKeyName: "payments_lease_id_fkey"
-            columns: ["lease_id"]
+            foreignKeyName: "mortgages_property_id_fkey"
+            columns: ["property_id"]
             isOneToOne: false
-            referencedRelation: "leases"
+            referencedRelation: "v_properties"
             referencedColumns: ["id"]
           },
         ]
       }
       properties: {
         Row: {
-          name: string | null
-          alias: string | null
-          type: string | null
-          insurance: number | null
-          user_id: string | null
           address: string | null
-          created_at: string | null
+          alias: string | null
           id: string
-          mortgage_payment: number | null
+          insurance: number | null
+          maintenance_pct: number | null
+          mgmt_pct: number | null
+          name: string | null
           opex_inflation_rate: number | null
+          property_taxes: number | null
           property_value: number | null
           purchase_price: number | null
           rent_growth_rate: number | null
-          total_units: number | null
-          updated_at: string | null
           sale_price: number | null
-          property_taxes: number | null
-          mgmt_pct: number | null
+          total_units: number | null
+          type: string | null
+          user_id: string | null
           vacancy_pct: number | null
-          maintenance_pct: number | null
         }
+        ComputedFields: never
         Insert: {
-          name?: string | null
+          address?: string | null
           alias?: string | null
-          type?: string | null
-          insurance?: number | null
-          user_id?: string | null
-          address: string | null
-          created_at?: string | null
           id?: string
-          mortgage_payment?: number | null
+          insurance?: number | null
+          maintenance_pct?: number | null
+          mgmt_pct?: number | null
+          name?: string | null
           opex_inflation_rate?: number | null
+          property_taxes?: number | null
           property_value?: number | null
           purchase_price?: number | null
           rent_growth_rate?: number | null
-          total_units?: number | null
-          updated_at?: string | null
           sale_price?: number | null
-          property_taxes?: number | null
-          mgmt_pct?: number | null
+          total_units?: number | null
+          type?: string | null
+          user_id?: string | null
           vacancy_pct?: number | null
-          maintenance_pct?: number | null
         }
         Update: {
-          name?: string | null
-          alias?: string | null
-          type?: string | null
-          insurance?: number | null
-          user_id?: string | null
           address?: string | null
-          created_at?: string | null
+          alias?: string | null
           id?: string
-          mortgage_payment?: number | null
+          insurance?: number | null
+          maintenance_pct?: number | null
+          mgmt_pct?: number | null
+          name?: string | null
           opex_inflation_rate?: number | null
+          property_taxes?: number | null
           property_value?: number | null
           purchase_price?: number | null
           rent_growth_rate?: number | null
-          total_units?: number | null
-          updated_at?: string | null
           sale_price?: number | null
-          property_taxes?: number | null
-          mgmt_pct?: number | null
+          total_units?: number | null
+          type?: string | null
+          user_id?: string | null
           vacancy_pct?: number | null
-          maintenance_pct?: number | null
         }
         Relationships: []
       }
       tenants: {
         Row: {
-          user_id: string | null
-          created_at: string | null
-          email: string | null
           id: string
-          name: string
-          phone: string | null
-          updated_at: string | null
+          name: string | null
+          user_id: string | null
         }
+        ComputedFields: never
         Insert: {
-          user_id?: string | null
-          created_at?: string | null
-          email?: string | null
           id?: string
-          name: string
-          phone?: string | null
-          updated_at?: string | null
+          name?: string | null
+          user_id?: string | null
         }
         Update: {
-          user_id?: string | null
-          created_at?: string | null
-          email?: string | null
           id?: string
-          name?: string
-          phone?: string | null
-          updated_at?: string | null
+          name?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
       units: {
         Row: {
-          user_id: string | null
-          created_at: string | null
           id: string
-          property_id: string
-          unit_label: string
-          updated_at: string | null
+          property_id: string | null
+          unit_label: string | null
+          user_id: string | null
         }
+        ComputedFields: never
         Insert: {
-          user_id?: string | null
-          created_at?: string | null
           id?: string
-          property_id: string
-          unit_label: string
-          updated_at?: string | null
+          property_id?: string | null
+          unit_label?: string | null
+          user_id?: string | null
         }
         Update: {
-          user_id?: string | null
-          created_at?: string | null
           id?: string
-          property_id?: string
-          unit_label?: string
-          updated_at?: string | null
+          property_id?: string | null
+          unit_label?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -440,33 +312,113 @@ export type Database = {
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "units_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_properties"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      v_mortgages: {
+        Row: {
+          address: string | null
+          alias: string | null
+          current_balance: number | null
+          id: string | null
+          includes_escrow: boolean | null
+          interest_rate: number | null
+          loan_name: string | null
+          monthly_payment: number | null
+          name: string | null
+          principal: number | null
+          principal_original: number | null
+          property_id: string | null
+          start_date: string | null
+          term_months: number | null
+        }
+        ComputedFields: never
+        Relationships: [
+          {
+            foreignKeyName: "mortgages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mortgages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_properties: {
+        Row: {
+          address: string | null
+          alias: string | null
+          id: string | null
+          maintenance_pct: number | null
+          mgmt_pct: number | null
+          name: string | null
+          opex_inflation_rate: number | null
+          property_taxes: number | null
+          property_value: number | null
+          purchase_price: number | null
+          rent_growth_rate: number | null
+          sale_price: number | null
+          type: string | null
+          vacancy_pct: number | null
+        }
+        ComputedFields: never
+        Insert: {
+          address?: string | null
+          alias?: string | null
+          id?: string | null
+          maintenance_pct?: number | null
+          mgmt_pct?: number | null
+          name?: string | null
+          opex_inflation_rate?: number | null
+          property_taxes?: number | null
+          property_value?: number | null
+          purchase_price?: number | null
+          rent_growth_rate?: number | null
+          sale_price?: number | null
+          type?: string | null
+          vacancy_pct?: number | null
+        }
+        Update: {
+          address?: string | null
+          alias?: string | null
+          id?: string | null
+          maintenance_pct?: number | null
+          mgmt_pct?: number | null
+          name?: string | null
+          opex_inflation_rate?: number | null
+          property_taxes?: number | null
+          property_value?: number | null
+          purchase_price?: number | null
+          rent_growth_rate?: number | null
+          sale_price?: number | null
+          type?: string | null
+          vacancy_pct?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       update_property_unit_count: {
-        Args: { target_property: string };
-        Returns: number;
-      };
-
+        Args: { target_property: string }
+        Returns: number
+      }
     }
     Enums: {
-      expense_category:
-        | "repairs"
-        | "pm"
-        | "tax"
-        | "insurance"
-        | "capex"
-        | "utilities"
-        | "hoa"
-        | "advertising"
-        | "other"
       lease_status: "active" | "expiring" | "expired" | "vacant"
-      maintenance_status: "pending" | "in_progress" | "completed"
-      payment_status: "paid" | "overdue" | "pending"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -482,12 +434,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -511,11 +463,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -536,11 +488,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -561,11 +513,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -578,11 +530,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -594,20 +546,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      expense_category: [
-        "repairs",
-        "pm",
-        "tax",
-        "insurance",
-        "capex",
-        "utilities",
-        "hoa",
-        "advertising",
-        "other",
-      ],
       lease_status: ["active", "expiring", "expired", "vacant"],
-      maintenance_status: ["pending", "in_progress", "completed"],
-      payment_status: ["paid", "overdue", "pending"],
     },
   },
 } as const

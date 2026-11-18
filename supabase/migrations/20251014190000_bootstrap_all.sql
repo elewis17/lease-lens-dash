@@ -64,6 +64,13 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 );
 
 -- ---------- LEASES ----------
+DO $$
+BEGIN
+  IF to_regtype('public.lease_status') IS NULL THEN
+    CREATE TYPE public.lease_status AS ENUM ('active', 'expiring', 'expired', 'vacant');
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.leases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid,
@@ -73,7 +80,7 @@ CREATE TABLE IF NOT EXISTS public.leases (
   deposit NUMERIC(12,2),
   start_date TIMESTAMP WITH TIME ZONE,
   end_date   TIMESTAMP WITH TIME ZONE,
-  status TEXT
+  status public.lease_status
 );
 
 ALTER TABLE public.leases

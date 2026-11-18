@@ -95,3 +95,18 @@ publishing the client. Existing property ownership is preserved. Records
 without an attributable owner stay hidden until an administrator resolves
 ownership using the original record. Check grants and policies on the live
 schema and test anonymous and distinct signed-in sessions before cutover.
+
+### Regenerate preview database types
+
+Apply the checked-in migrations to a fresh local Supabase database, then
+generate the `public` schema contract with the Supabase CLI:
+
+```sh
+supabase gen types typescript --local --schema public > /tmp/dealstack-schema.ts
+cp /tmp/dealstack-schema.ts src/integrations/supabase/types.ts
+npm run typecheck
+```
+
+Review the generated diff before committing. The preview contract comes from
+the checked-in migrations. A schema-only inspection of the live project is
+needed separately before approving a production rollout.

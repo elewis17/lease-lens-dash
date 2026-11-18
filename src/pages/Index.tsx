@@ -170,7 +170,7 @@ const Index = ({ userId }: { userId: string }) => {
       console.error("Error loading units:", unitsError);
     } else {
       for (const unit of unitsData ?? []) {
-        unitLabelById.set(unit.id, unit.unit_label);
+        if (unit.unit_label !== null) unitLabelById.set(unit.id, unit.unit_label);
       }
     }
 
