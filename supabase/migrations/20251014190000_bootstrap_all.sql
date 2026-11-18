@@ -25,6 +25,8 @@ ALTER TABLE public.properties
   ADD COLUMN IF NOT EXISTS vacancy_pct NUMERIC(5,2),
   ADD COLUMN IF NOT EXISTS maintenance_pct NUMERIC(5,2),
   ADD COLUMN IF NOT EXISTS property_value NUMERIC(14,2),
+  ADD COLUMN IF NOT EXISTS insurance NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS total_units INTEGER,
   ADD COLUMN IF NOT EXISTS opex_inflation_rate NUMERIC(5,2) DEFAULT 2.5,
   ADD COLUMN IF NOT EXISTS rent_growth_rate NUMERIC(5,2) DEFAULT 3.0;
 
@@ -73,6 +75,11 @@ CREATE TABLE IF NOT EXISTS public.leases (
   end_date   TIMESTAMP WITH TIME ZONE,
   status TEXT
 );
+
+ALTER TABLE public.leases
+  ADD COLUMN IF NOT EXISTS parsed_json JSONB,
+  ADD COLUMN IF NOT EXISTS confidence_scores JSONB,
+  ADD COLUMN IF NOT EXISTS doc_url TEXT;
 
 -- If you had a legacy "unit" column, rename it safely
 DO $$
@@ -143,6 +150,8 @@ CREATE TABLE IF NOT EXISTS public.expenses (
   amount NUMERIC(14,2),
   date TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+ALTER TABLE public.expenses
+  ADD COLUMN IF NOT EXISTS unit_id UUID REFERENCES public.units(id) ON DELETE SET NULL;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='expenses_property_id_fkey') THEN

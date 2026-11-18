@@ -88,8 +88,8 @@ export type Database = {
           parsed_json: Json | null
           start_date: string
           status: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id: string
-          unit_id: string
+          tenant_id: string | null
+          unit_id: string | null
           updated_at: string | null
           vacancy_rate: number | null
         }
@@ -109,8 +109,8 @@ export type Database = {
           parsed_json?: Json | null
           start_date: string
           status?: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id: string
-          unit_id: string
+          tenant_id: string | null
+          unit_id: string | null
           updated_at?: string | null
           vacancy_rate?: number | null
         }
@@ -130,8 +130,8 @@ export type Database = {
           parsed_json?: Json | null
           start_date?: string
           status?: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id?: string
-          unit_id?: string
+          tenant_id?: string | null
+          unit_id?: string | null
           updated_at?: string | null
           vacancy_rate?: number | null
         }
@@ -201,42 +201,51 @@ export type Database = {
       }
       mortgages: {
         Row: {
+          includes_escrow: boolean | null
+          principal_original: number | null
+          current_balance: number | null
           user_id: string | null
           created_at: string | null
           id: string
-          interest_rate: number
-          loan_name: string
-          monthly_payment: number
-          principal: number
-          property_id: string
-          start_date: string
-          term_months: number
+          interest_rate: number | null
+          loan_name: string | null
+          monthly_payment: number | null
+          principal: number | null
+          property_id: string | null
+          start_date: string | null
+          term_months: number | null
           updated_at: string | null
         }
         Insert: {
+          includes_escrow?: boolean | null
+          principal_original?: number | null
+          current_balance?: number | null
           user_id?: string | null
           created_at?: string | null
           id?: string
-          interest_rate: number
-          loan_name?: string
-          monthly_payment: number
-          principal: number
-          property_id: string
-          start_date: string
-          term_months: number
+          interest_rate: number | null
+          loan_name?: string | null
+          monthly_payment: number | null
+          principal: number | null
+          property_id: string | null
+          start_date: string | null
+          term_months: number | null
           updated_at?: string | null
         }
         Update: {
+          includes_escrow?: boolean | null
+          principal_original?: number | null
+          current_balance?: number | null
           user_id?: string | null
           created_at?: string | null
           id?: string
-          interest_rate?: number
-          loan_name?: string
-          monthly_payment?: number
-          principal?: number
-          property_id?: string
-          start_date?: string
-          term_months?: number
+          interest_rate?: number | null
+          loan_name?: string | null
+          monthly_payment?: number | null
+          principal?: number | null
+          property_id?: string | null
+          start_date?: string | null
+          term_months?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -301,8 +310,12 @@ export type Database = {
       }
       properties: {
         Row: {
+          name: string | null
+          alias: string | null
+          type: string | null
+          insurance: number | null
           user_id: string | null
-          address: string
+          address: string | null
           created_at: string | null
           id: string
           mortgage_payment: number | null
@@ -319,8 +332,12 @@ export type Database = {
           maintenance_pct: number | null
         }
         Insert: {
+          name?: string | null
+          alias?: string | null
+          type?: string | null
+          insurance?: number | null
           user_id?: string | null
-          address: string
+          address: string | null
           created_at?: string | null
           id?: string
           mortgage_payment?: number | null
@@ -337,8 +354,12 @@ export type Database = {
           maintenance_pct?: number | null
         }
         Update: {
+          name?: string | null
+          alias?: string | null
+          type?: string | null
+          insurance?: number | null
           user_id?: string | null
-          address?: string
+          address?: string | null
           created_at?: string | null
           id?: string
           mortgage_payment?: number | null

@@ -5,7 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Trash2, Save, X, Plus, Edit, Pencil } from "lucide-react";
 import { format } from "date-fns";
 
-interface LeaseData {
+import { Constants, type Enums } from "@/integrations/supabase/types";
+
+type LeaseStatus = Enums<"lease_status">;
+const isLeaseStatus = (value: string): value is LeaseStatus =>
+  Constants.public.Enums.lease_status.some((status) => value === status);
+
+export interface LeaseData {
   id: string;
   tenant: string;
   monthlyRent: number;
@@ -14,7 +20,8 @@ interface LeaseData {
   leaseEnd: Date;
   property_id?: string;
   // NEW FIELDS
-  status?: string;        // from leases table
+  status?: LeaseStatus | null;
+  unit_id?: string | null;
   unit_label?: string | null; // from units table (joined in Index.tsx)
 }
 
@@ -135,12 +142,14 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                     <select
                       className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                       value={editData.status ?? "active"}
-                      onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                      onChange={({ target: { value } }) => {
+                        if (isLeaseStatus(value)) setEditData({ ...editData, status: value });
+                      }}
                     >
                       <option value="active">Active</option>
                       <option value="expiring">Expiring</option>
                       <option value="vacant">Vacant</option>
-                      <option value="inactive">Inactive</option>
+                      <option value="expired">Inactive</option>
                     </select>
                   </TableCell>
                   <TableCell>
@@ -248,14 +257,14 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 <select
                   className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                   value={newLease.status ?? "active"}
-                  onChange={(e) =>
-                    setNewLease({ ...newLease, status: e.target.value })
-                  }
+                  onChange={({ target: { value } }) => {
+                    if (isLeaseStatus(value)) setNewLease({ ...newLease, status: value });
+                  }}
                 >
                   <option value="active">Active</option>
                   <option value="expiring">Expiring</option>
                   <option value="vacant">Vacant</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="expired">Inactive</option>
                 </select>
               </TableCell>
               <TableCell>

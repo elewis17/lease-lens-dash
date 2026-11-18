@@ -41,7 +41,7 @@ export interface OpexContext {
     term_months?: number | string | null;
     interest_rate?: number | string | null;
     monthly_payment?: number | string | null;
-  };
+  } | null;
 }
 
 export class OpexCalculator {

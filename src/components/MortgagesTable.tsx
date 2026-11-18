@@ -7,32 +7,46 @@ import { Card } from "@/components/ui/card";
 
 type PropertyOption = { id: string; name: string };
 
-interface Mortgage {
+export interface Mortgage {
   id: string;
-  property_id?: string; // NEW
-  loan_name: string;
-  principal: number;
+  property_id?: string | null;
+  loan_name: string | null;
+  principal: number | null;
   principal_original?: number | null;  
   current_balance?: number | null;   
   interest_rate: number;
   term_months: number;
-  start_date: Date;
+  start_date: Date | null;
   monthly_payment: number;
-  includes_escrow?: boolean;  // NEW
+  includes_escrow?: boolean | null;
 }
+
+type NumericInput = number | string | null;
+export type MortgageInput = {
+  property_id?: string | null;
+  loan_name?: string | null;
+  principal?: NumericInput;
+  principal_original?: NumericInput;
+  current_balance?: NumericInput;
+  interest_rate?: NumericInput;
+  term_months?: NumericInput;
+  monthly_payment?: NumericInput;
+  start_date?: Date | string | null;
+  includes_escrow?: boolean;
+};
 
 interface MortgagesTableProps {
   mortgages: Mortgage[];
-  onUpdate: (id: string, data: Partial<Mortgage>) => void;
+  onUpdate: (id: string, data: MortgageInput) => void;
   onDelete: (id: string) => void;
-  onAdd: (data: Omit<Mortgage, "id">) => void;
+  onAdd: (data: MortgageInput) => void;
   propertyOptions: PropertyOption[]; // NEW
 }
 
 export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyOptions}: MortgagesTableProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [editData, setEditData] = useState<any>({});
+  const [editData, setEditData] = useState<MortgageInput>({});
 
   const handleEdit = (mortgage: Mortgage) => {
     setEditingId(mortgage.id);
@@ -51,8 +65,8 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
 
 
     // helpers
-    const numOrNull = (v: any) => (v === "" || v === undefined || v === null ? null : Number(v));
-    const intOrNull = (v: any) => (v === "" || v === undefined || v === null ? null : parseInt(v));
+    const numOrNull = (v?: NumericInput) => (v === "" || v === undefined || v === null ? null : Number(v));
+    const intOrNull = (v?: NumericInput) => (v === "" || v === undefined || v === null ? null : parseInt(String(v), 10));
     const toApiDate = (d: string | Date | null | undefined): string | null => {
       if (!d) return null;
       if (d instanceof Date) return d.toISOString().slice(0, 10);  // YYYY-MM-DD
@@ -63,7 +77,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
     const handleSave = () => {
       if (!editingId) return;
 
-      const payload: any = {
+      const payload: MortgageInput = {
         property_id: editData.property_id || null,
         loan_name: (editData.loan_name ?? "").toString().trim() || null,
 
@@ -80,9 +94,6 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
         includes_escrow: !!editData.includes_escrow,  
       };
 
-      // drop undefined keys
-      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
-
       onUpdate(editingId, payload);
       setEditingId(null);
     };
@@ -95,12 +106,12 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
       principal: editData.principal ? Number(editData.principal) : 0,
       principal_original: editData.principal_original ?? null, // ✅ NEW
       current_balance: editData.current_balance ?? null,       // ✅ NEW
-      interest_rate: parseFloat(editData.interest_rate) || 0,
-      term_months: parseInt(editData.term_months) || 360,
+      interest_rate: parseFloat(String(editData.interest_rate)) || 0,
+      term_months: parseInt(String(editData.term_months), 10) || 360,
       start_date: new Date(editData.start_date || new Date()),
-      monthly_payment: parseFloat(editData.monthly_payment) || 0,
+      monthly_payment: parseFloat(String(editData.monthly_payment)) || 0,
       includes_escrow: !!editData.includes_escrow,
-    } as Omit<Mortgage, "id">);
+    });
     setIsAdding(false);
     setEditData({});
   };
@@ -166,7 +177,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                       <Input
                         type="number"
                         step="0.01"
-                        value={editData.interest_rate}
+                        value={editData.interest_rate ?? ""}
                         onChange={(e) => setEditData({ ...editData, interest_rate: e.target.value })}
                         className="h-8"
                       />
@@ -174,7 +185,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">
                       <Input
                         type="number"
-                        value={editData.term_months}
+                        value={editData.term_months ?? ""}
                         onChange={(e) => setEditData({ ...editData, term_months: e.target.value })}
                         className="h-8"
                       />
@@ -182,7 +193,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">
                       <Input
                         type="date"
-                        value={editData.start_date instanceof Date ? editData.start_date.toISOString().split('T')[0] : editData.start_date}
+                        value={toApiDate(editData.start_date) ?? ""}
                         onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                         className="h-8"
                       />
@@ -201,7 +212,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">
                       <Input
                         type="number"
-                        value={editData.monthly_payment}
+                        value={editData.monthly_payment ?? ""}
                         onChange={(e) => setEditData({ ...editData, monthly_payment: e.target.value })}
                         className="h-8"
                       />
@@ -225,7 +236,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">${ (mortgage.current_balance ?? mortgage.principal ?? 0).toLocaleString() }</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.interest_rate}%</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.term_months}</TableCell>
-                    <TableCell className="px-4 py-3">{new Date(mortgage.start_date).toLocaleDateString()}</TableCell>
+                    <TableCell className="px-4 py-3">{mortgage.start_date ? new Date(mortgage.start_date).toLocaleDateString() : "—"}</TableCell>
                     <TableCell className="px-4 py-3">
                       <label className="inline-flex items-center gap-2 text-xs">
                         <input
@@ -312,7 +323,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                 <TableCell className="px-4 py-3">
                   <Input
                     type="date"
-                    value={editData.start_date || ""}
+                    value={toApiDate(editData.start_date) ?? ""}
                     onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                     className="h-8"
                   />
