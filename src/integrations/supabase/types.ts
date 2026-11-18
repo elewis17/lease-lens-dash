@@ -11,31 +11,43 @@ export type Database = {
     Tables: {
       expenses: {
         Row: {
-          amount: number | null
-          category: string | null
-          date: string | null
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string | null
+          date: string
           id: string
+          memo: string | null
           property_id: string | null
+          receipt_url: string | null
           unit_id: string | null
+          updated_at: string | null
           user_id: string | null
         }
         ComputedFields: never
         Insert: {
-          amount?: number | null
-          category?: string | null
-          date?: string | null
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at?: string | null
+          date: string
           id?: string
+          memo?: string | null
           property_id?: string | null
+          receipt_url?: string | null
           unit_id?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
-          amount?: number | null
-          category?: string | null
-          date?: string | null
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string | null
+          date?: string
           id?: string
+          memo?: string | null
           property_id?: string | null
+          receipt_url?: string | null
           unit_id?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -65,68 +77,69 @@ export type Database = {
       leases: {
         Row: {
           confidence_scores: Json | null
+          created_at: string | null
           deposit: number | null
           doc_url: string | null
-          end_date: string | null
+          end_date: string
+          grace_period_days: number | null
           id: string
-          monthly_rent: number | null
+          late_fee_amount: number | null
+          monthly_rent: number
+          notice_days: number | null
           parsed_json: Json | null
           property_id: string | null
-          start_date: string | null
+          start_date: string
           status: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id: string | null
-          unit_id: string | null
+          tenant_id: string
+          unit_id: string
+          updated_at: string | null
           user_id: string | null
           vacancy_rate: number | null
         }
         ComputedFields: never
         Insert: {
           confidence_scores?: Json | null
+          created_at?: string | null
           deposit?: number | null
           doc_url?: string | null
-          end_date?: string | null
+          end_date: string
+          grace_period_days?: number | null
           id?: string
-          monthly_rent?: number | null
+          late_fee_amount?: number | null
+          monthly_rent: number
+          notice_days?: number | null
           parsed_json?: Json | null
           property_id?: string | null
-          start_date?: string | null
+          start_date: string
           status?: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id?: string | null
-          unit_id?: string | null
+          tenant_id: string
+          unit_id: string
+          updated_at?: string | null
           user_id?: string | null
           vacancy_rate?: number | null
         }
         Update: {
           confidence_scores?: Json | null
+          created_at?: string | null
           deposit?: number | null
           doc_url?: string | null
-          end_date?: string | null
+          end_date?: string
+          grace_period_days?: number | null
           id?: string
-          monthly_rent?: number | null
+          late_fee_amount?: number | null
+          monthly_rent?: number
+          notice_days?: number | null
           parsed_json?: Json | null
           property_id?: string | null
-          start_date?: string | null
+          start_date?: string
           status?: Database["public"]["Enums"]["lease_status"] | null
-          tenant_id?: string | null
-          unit_id?: string | null
+          tenant_id?: string
+          unit_id?: string
+          updated_at?: string | null
           user_id?: string | null
           vacancy_rate?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "leases_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "leases_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "v_properties"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "leases_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -143,48 +156,102 @@ export type Database = {
           },
         ]
       }
-      mortgages: {
+      maintenance: {
         Row: {
-          current_balance: number | null
+          category: string | null
+          created_at: string | null
+          description: string | null
           id: string
-          includes_escrow: boolean | null
-          interest_rate: number | null
-          loan_name: string | null
-          monthly_payment: number | null
-          principal: number | null
-          principal_original: number | null
-          property_id: string | null
-          start_date: string | null
-          term_months: number | null
+          images: string[] | null
+          status: Database["public"]["Enums"]["maintenance_status"] | null
+          title: string
+          unit_id: string
+          updated_at: string | null
           user_id: string | null
         }
         ComputedFields: never
         Insert: {
-          current_balance?: number | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
           id?: string
-          includes_escrow?: boolean | null
-          interest_rate?: number | null
-          loan_name?: string | null
-          monthly_payment?: number | null
-          principal?: number | null
-          principal_original?: number | null
-          property_id?: string | null
-          start_date?: string | null
-          term_months?: number | null
+          images?: string[] | null
+          status?: Database["public"]["Enums"]["maintenance_status"] | null
+          title: string
+          unit_id: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          status?: Database["public"]["Enums"]["maintenance_status"] | null
+          title?: string
+          unit_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mortgages: {
+        Row: {
+          created_at: string | null
+          current_balance: number | null
+          id: string
+          includes_escrow: boolean | null
+          interest_rate: number
+          loan_name: string
+          monthly_payment: number
+          principal: number
+          principal_original: number | null
+          property_id: string
+          start_date: string
+          term_months: number
+          updated_at: string | null
+          user_id: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string | null
           current_balance?: number | null
           id?: string
           includes_escrow?: boolean | null
-          interest_rate?: number | null
-          loan_name?: string | null
-          monthly_payment?: number | null
-          principal?: number | null
+          interest_rate: number
+          loan_name?: string
+          monthly_payment: number
+          principal: number
           principal_original?: number | null
-          property_id?: string | null
-          start_date?: string | null
-          term_months?: number | null
+          property_id: string
+          start_date: string
+          term_months: number
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_balance?: number | null
+          id?: string
+          includes_escrow?: boolean | null
+          interest_rate?: number
+          loan_name?: string
+          monthly_payment?: number
+          principal?: number
+          principal_original?: number | null
+          property_id?: string
+          start_date?: string
+          term_months?: number
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -204,14 +271,67 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount_due: number
+          created_at: string | null
+          due_date: string
+          id: string
+          lease_id: string
+          paid_amount: number | null
+          paid_date: string | null
+          payment_method: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          amount_due: number
+          created_at?: string | null
+          due_date: string
+          id?: string
+          lease_id: string
+          paid_amount?: number | null
+          paid_date?: string | null
+          payment_method?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_due?: number
+          created_at?: string | null
+          due_date?: string
+          id?: string
+          lease_id?: string
+          paid_amount?: number | null
+          paid_date?: string | null
+          payment_method?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "leases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       properties: {
         Row: {
-          address: string | null
+          address: string
           alias: string | null
+          created_at: string | null
           id: string
           insurance: number | null
           maintenance_pct: number | null
           mgmt_pct: number | null
+          mortgage_payment: number | null
           name: string | null
           opex_inflation_rate: number | null
           property_taxes: number | null
@@ -221,17 +341,20 @@ export type Database = {
           sale_price: number | null
           total_units: number | null
           type: string | null
+          updated_at: string | null
           user_id: string | null
           vacancy_pct: number | null
         }
         ComputedFields: never
         Insert: {
-          address?: string | null
+          address: string
           alias?: string | null
+          created_at?: string | null
           id?: string
           insurance?: number | null
           maintenance_pct?: number | null
           mgmt_pct?: number | null
+          mortgage_payment?: number | null
           name?: string | null
           opex_inflation_rate?: number | null
           property_taxes?: number | null
@@ -241,16 +364,19 @@ export type Database = {
           sale_price?: number | null
           total_units?: number | null
           type?: string | null
+          updated_at?: string | null
           user_id?: string | null
           vacancy_pct?: number | null
         }
         Update: {
-          address?: string | null
+          address?: string
           alias?: string | null
+          created_at?: string | null
           id?: string
           insurance?: number | null
           maintenance_pct?: number | null
           mgmt_pct?: number | null
+          mortgage_payment?: number | null
           name?: string | null
           opex_inflation_rate?: number | null
           property_taxes?: number | null
@@ -260,6 +386,7 @@ export type Database = {
           sale_price?: number | null
           total_units?: number | null
           type?: string | null
+          updated_at?: string | null
           user_id?: string | null
           vacancy_pct?: number | null
         }
@@ -267,41 +394,59 @@ export type Database = {
       }
       tenants: {
         Row: {
+          created_at: string | null
+          email: string | null
           id: string
-          name: string | null
+          name: string
+          phone: string | null
+          updated_at: string | null
           user_id: string | null
         }
         ComputedFields: never
         Insert: {
+          created_at?: string | null
+          email?: string | null
           id?: string
-          name?: string | null
+          name: string
+          phone?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          created_at?: string | null
+          email?: string | null
           id?: string
-          name?: string | null
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: []
       }
       units: {
         Row: {
+          created_at: string | null
           id: string
-          property_id: string | null
-          unit_label: string | null
+          property_id: string
+          unit_label: string
+          updated_at: string | null
           user_id: string | null
         }
         ComputedFields: never
         Insert: {
+          created_at?: string | null
           id?: string
-          property_id?: string | null
-          unit_label?: string | null
+          property_id: string
+          unit_label: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          created_at?: string | null
           id?: string
-          property_id?: string | null
-          unit_label?: string | null
+          property_id?: string
+          unit_label?: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -327,18 +472,17 @@ export type Database = {
         Row: {
           address: string | null
           alias: string | null
-          current_balance: number | null
+          created_at: string | null
           id: string | null
-          includes_escrow: boolean | null
           interest_rate: number | null
           loan_name: string | null
           monthly_payment: number | null
           name: string | null
           principal: number | null
-          principal_original: number | null
           property_id: string | null
           start_date: string | null
           term_months: number | null
+          updated_at: string | null
         }
         ComputedFields: never
         Relationships: [
@@ -418,7 +562,19 @@ export type Database = {
       }
     }
     Enums: {
+      expense_category:
+        | "repairs"
+        | "pm"
+        | "tax"
+        | "insurance"
+        | "capex"
+        | "utilities"
+        | "hoa"
+        | "advertising"
+        | "other"
       lease_status: "active" | "expiring" | "expired" | "vacant"
+      maintenance_status: "pending" | "in_progress" | "completed"
+      payment_status: "paid" | "overdue" | "pending"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -546,7 +702,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      expense_category: [
+        "repairs",
+        "pm",
+        "tax",
+        "insurance",
+        "capex",
+        "utilities",
+        "hoa",
+        "advertising",
+        "other",
+      ],
       lease_status: ["active", "expiring", "expired", "vacant"],
+      maintenance_status: ["pending", "in_progress", "completed"],
+      payment_status: ["paid", "overdue", "pending"],
     },
   },
 } as const

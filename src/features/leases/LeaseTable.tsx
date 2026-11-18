@@ -67,7 +67,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
   };
 
   const handleAddNew = () => {
-    if (!newLease.tenant.trim()) return;          // tenant required
+    if (!newLease.tenant.trim() || !newLease.unit_label?.trim()) return;
     if (!newLease.property_id) return;    
 
     onAdd(newLease);
@@ -303,7 +303,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={handleAddNew} className="hover:scale-105 transition-transform">
+                  <Button variant="ghost" size="sm" onClick={handleAddNew} disabled={!newLease.property_id || !newLease.tenant.trim() || !newLease.unit_label?.trim()} className="hover:scale-105 transition-transform">
                     <Save className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)} className="hover:scale-105 transition-transform">

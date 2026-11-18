@@ -526,6 +526,12 @@ const Index = ({ userId }: { userId: string }) => {
     // 2) TENANT: find or create by name
     // -------------------------------
     const tenantName = (data.tenant ?? "").trim();
+    const unitLabel = (data.unit_label ?? "").trim();
+    if (!tenantName || !unitLabel) {
+      toast({ title: "Tenant and unit required", description: "Enter a tenant and unit before saving the lease.", variant: "destructive" });
+      return;
+    }
+
     let tenantId: string | null = null;
 
     if (tenantName) {
@@ -568,7 +574,6 @@ const Index = ({ userId }: { userId: string }) => {
     // -------------------------------
     // 3) UNIT: find or create by (property_id + unit_label)
     // -------------------------------
-    const unitLabel = (data.unit_label ?? "").trim();
     let unitId: string | null = null;
 
     if (unitLabel) {
@@ -616,6 +621,8 @@ const Index = ({ userId }: { userId: string }) => {
     // -------------------------------
     // 4) LEASE: write the foreign keys into leases
     // -------------------------------
+    if (!tenantId || !unitId) return;
+
     const payload: TablesInsert<"leases"> = {
       user_id: userId,
       tenant_id: tenantId,
@@ -649,24 +656,35 @@ const Index = ({ userId }: { userId: string }) => {
   };
 
   //MORTGAGE HANDLERS
+  const mortgageNumberMissing = (value: string | number | null | undefined) =>
+    value == null || value === "" || !Number.isFinite(Number(value));
+
   const handleUpdateMortgage = async (id: string, data: MortgageInput) => {
+    const { property_id, loan_name, start_date, principal, interest_rate, term_months, monthly_payment } = data;
+    if ([property_id, loan_name, start_date].some((field) => field === null || field === "") ||
+        [principal, interest_rate, term_months, monthly_payment].some((value) =>
+          value !== undefined && mortgageNumberMissing(value))) {
+      toast({ title: "Required mortgage details missing", description: "Enter the property, loan name, principal, terms, start date and payment.", variant: "destructive" });
+      return;
+    }
+
     const payload: TablesUpdate<"mortgages"> = {};
 
-    if (data.loan_name !== undefined) payload.loan_name = data.loan_name;
+    if (data.loan_name != null) payload.loan_name = data.loan_name;
     if (data.principal !== undefined) payload.principal = Number(data.principal);
     if (data.principal_original !== undefined) payload.principal_original = Number(data.principal_original);
     if (data.current_balance !== undefined) payload.current_balance = Number(data.current_balance);
     if (data.interest_rate !== undefined) payload.interest_rate = Number(data.interest_rate);
     if (data.term_months !== undefined) payload.term_months = Number(data.term_months);
 
-    if (data.start_date !== undefined)
+    if (data.start_date != null)
       payload.start_date = data.start_date instanceof Date 
         ? data.start_date.toISOString() 
         : data.start_date;
 
     if (data.monthly_payment !== undefined) payload.monthly_payment = Number(data.monthly_payment);
     if (data.includes_escrow !== undefined) payload.includes_escrow = Boolean(data.includes_escrow);
-    if (data.property_id !== undefined) payload.property_id = data.property_id;
+    if (data.property_id != null) payload.property_id = data.property_id;
 
     const { data: rows, error } = await supabase
       .from("mortgages")
@@ -712,19 +730,27 @@ const Index = ({ userId }: { userId: string }) => {
   };
 
   const handleAddMortgage = async (data: MortgageInput) => {
+    const propertyId = data.property_id ?? selectedProperty;
+    const startDate = data.start_date instanceof Date
+      ? data.start_date.toISOString()
+      : data.start_date;
+    if (!propertyId || !startDate ||
+        [data.principal, data.interest_rate, data.term_months, data.monthly_payment].some(mortgageNumberMissing)) {
+      toast({ title: "Required mortgage details missing", description: "Enter the property, principal, terms, start date and payment.", variant: "destructive" });
+      return;
+    }
+
     const payload: TablesInsert<"mortgages"> = {
       user_id: userId,
-      property_id: data.property_id ?? selectedProperty,
-      loan_name: data.loan_name ?? null,
-      principal: data.principal !== "" ? Number(data.principal) : null,
+      property_id: propertyId,
+      loan_name: data.loan_name ?? undefined,
+      principal: Number(data.principal),
       principal_original: data.principal_original !== "" ? Number(data.principal_original) : null,
       current_balance: data.current_balance !== "" ? Number(data.current_balance) : null,
-      interest_rate: data.interest_rate !== "" ? Number(data.interest_rate) : null,
-      term_months: data.term_months !== "" ? Number(data.term_months) : null,
-      start_date: data.start_date instanceof Date 
-        ? data.start_date.toISOString() 
-        : data.start_date ?? null,
-      monthly_payment: data.monthly_payment !== "" ? Number(data.monthly_payment) : null,
+      interest_rate: Number(data.interest_rate),
+      term_months: Number(data.term_months),
+      start_date: startDate,
+      monthly_payment: Number(data.monthly_payment),
       includes_escrow: Boolean(data.includes_escrow),
     };
 
@@ -742,9 +768,14 @@ const Index = ({ userId }: { userId: string }) => {
 
   //PROPERTY HANDLERS
   const handleAddProperty = async (data: Omit<Property, "id">) => {
+    if (!data.address?.trim()) {
+      toast({ title: "Address required", description: "Enter a property address before saving.", variant: "destructive" });
+      return;
+    }
+
     const payload: TablesInsert<"properties"> = {
       alias: data.alias,
-      address: data.address ?? null,
+      address: data.address,
       type: data.type ?? null,
       sale_price: data.sale_price ?? null,
       property_taxes: data.property_taxes ?? null,
@@ -783,7 +814,13 @@ const Index = ({ userId }: { userId: string }) => {
     // - Map sale_price -> purchase_price (legacy column) if provided
     // - Only include fields that are not undefined (avoid sending unknown keys)
     const payload: TablesUpdate<"properties"> = {};
-    if (patch.address !== undefined) payload.address = patch.address ?? null;
+    if (patch.address !== undefined) {
+      if (!patch.address?.trim()) {
+        toast({ title: "Address required", description: "Enter a property address before saving.", variant: "destructive" });
+        return;
+      }
+      payload.address = patch.address;
+    }
     if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price;
 
     // If your migration with the new columns is applied, these will also succeed (harmless if ignored by types)
