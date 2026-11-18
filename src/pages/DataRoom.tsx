@@ -13,7 +13,6 @@ type DataRoomProps = {
   mortgages: any[];
   properties: Property[];
   propertyOptions: PropertyOption[];
-  unitOptions: any[];
   escrowByProperty: Map<string, boolean>;
   onAddProperty: (data: Omit<Property, "id">) => void;
   onUpdateProperty: (id: string, data: Partial<Property>) => void;
@@ -64,7 +63,6 @@ export default function DataRoom({
   mortgages,
   properties,
   propertyOptions,
-  unitOptions,
   escrowByProperty,
   onAddProperty,
   onUpdateProperty,
@@ -235,7 +233,6 @@ export default function DataRoom({
             id: p.id,
             name: p.alias || p.address || "Untitled Property",
           }))}
-          unitOptions={unitOptions}
         />
       </section>
 

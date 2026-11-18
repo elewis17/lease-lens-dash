@@ -1,7 +1,7 @@
 -- ===========================
 -- BOOTSTRAP ALL (idempotent)
 -- Creates/aligns schema used by your app.
--- Safe to re-run. No data drop by default.
+-- Schema only. Existing property and mortgage values are preserved.
 -- ===========================
 
 -- Helpers: ensure extensions commonly used by Supabase
@@ -28,20 +28,11 @@ ALTER TABLE public.properties
   ADD COLUMN IF NOT EXISTS opex_inflation_rate NUMERIC(5,2) DEFAULT 2.5,
   ADD COLUMN IF NOT EXISTS rent_growth_rate NUMERIC(5,2) DEFAULT 3.0;
 
--- Backfill display fields + mirror prices
-UPDATE public.properties
-SET alias = COALESCE(NULLIF(alias,''), NULLIF(name,''), NULLIF(address,''), id::text)
-WHERE alias IS NULL OR alias = '';
-
-UPDATE public.properties
-SET sale_price = COALESCE(sale_price, purchase_price),
-    purchase_price = COALESCE(purchase_price, sale_price)
-WHERE sale_price IS NULL OR purchase_price IS NULL;
-
 -- Case-insensitive uniqueness on alias (best effort)
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'uniq_properties_alias_ci') THEN
+  IF to_regclass('public.uniq_properties_alias_ci') IS NULL
+    AND to_regclass('public.uniq_properties_owner_alias_ci') IS NULL THEN
     CREATE UNIQUE INDEX uniq_properties_alias_ci ON public.properties (lower(alias));
   END IF;
 END $$;
@@ -89,6 +80,9 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema='public' AND table_name='leases' AND column_name='unit'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='leases' AND column_name='property_name'
   ) THEN
     EXECUTE 'ALTER TABLE public.leases RENAME COLUMN unit TO property_name';
   END IF;
@@ -131,11 +125,6 @@ ALTER TABLE public.mortgages
   ADD COLUMN IF NOT EXISTS principal_original NUMERIC(14,2),
   ADD COLUMN IF NOT EXISTS current_balance   NUMERIC(14,2);
 
--- Optional: backfill principal_original from existing principal
-UPDATE public.mortgages
-SET principal_original = COALESCE(principal_original, principal)
-WHERE principal_original IS NULL;
-
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='mortgages_property_id_fkey') THEN
@@ -173,30 +162,16 @@ SELECT
   property_value, opex_inflation_rate, rent_growth_rate
 FROM public.properties;
 
-CREATE OR REPLACE VIEW public.v_mortgages AS
-SELECT m.*, p.alias, p.name, p.address
-FROM public.mortgages m
-LEFT JOIN public.properties p ON p.id = m.property_id;
+-- The existing view retains its column order as mortgage columns are added.
+DO $$
+BEGIN
+  IF to_regclass('public.v_mortgages') IS NULL THEN
+    CREATE VIEW public.v_mortgages AS
+    SELECT m.*, p.alias, p.name, p.address
+    FROM public.mortgages m
+    LEFT JOIN public.properties p ON p.id = m.property_id;
+  END IF;
+END $$;
 
 -- ---------- PostgREST cache refresh ----------
 NOTIFY pgrst, 'reload schema';
-
--- ===========================
--- (OPTIONAL) DESTRUCTIVE RESET
--- Uncomment to wipe and rebuild. USE WITH CARE!
--- DROP VIEW IF EXISTS public.v_mortgages;
--- DROP VIEW IF EXISTS public.v_properties;
--- DROP TABLE IF EXISTS public.expenses;
--- DROP TABLE IF EXISTS public.mortgages;
--- DROP TABLE IF EXISTS public.leases;
--- DROP TABLE IF EXISTS public.units;
--- DROP TABLE IF EXISTS public.tenants;
--- DROP TABLE IF EXISTS public.properties;
--- THEN re-run the Bootstrap section above.
--- ===========================
-
--- ---------- (OPTIONAL) SEED EXAMPLES ----------
--- INSERT INTO public.properties (alias, name, address, sale_price) VALUES
---   ('Maple Duplex','Maple Duplex','123 Maple St', 350000),
---   ('Cedar Fourplex','Cedar Fourplex','45 Cedar Ave', 725000)
--- ON CONFLICT DO NOTHING;

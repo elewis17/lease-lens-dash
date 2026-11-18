@@ -58,7 +58,6 @@ type PropertyRowLegacy = {
   };
 
 const Index = ({ userId }: { userId: string }) => {
-  const [unitOptions, setUnitOptions] = useState<any[]>([]);
   const [showUploader, setShowUploader] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>(""); // property_id
@@ -191,9 +190,7 @@ const Index = ({ userId }: { userId: string }) => {
     const unitLabelById = new Map<string, string>();
     if (unitsError) {
       console.error("Error loading units:", unitsError);
-      setUnitOptions([]);
     } else {
-      setUnitOptions(unitsData ?? []);
       for (const unit of unitsData ?? []) {
         unitLabelById.set(unit.id, unit.unit_label);
       }
@@ -1400,7 +1397,6 @@ const formatNum = (n: number) =>
             mortgages={mortgages}
             properties={properties}
             propertyOptions={propertyOptions}
-            unitOptions={unitOptions}
             escrowByProperty={escrowByProperty}
             onAddProperty={handleAddProperty}
             onUpdateProperty={handleUpdateProperty}
