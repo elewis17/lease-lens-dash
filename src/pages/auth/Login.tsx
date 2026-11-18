@@ -1,12 +1,18 @@
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-const redirectUrl = import.meta.env.DEV
-  ? "https://obscure-happiness-x96vq4vxrj43pvp-8000.app.github.dev/auth/callback"
-  : "https://elewis17.github.io/lease-lens-dash/auth/callback"
-
 export default function Login() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to="/" replace />;
+
+  const redirectUrl = new URL(
+    import.meta.env.BASE_URL + "auth/callback",
+    window.location.origin,
+  ).href;
   return (
     <div className="flex items-center justify-center min-h-screen">
       <Auth

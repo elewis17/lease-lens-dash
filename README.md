@@ -71,3 +71,27 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Portfolio sign-in and Supabase setup
+
+Copy `.env.example` to `.env.local` and set the project URL and a browser-safe
+publishable key. Supply the same two Vite variables to the GitHub Pages build.
+Keep privileged keys in the relevant server-side configuration.
+
+Signed-out visitors see a read-only demo of the illustrative DealStack
+portfolio. It is bundled separately from private records and makes no
+portfolio requests. Signing in opens the signed-in owner's portfolio, and
+signing out returns to the demo.
+
+Private portfolio access requires a Supabase session. Allow the deployed app's
+`auth/callback` URL under Supabase Authentication → URL Configuration, including
+the GitHub Pages project path. For local sign-in, also allow
+`http://localhost:8000/auth/callback`.
+
+The portfolio ownership migration is the repository source of truth for the
+row-level policies on portfolio tables, including the bootstrap views and
+the existing unit-count helper when present. Apply and verify it before
+publishing the client. Existing property ownership is preserved. Records
+without an attributable owner stay hidden until an administrator resolves
+ownership using the original record. Check grants and policies on the live
+schema and test anonymous and distinct signed-in sessions before cutover.

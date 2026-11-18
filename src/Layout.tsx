@@ -48,20 +48,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {theme === "dark" ? "Dark Mode" : "Light Mode"}
           </button>
 
-          {/* Demo Mode label – only when logged out */}
-          {!user && (
-            <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
-              Demo Mode
-            </span>
-          )}
-
           {/* Log In button – only when logged out */}
           {!user && (
             <button
               onClick={() => navigate("/auth/login")}
               className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
             >
-              Log In
+              Sign in
             </button>
           )}
 
