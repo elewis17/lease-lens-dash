@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { defaultThresholds } from "@/domain/finance/thresholds";
+import { propertyTypes, type ThresholdPolicy } from "@/domain/finance/thresholds";
 import { modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
 
 import { money as currency, ratio, percent } from "@/domain/finance/format";
@@ -22,8 +22,9 @@ function priceRange(asking: number, test: number, walkAway: number, maxOffer: nu
   return Number.isSafeInteger(max) && max > min ? { min, max, step: Math.max(1, tick / 10) } : null;
 }
 
-export default function DealsScenarios({ illustrative = false, values, onChange }: {
+export default function DealsScenarios({ illustrative = false, values, onChange, policy }: {
   illustrative?: boolean;
+  policy: ThresholdPolicy;
   values: AssumptionInputs;
   onChange: (values: AssumptionInputs) => void;
 }) {
@@ -34,7 +35,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange 
   const testPrice = values.testPrice ? Number(values.testPrice) : null;
   const assumptions = asking && { ...asking, price: testPrice ?? asking.price };
   const model = assumptions && modelDeal(assumptions);
-  const gates = assumptions && priceGates(assumptions);
+  const gates = assumptions && priceGates(assumptions, policy.buy, policy.lender);
   const range = asking && assumptions && gates?.walkAway != null
     ? priceRange(asking.price, assumptions.price, gates.walkAway, gates.maxOffer)
     : null;
@@ -44,18 +45,18 @@ export default function DealsScenarios({ illustrative = false, values, onChange 
     { name: "If interest rate is 0.5 pp higher", model: modelDeal({ ...assumptions, annualRate: assumptions.annualRate + 0.005 }) },
     { name: "If operating expenses are 15% higher", model: modelDeal({ ...assumptions, opexMonthly: assumptions.opexMonthly * 1.15 }) },
   ] : [];
-  const dscrPasses = model?.dscr != null && model.dscr >= defaultThresholds.buy.minimumDscr;
-  const irrPasses = model?.irr != null && model.irr >= defaultThresholds.buy.minimumIrr;
+  const dscrPasses = model?.dscr != null && model.dscr >= policy.buy.minimumDscr;
+  const irrPasses = model?.irr != null && model.irr >= policy.buy.minimumIrr;
 
   return (
     <section aria-labelledby="underwriting-title" className="space-y-6 tabular-nums">
       <header className="space-y-1">
-        <h2 id="underwriting-title" className="text-2xl font-semibold">Deal Underwriting</h2>
+        <h2 id="underwriting-title" tabIndex={-1} className="text-2xl font-semibold">Deal Underwriting</h2>
         {illustrative && <p className="text-sm text-muted-foreground">Illustrative data · Kirkwood</p>}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="space-y-4 p-5 shadow-none lg:col-start-2 lg:row-start-1">
+        <Card className="space-y-4 p-5 lg:col-start-2 lg:row-start-1">
           <h3 className="text-lg font-semibold">Price guidance</h3>
           {model && gates
             ? <div className={cn("space-y-1", testPrice !== null && "italic")}>
@@ -103,18 +104,25 @@ export default function DealsScenarios({ illustrative = false, values, onChange 
             <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash yield</dt><dd>{percent(model?.cashYield)}</dd></div>
           </dl>
           <p className="text-sm text-muted-foreground">
-            Estimate · Buy requires DSCR ≥ {ratio(defaultThresholds.buy.minimumDscr)} and IRR ≥ {percent(defaultThresholds.buy.minimumIrr)}.
+            Estimate · Buy requires DSCR ≥ {ratio(policy.buy.minimumDscr)} and IRR ≥ {percent(policy.buy.minimumIrr)}.
             {model?.dscr != null && model.irr != null && ` ${testPrice === null ? "Asking price" : "Test price"} passes ${Number(dscrPasses) + Number(irrPasses)} of 2 gates.`}
           </p>
           <p className="text-sm text-muted-foreground">
-            Walk-away uses the {ratio(defaultThresholds.lender.minimumDscr)} lender floor. Above max offer, verify rent, a rate buydown, or a larger down payment before proceeding.
+            Walk-away uses the {ratio(policy.lender.minimumDscr)} lender floor. Above max offer, verify rent, a rate buydown, or a larger down payment before proceeding.
           </p>
           {model?.dscr === null && <p className="text-sm text-muted-foreground">DSCR requires scheduled debt service.</p>}
           {model?.irr === null && <p className="text-sm text-muted-foreground">Projected cash flows do not establish a unique IRR.</p>}
         </Card>
-        {assumptions && model && <RentSensitivity assumptions={assumptions} />}
-        <Card className="space-y-4 p-5 shadow-none lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:self-start">
+        {assumptions && model && <RentSensitivity assumptions={assumptions} irrGate={policy.buy.minimumIrr} />}
+        <Card className="space-y-4 p-5 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:self-start">
           <h3 className="text-lg font-semibold">Deal inputs</h3>
+          <label className="grid gap-1 text-sm">Property type
+            <select className="rounded-md border bg-background p-2" value={values.propertyType ?? ""}
+              onChange={event => onChange({ ...values, propertyType: event.target.value || undefined })}>
+              <option value="">Use portfolio policy</option>
+              {propertyTypes.map(type => <option key={type}>{type}</option>)}
+            </select>
+          </label>
           <div className="grid gap-4 sm:grid-cols-2">
             {fields.map(({ key, label }) => (
               <div className="space-y-2" key={key}>
@@ -132,7 +140,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange 
         </Card>
       </div>
 
-      <Card className="space-y-3 p-5 shadow-none">
+      <Card className="space-y-3 p-5">
         <h3 className="text-lg font-semibold">Scenario analysis</h3>
         <p className="text-sm text-muted-foreground">The estimate uses operating income after vacancy and expenses. The sale uses next-year NOI at the exit cap, less selling costs and loan payoff.</p>
         {scenarios.length ? (
@@ -157,7 +165,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange 
         ) : <p className="text-sm text-muted-foreground">Complete the deal inputs to compare scenarios.</p>}
       </Card>
 
-      <Card className="space-y-2 p-5 shadow-none">
+      <Card className="space-y-2 p-5">
         <h3 className="text-lg font-semibold">Market comparables</h3>
         <p className="text-sm text-muted-foreground">No verified comparables are available for this deal.</p>
       </Card>

@@ -16,14 +16,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground transition-colors">
       {/* --- Top Bar --- */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-         {/* LEFT: brand + sidebar toggle (aligned to sidebar width) */}
-        <div>
-          <div>
-            <h1 className="text-2xl font-bold">DealStack</h1>
-            <p className="text-sm text-muted-foreground -mt-1">
-              AI Co-Pilot for Investors
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-3 w-3 shrink-0 bg-brand" />
+          <h1 className="text-xl font-semibold">DealStack</h1>
         </div>
         {/* RIGHT: controls */}
         <div className="flex items-center gap-3">

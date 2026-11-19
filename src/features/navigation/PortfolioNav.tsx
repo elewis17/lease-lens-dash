@@ -29,7 +29,7 @@ export function PortfolioNav({ prefix }: { prefix: string }) {
             className={({ isActive }) => [
               desktopOnly ? "hidden lg:flex" : "flex",
               "min-h-14 min-w-0 flex-col items-center justify-center gap-1 border-t-2 px-1 text-center text-xs lg:min-h-11 lg:flex-row lg:justify-start lg:gap-2 lg:rounded-r-md lg:border-l-2 lg:border-t-0 lg:px-3 lg:text-left lg:text-sm",
-              isActive ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+              isActive ? "border-brand font-semibold text-foreground" : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground",
             ].join(" ")}
           >
             <Icon className="h-5 w-5 shrink-0 lg:h-4 lg:w-4" aria-hidden />

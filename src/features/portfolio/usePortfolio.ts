@@ -42,10 +42,11 @@ function toProperty(property: Tables<"properties">): Property {
   };
 }
 
-const emptyPortfolio: { properties: Property[]; leases: LeaseData[]; mortgages: Mortgage[]; record: PortfolioRecord } = {
+const emptyPortfolio: { properties: Property[]; leases: LeaseData[]; mortgages: Mortgage[]; statements: Tables<"dealstack_mortgage_statements">[]; record: PortfolioRecord } = {
   properties: [],
   leases: [],
   mortgages: [],
+  statements: [],
   record: { units: [], leases: [], loans: [], expenses: [], payments: [] },
 };
 
@@ -57,7 +58,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
   const properties = propertyRows.map(toProperty);
   const propertyIds = new Set(properties.map(property => property.id));
 
-  const [unitRows, loans, expenses, leaseRows, payments] = await Promise.all([
+  const [unitRows, loans, expenses, leaseRows, statements, payments] = await Promise.all([
     readAll("units", (start, end) => supabase.from("units").select("id, unit_label, property_id")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("mortgages", (start, end) => supabase.from("mortgages").select("*")
@@ -66,6 +67,8 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("leases", (start, end) => supabase.from("leases")
       .select("id, monthly_rent, status, start_date, end_date, deposit, doc_url, tenant:tenants(name), unit_id")
+      .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
+    readAll("mortgage statements", (start, end) => supabase.from("dealstack_mortgage_statements").select("*")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("payments", (start, end) => supabase.from("payments").select("lease_id, due_date, amount_due, paid_date, paid_amount")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
@@ -93,7 +96,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     start_date: loan.start_date ? new Date(loan.start_date) : null,
   }));
 
-  return { properties, leases, mortgages, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments } };
+  return { properties, leases, mortgages, statements, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments } };
 }
 
 export function usePortfolio(userId: string) {

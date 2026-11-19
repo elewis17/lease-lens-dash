@@ -9,6 +9,24 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      dealstack_mortgage_statements: {
+        Row: { id: string; user_id: string; mortgage_id: string; statement_date: string; principal_balance: number; document_path: string; created_at: string }
+        Insert: { id: string; user_id: string; mortgage_id: string; statement_date: string; principal_balance: number; document_path: string; created_at?: string }
+        Update: { id?: string; user_id?: string; mortgage_id?: string; statement_date?: string; principal_balance?: number; document_path?: string; created_at?: string }
+        Relationships: [{
+          foreignKeyName: "dealstack_mortgage_statements_mortgage_id_fkey"
+          columns: ["mortgage_id"]
+          isOneToOne: false
+          referencedRelation: "mortgages"
+          referencedColumns: ["id"]
+        }]
+      }
+      dealstack_workspace_entries: {
+        Row: { created_at: string; id: string; payload: Json; user_id: string }
+        Insert: { created_at?: string; id?: string; payload: Json; user_id?: string }
+        Update: { created_at?: string; id?: string; payload?: Json; user_id?: string }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -556,6 +574,10 @@ export type Database = {
       }
     }
     Functions: {
+      confirm_mortgage_statement: {
+        Args: { p_id: string; p_mortgage_id: string; p_statement_date: string; p_principal_balance: number; p_document_path: string }
+        Returns: string
+      }
       confirm_parsed_lease: {
         Args: {
           p_lease_id: string

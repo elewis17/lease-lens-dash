@@ -2,6 +2,10 @@ import { format } from "date-fns";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PropertyFilter } from "@/features/properties/PropertyFilter";
 import { usePortfolio } from "./usePortfolio";
+import { defaultThresholds } from "@/domain/finance/thresholds";
+import { currentPolicies } from "@/features/decisions/entries";
+import { PolicySettings } from "@/features/decisions/PolicySettings";
+import { useWorkspaceEntries } from "@/features/decisions/useWorkspaceEntries";
 import { PortfolioNav } from "@/features/navigation/PortfolioNav";
 import { ScrollRestoration } from "@/features/navigation/ScrollRestoration";
 import { useSessionState } from "@/features/navigation/sessionState";
@@ -14,6 +18,7 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   const navigate = useNavigate();
   const { pathname, search, hash } = location;
   const query = usePortfolio(userId);
+  const entries = useWorkspaceEntries(userId, illustrative);
   const { properties, leases, mortgages, record } = query.portfolio;
   const selection = new URLSearchParams(search).get("property") ?? "";
   const selectedProperty = properties.some(property => property.id === selection) ? selection : "";
@@ -25,21 +30,30 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   const [marketRate, setMarketRate] = useSessionState(`dealstack:${userId}:market-rate`, illustrative ? "6.25" : "");
   const marketRateAmount = marketRate.trim() === "" ? null : Number(marketRate);
   const marketRatePct = marketRateAmount !== null && Number.isFinite(marketRateAmount) && marketRateAmount >= 0 ? marketRateAmount : null;
+  const policies = currentPolicies(entries.entries);
+  const portfolioPolicy = policies.get("Portfolio")?.policy ?? defaultThresholds;
+  const policyFor = (type?: string | null) => policies.get(type ?? "")?.policy ?? portfolioPolicy;
+  const propertyPolicies = new Map([...policies].map(([target, value]) => [target, value.policy]));
   const asOf = format(new Date(), "yyyy-MM-dd");
-  const metrics = modelPortfolio(filteredProperties, record, asOf, marketRatePct);
+  const metrics = modelPortfolio(filteredProperties, record, asOf, marketRatePct, portfolioPolicy, propertyPolicies);
   const rentScenario = (increase: number) => modelPortfolio(filteredProperties, {
     ...record,
     leases: record.leases?.map(lease => ({ ...lease, monthly_rent: lease.monthly_rent * (1 + increase / 100) })) ?? null,
-  }, asOf, marketRatePct);
+  }, asOf, marketRatePct, portfolioPolicy, propertyPolicies);
 
   const [sessionDraft, setSessionDraft] = useSessionState<AssumptionInputs>(
     `dealstack:${userId}:underwriting`, initialValues(illustrative ? kirkwoodExample : null),
   );
   const draft = readDraft(hash) ?? sessionDraft;
-  const setDraft = (values: AssumptionInputs) => {
+  const activeDealId = new URLSearchParams(search).get("deal");
+  const openDeal = (id: string | null, values: AssumptionInputs) => {
+    const params = new URLSearchParams(search);
+    if (id) params.set("deal", id);
+    else params.delete("deal");
     setSessionDraft(values);
-    navigate({ pathname, search, hash: draftFragment(values) }, { replace: true, preventScrollReset: true });
+    navigate({ pathname, search: params.toString(), hash: draftFragment(values) }, { replace: true, preventScrollReset: true });
   };
+  const setDraft = (values: AssumptionInputs) => openDeal(activeDealId, values);
   const setSelectedProperty = (id: string) => {
     const params = new URLSearchParams(search);
     if (id) params.set("property", id);
@@ -52,7 +66,7 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
     userId, illustrative, query, metrics, selectedProperty, setSelectedProperty, pathTo,
     properties, leases, mortgages, filteredProperties, filteredLeases, filteredMortgages, escrowByProperty, propertyOptions,
     marketRate, setMarketRate, rentScenario,
-    draft, setDraft, dealAssumptions: assumptionsFrom(draft),
+    draft, setDraft, entries, activeDealId, openDeal, policyFor, dealAssumptions: assumptionsFrom(draft),
   };
 }
 
@@ -63,6 +77,7 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
   prefix?: string;
   illustrative?: boolean;
 }) {
+  const { pathname: pathnameForView } = useLocation();
   const context = useWorkspaceState(userId, prefix, illustrative);
   const { properties, query, selectedProperty, setSelectedProperty } = context;
   return (
@@ -74,8 +89,9 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
             id: property.id, alias: property.alias, address: property.address ?? "",
           }))} selectedProperty={selectedProperty} onPropertyChange={setSelectedProperty} />
         )}
+        <PolicySettings store={context.entries} />
         <ScrollRestoration ownerId={userId} />
-        <Outlet context={context} />
+        <div key={pathnameForView} className={pathnameForView.endsWith("/holdings") ? undefined : "animate-fade-in"}><Outlet context={context} /></div>
       </div>
     </div>
   );

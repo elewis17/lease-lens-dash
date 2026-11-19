@@ -88,7 +88,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
   };
 
   return (
-    <Card className="rounded-xl shadow-sm border-border overflow-hidden">
+    <Card className="rounded-xl border-border overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>

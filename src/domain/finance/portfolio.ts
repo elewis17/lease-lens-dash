@@ -9,6 +9,7 @@ import { portfolioVerdict } from "./verdicts.ts";
 type PropertyInput = {
   id: string;
   alias: string;
+  type?: string | null;
   property_value?: number | null;
   property_taxes?: number | null;
   insurance?: number | null;
@@ -40,7 +41,7 @@ function dateYearBefore(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
-export function modelPortfolio(properties: readonly PropertyInput[], record: PortfolioRecord, asOf: string, marketRatePct: number | null, policy: ThresholdPolicy = defaultThresholds) {
+export function modelPortfolio(properties: readonly PropertyInput[], record: PortfolioRecord, asOf: string, marketRatePct: number | null, policy: ThresholdPolicy = defaultThresholds, propertyPolicies: ReadonlyMap<string, ThresholdPolicy> = new Map()) {
   const trailingStart = dateYearBefore(asOf);
   const assets = properties.map(property => {
     const unitIds = record.units === null ? null : new Set(record.units.filter(unit => unit.property_id === property.id).map(unit => unit.id));
@@ -70,7 +71,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
     const metrics = MetricsCalculator.summary({ noi, debtService, propertyValue: value, investedCash: null });
     const rateBasis = loans ? sumKnown(loans.map(loan => loan.balance === null ? null : loan.balance * loan.rate * 100)) : null;
     const loanRatePct = debt !== null && debt > 0 && rateBasis !== null ? rateBasis / debt : null;
-    const verdict = portfolioVerdict({ ...metrics, debtService, loanRatePct, marketRatePct }, policy);
+    const verdict = portfolioVerdict({ ...metrics, debtService, loanRatePct, marketRatePct }, propertyPolicies.get(property.type ?? "") ?? policy);
     return {
       ...metrics, property, value, debt, debtService, escrow, loans, expectedRent, effectiveRent, occupancy,
       loanRatePct, rateBasis, expenseLines, opex, equity: value === null || debt === null ? null : value - debt,

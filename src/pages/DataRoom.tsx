@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
+import { StatementCapture } from "@/features/leases/StatementCapture";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { LeaseTable, type LeaseData, type ManualLeaseInput } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
@@ -42,7 +43,7 @@ const DataSignal = ({
   cue: string;
   description: string;
 }) => (
-  <div className="rounded-xl bg-muted/30 p-4 shadow-sm">
+  <div className="rounded-xl bg-muted/30 p-4">
     <div className="flex items-start gap-3">
       <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <Icon className="h-4 w-4" />
@@ -89,37 +90,37 @@ export default function DataRoom({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-[28px] bg-[#050817] p-6 sm:p-8 text-white shadow-sm">
+      <section className="rounded-[28px] border bg-card p-6 sm:p-8 text-foreground">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground">
               <Database className="h-4 w-4" />
               Data Room
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Decision Data Room</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/80">
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               The source data behind underwriting, portfolio decisions, investment memos, and valuation support.
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/10 p-4 text-sm">
+          <div className="grid grid-cols-3 gap-3 rounded-2xl bg-muted p-4 text-sm">
             <div>
-              <p className="text-xs text-white/70">Properties</p>
+              <p className="text-xs text-muted-foreground">Properties</p>
               <p className="text-2xl font-bold">{filteredProperties.length}</p>
             </div>
             <div>
-              <p className="text-xs text-white/70">Leases</p>
+              <p className="text-xs text-muted-foreground">Leases</p>
               <p className="text-2xl font-bold">{filteredLeases.length}</p>
             </div>
             <div>
-              <p className="text-xs text-white/70">Mortgages</p>
+              <p className="text-xs text-muted-foreground">Mortgages</p>
               <p className="text-2xl font-bold">{filteredMortgages.length}</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Decision-ready data signals</h2>
@@ -210,6 +211,7 @@ export default function DataRoom({
             Drives DSCR, debt stress, refinance capacity, equity visibility, and cash-flow pressure.
           </p>
         </div>
+        <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />
         <MortgagesTable
           mortgages={filteredMortgages}
           onUpdate={onUpdateMortgage}

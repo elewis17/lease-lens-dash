@@ -28,7 +28,7 @@ export function refinance(metrics: RefinanceInputs, ratePct: number, termMonths:
   };
 }
 
-export function projectPortfolio(metrics: PortfolioMetrics) {
+export function projectPortfolio(metrics: PortfolioMetrics, appreciationRatePct: number | null = null) {
   if (!metrics.assets.length) return [];
   return Array.from({ length: 10 }, (_, offset) => {
     const basis = metrics.assets.map(asset => {
@@ -44,7 +44,10 @@ export function projectPortfolio(metrics: PortfolioMetrics) {
       ));
       const totalExpenses = opex === null || debtService === null ? null : opex + debtService;
       const noi = opex === null || revenue === null ? null : revenue - opex;
-      const propertyValue = noi === null || noi < 0 || asset.capRate === null || asset.capRate <= 0 ? null : noi / asset.capRate;
+      const propertyValue = appreciationRatePct !== null
+        ? asset.value === null || appreciationRatePct < -100 || !Number.isFinite(appreciationRatePct)
+          ? null : asset.value * (1 + appreciationRatePct / 100) ** offset
+        : noi === null || noi < 0 || asset.capRate === null || asset.capRate <= 0 ? null : noi / asset.capRate;
       const debtBalance = asset.loans && sumKnown(asset.loans.map(loan => balanceAfter(loan, monthsElapsed)));
       return { revenue, totalExpenses, propertyValue, debtBalance };
     });

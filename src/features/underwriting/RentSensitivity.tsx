@@ -2,11 +2,10 @@ import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
 import { money, percent, ratio } from "@/domain/finance/format";
-import { defaultThresholds } from "@/domain/finance/thresholds";
 import { modelDeal, type DealAssumptions } from "@/domain/finance/underwriting";
 import { cn } from "@/lib/utils";
 
-export function RentSensitivity({ assumptions }: { assumptions: DealAssumptions }) {
+export function RentSensitivity({ assumptions, irrGate }: { assumptions: DealAssumptions; irrGate: number }) {
   const [selectedCase, setSelectedCase] = useState(0);
   const { rentMonthly, price } = assumptions;
   const increment = Math.max(1, Math.round(rentMonthly * 0.06 / 100) * 100);
@@ -17,10 +16,9 @@ export function RentSensitivity({ assumptions }: { assumptions: DealAssumptions 
   });
   const activeOffset = rentMonthly === 0 ? Math.max(0, selectedCase) : selectedCase;
   const selected = cases[activeOffset + (rentMonthly === 0 ? 0 : 1)];
-  const irrGate = defaultThresholds.buy.minimumIrr;
 
   return (
-    <Card className="min-w-0 space-y-3 p-5 shadow-none lg:col-start-2 lg:row-start-2">
+    <Card className="min-w-0 space-y-3 p-5 lg:col-start-2 lg:row-start-2">
       <h3 className="text-lg font-semibold">Sensitivity · IRR by rent</h3>
       <p className="text-sm italic text-muted-foreground">
         Hypothetical · if bought at {money(price)} with the other assumptions unchanged

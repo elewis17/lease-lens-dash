@@ -14,7 +14,12 @@ export default {
       },
     },
     extend: {
+      fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+      transitionTimingFunction: { DEFAULT: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      transitionDuration: { DEFAULT: "120ms" },
       colors: {
+        brand: "hsl(var(--brand))",
+        backdrop: "hsl(var(--backdrop) / <alpha-value>)",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -61,19 +66,6 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      backgroundImage: {
-        "metric-gradient": "var(--metric-gradient)",
-        "success-gradient": "var(--success-gradient)",
-        "warning-gradient": "var(--warning-gradient)",
-      },
-      boxShadow: {
-        sm: "var(--shadow-sm)",
-        md: "var(--shadow-md)",
-        lg: "var(--shadow-lg)",
-      },
-      transitionProperty: {
-        base: "var(--transition-base)",
-      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -98,8 +90,8 @@ export default {
         },
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
+        "accordion-down": "accordion-down 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "accordion-up": "accordion-up 240ms cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },

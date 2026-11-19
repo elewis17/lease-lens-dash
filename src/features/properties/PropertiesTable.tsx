@@ -89,7 +89,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
   };
 
   return (
-    <Card className="rounded-xl shadow-sm border-border overflow-hidden">
+    <Card className="rounded-xl border-border overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -104,7 +104,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
               <TableHead className="px-4 py-2">Vacancy %</TableHead>
 
               {/* OPEX #1: Taxes */}
-              <TableHead className="px-4 py-2 bg-rose-50/60">
+              <TableHead className="px-4 py-2 bg-muted">
                 <div className="flex items-center">
                   <span>Annual Taxes</span>
                   <span
@@ -117,13 +117,13 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
               </TableHead>
 
               {/* OPEX #2: Insurance */}
-              <TableHead className="px-4 py-2 bg-rose-50/60">Insurance</TableHead>
+              <TableHead className="px-4 py-2 bg-muted">Insurance</TableHead>
 
               {/* OPEX #3: Mgmt % */}
-              <TableHead className="px-4 py-2 bg-rose-50/60">Mgmt %</TableHead>
+              <TableHead className="px-4 py-2 bg-muted">Mgmt %</TableHead>
 
               {/* OPEX #4: Maint % */}
-              <TableHead className="px-4 py-2 bg-rose-50/60">Maint %</TableHead>
+              <TableHead className="px-4 py-2 bg-muted">Maint %</TableHead>
 
               <TableHead className="px-4 py-2 text-center">Actions</TableHead>
 
@@ -398,7 +398,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
               setIsAdding(true) ;
               setEditData({});
             }}
-            className="w-full hover:scale-105 transition-transform"//"shadow-sm"
+            className="w-full"
           >
             <Plus className="h-4 w-4 mr-2" /> Add Property
           </Button>

@@ -1,9 +1,10 @@
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import PortfolioSnapshot from "@/pages/PortfolioSnapshot";
 import PortfolioDecisions from "@/pages/PortfolioDecisions";
 import DealsScenarios from "@/pages/DealsScenarios";
 import Memo from "@/pages/Memo";
-import NotFound from "@/pages/NotFound";
+import { RecordedMemo } from "@/features/decisions/RecordedMemo";
+import { InvestmentPipeline } from "@/features/underwriting/InvestmentPipeline";
 import { PortfolioStatus } from "./PortfolioStatus";
 import { useWorkspace } from "./useWorkspace";
 
@@ -12,6 +13,7 @@ export function Briefing() {
   const navigate = useNavigate();
   return (
     <PortfolioStatus>
+      {metrics.assets.length > 0 && <Link className="text-sm underline underline-offset-4" to={pathTo("/capital")}>Review capital opportunities</Link>}
       <PortfolioSnapshot metrics={metrics} onAddData={() => navigate(pathTo("/holdings"))}
         initialAppreciation={illustrative ? "3" : ""} sessionKey={`dealstack:${userId}:appreciation`} />
     </PortfolioStatus>
@@ -30,17 +32,17 @@ export function Capital() {
 }
 
 export function Underwrite() {
-  const { draft, setDraft, illustrative } = useWorkspace();
-  return <DealsScenarios values={draft} onChange={setDraft} illustrative={illustrative} />;
+  const { draft, setDraft, illustrative, policyFor } = useWorkspace();
+  return <div className="space-y-8"><DealsScenarios values={draft} onChange={setDraft} illustrative={illustrative} policy={policyFor(draft.propertyType)} /><InvestmentPipeline /></div>;
 }
 
 export function DecisionMemo() {
   const { id } = useParams();
-  const { dealAssumptions, pathTo } = useWorkspace();
+  const { dealAssumptions, pathTo, draft, policyFor } = useWorkspace();
   const navigate = useNavigate();
   return id === "draft"
-    ? <Memo assumptions={dealAssumptions} onOpenUnderwriting={() => navigate(pathTo("/underwrite"))} />
-    : <NotFound />;
+    ? <Memo assumptions={dealAssumptions} policy={policyFor(draft.propertyType)} onOpenUnderwriting={() => navigate(pathTo("/underwrite"))} />
+    : <RecordedMemo id={id ?? ""} />;
 }
 
 export function WorkspaceHome() {

@@ -1,3 +1,4 @@
+import { monthlyPayment } from "./underwriting.ts";
 import { balanceAfter } from "./debt.ts";
 import { refinance } from "./scenarios.ts";
 import { sumKnown, type AssetMetrics } from "./portfolio.ts";
@@ -34,9 +35,10 @@ function modelRefinance(asset: AssetMetrics, quote: RefinanceQuote) {
   const risk = asset.dscr === null || result.dscr === null ? null : result.dscr - asset.dscr;
 
   return {
-    ...result,
+    ...result, rate, term, costPct: Number(quote.cost),
     cash,
     wealth,
+    tenYearInterestSaved: wealth === null ? null : wealth + result.closingCosts,
     risk,
     cashYield: result.closingCosts > 0 ? (result.firstYearNet + result.closingCosts) / result.closingCosts : null,
   };
@@ -97,4 +99,75 @@ export function rankCapitalOpportunities(opportunities: CapitalOpportunity[], ob
     if (right === null && left !== null) return -1;
     return (right ?? 0) - (left ?? 0) || a.title.localeCompare(b.title);
   });
+}
+
+export function capitalBudget(available: string, reserve: string) {
+  if ([available, reserve].some(value => value.trim() === "" || !Number.isFinite(Number(value)) || Number(value) < 0)) return null;
+  return Math.max(0, Number(available) - Number(reserve));
+}
+
+export function capitalConflicts(actions: CapitalOpportunity[]) {
+  const seen = new Map<string, CapitalOpportunity[]>();
+  for (const action of actions) {
+    const existing = seen.get(action.asset.property.id) ?? [];
+    seen.set(action.asset.property.id, [...existing, action]);
+  }
+  return [...seen.values()].flatMap(group => {
+    if (group.length <= 1) return [];
+    const property = group[0].asset.property.alias;
+    return group.some(action => action.action === "sale")
+      ? ["Conflict · review the sale separately from other actions on " + property + "."]
+      : ["Stacked risk · the actions share exposure to " + property + "."];
+  });
+}
+
+export function recommendCapital(actions: CapitalOpportunity[], objective: CapitalObjective, deployable: number) {
+  let remaining = deployable;
+  const properties = new Set<string>();
+  return rankCapitalOpportunities(actions, objective).filter(action => {
+    const projection = action.refinance;
+    const property = action.asset.property.id;
+    if (!projection || (projection[objective] ?? 0) <= 0 || projection.closingCosts > remaining || properties.has(property)) return false;
+    remaining -= projection.closingCosts;
+    properties.add(property);
+    return true;
+  });
+}
+
+export function combinedRefinance(actions: CapitalOpportunity[], monthsToStart: number, metrics: { noi: number | null; debtService: number | null }) {
+  if (!Number.isInteger(monthsToStart) || monthsToStart < 0 || monthsToStart > 12 || !actions.length ||
+    actions.some(action => !action.refinance || action.asset.debtService === null) || capitalConflicts(actions).length) return null;
+  let costs = 0;
+  let runRate = 0;
+  let firstYear = 0;
+  let debtService = metrics.debtService;
+  for (const action of actions) {
+    const model = action.refinance;
+    if (!model || action.asset.debtService === null) return null;
+    const activeMonths = 12 - monthsToStart;
+    const baseline = action.asset.loans && sumKnown(action.asset.loans.map(loan =>
+      loan.remaining === null || loan.principalInterest === null ? null : Math.min(activeMonths, Math.max(0, loan.remaining - monthsToStart)) * loan.principalInterest,
+    ));
+    const closingBalance = action.asset.loans && sumKnown(action.asset.loans.map(loan => balanceAfter(loan, monthsToStart)));
+    const ongoingService = action.asset.loans && sumKnown(action.asset.loans.map(loan =>
+      loan.remaining === null || loan.principalInterest === null ? null : loan.remaining > monthsToStart ? loan.principalInterest : 0,
+    ));
+    if (baseline === null || closingBalance === null || ongoingService === null) return null;
+    const cost = closingBalance * model.costPct / 100;
+    const replacement = monthlyPayment(closingBalance, model.rate / 100, model.term);
+    costs += cost;
+    runRate += (ongoingService - replacement) * 12;
+    firstYear += baseline - activeMonths * replacement - (activeMonths > 0 ? cost : 0);
+    if (debtService !== null) debtService += replacement - action.asset.debtService;
+  }
+  const dscr = metrics.noi !== null && debtService !== null && debtService > 0 ? metrics.noi / debtService : null;
+  return { costs, runRate, firstYear, dscr };
+}
+
+
+export function netSaleProceeds(price: string, costs: string, payoff: string) {
+  const parsed = [price, costs, payoff].map(value => value.trim() === "" ? NaN : Number(value));
+  if (parsed.some(value => !Number.isFinite(value) || value < 0)) return null;
+  const [sale, selling, mortgage] = parsed;
+  return sale - selling - mortgage;
 }

@@ -12,6 +12,8 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
   metrics: PortfolioMetrics; onAddData: () => void; initialAppreciation?: string; sessionKey: string;
 }) {
   const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
+  const [equityGoal, setEquityGoal] = useSessionState(sessionKey + ":equityGoal", "");
+  const [cashGoal, setCashGoal] = useSessionState(sessionKey + ":cashGoal", "");
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
@@ -22,7 +24,10 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
     );
   }
 
-  const wealth = projectNextYearWealth(metrics, appreciationRate.trim() === "" ? null : Number(appreciationRate));
+  const appreciation = appreciationRate.trim() === "" ? null : Number(appreciationRate);
+  const wealth = projectNextYearWealth(metrics, appreciation);
+  const progress = (amount: number | null, target: string) =>
+    amount !== null && Number(target) > 0 && Number.isFinite(Number(target)) ? percent(amount / Number(target)) : "—";
   const tiles = [
     { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest" },
     { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest" },
@@ -42,7 +47,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
 
       <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(tile => (
-          <Card key={tile.label} className="p-4 shadow-none">
+          <Card key={tile.label} className="p-4">
             <dt className="text-sm text-muted-foreground">{tile.label}</dt>
             <dd className="text-2xl font-semibold tabular-nums">{tile.value}</dd>
             <dd className="text-xs text-muted-foreground">{tile.basis}</dd>
@@ -51,7 +56,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
       </dl>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="space-y-4 p-5 shadow-none">
+        <Card className="space-y-4 p-5">
           <h2 className="text-lg font-semibold">Operating reality</h2>
           <dl className="space-y-2 tabular-nums">
             <div className="flex justify-between gap-4"><dt>Contractual rent / mo</dt><dd>{money(metrics.expectedRent)}</dd></div>
@@ -67,7 +72,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
           </dl>
           <p className="text-xs text-muted-foreground">Economic occupancy uses recorded receipts divided by contractual amounts due on payment records for the completed month. Arrears use recorded amounts overdue.</p>
         </Card>
-        <Card className="space-y-4 p-5 shadow-none">
+        <Card className="space-y-4 p-5">
           <h2 className="text-lg font-semibold">Equity position</h2>
           <dl className="space-y-2 tabular-nums">
             <div className="flex justify-between gap-4"><dt>Property value · Estimate</dt><dd>{money(metrics.value)}</dd></div>
@@ -90,7 +95,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
         </Card>
       </div>
 
-      <Card className="space-y-3 p-5 shadow-none">
+      <Card className="space-y-3 p-5">
         <h2 className="text-lg font-semibold">Expense evidence</h2>
         {metrics.assets.map(asset => (
           <details key={asset.property.id} className="border-t pt-2">
@@ -104,7 +109,19 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
           </details>
         ))}
       </Card>
-      <WealthBuildChart metrics={metrics} />
+      <WealthBuildChart metrics={metrics} appreciationRatePct={appreciation} />
+      <Card className="space-y-3 p-5">
+        <h2 className="text-lg font-semibold">Portfolio objectives</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1 text-sm">Real estate equity target ($)
+            <Input type="number" min="0" value={equityGoal} onChange={event => setEquityGoal(event.target.value)} />
+          </label>
+          <label className="space-y-1 text-sm">Monthly cash flow target ($)
+            <Input type="number" min="0" value={cashGoal} onChange={event => setCashGoal(event.target.value)} />
+          </label>
+        </div>
+        <p className="text-sm tabular-nums">Estimated progress · Equity {progress(metrics.equity, equityGoal)} · Monthly cash flow {progress(metrics.cashFlow, cashGoal)}</p>
+      </Card>
     </section>
   );
 }

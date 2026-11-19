@@ -47,11 +47,11 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
           ["Monthly cash flow", money(metrics.cashFlow)],
           ["DSCR", coverage(metrics)],
           ["Real estate equity", money(metrics.equity)],
-        ].map(([label, value]) => <Card className="p-4 shadow-none" key={label}>
+        ].map(([label, value]) => <Card className="p-4" key={label}>
           <dt className="text-sm text-muted-foreground">{label} · Estimate</dt><dd className="text-2xl font-semibold tabular-nums">{value}</dd>
         </Card>)}
       </dl>
-      <Card className="space-y-3 p-5 shadow-none">
+      <Card className="space-y-3 p-5">
         <h2 className="text-lg font-semibold">Asset ranking</h2>
         <p className="text-sm text-muted-foreground">Estimated monthly cash flow, with coverage and real estate equity as tie-breakers. A rank requires all three measures.</p>
         <div className="overflow-x-auto">

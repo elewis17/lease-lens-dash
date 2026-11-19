@@ -1,8 +1,10 @@
+import { Link } from "react-router-dom";
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { downloadCapturedLease } from "@/features/leases/leaseCaptureApi";
+import { downloadCapturedDocument } from "@/features/leases/leaseCaptureApi";
 import type { usePortfolio } from "@/features/portfolio/usePortfolio";
 import { money, percent } from "@/domain/finance/format";
 import type { Property } from "./PropertiesTable";
@@ -30,7 +32,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function LeaseDocument({ ownerId, path, unit }: { ownerId: string; path: string; unit: string }) {
+function RecordedDocument({ ownerId, path, title }: { ownerId: string; path: string; title: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -39,24 +41,31 @@ function LeaseDocument({ ownerId, path, unit }: { ownerId: string; path: string;
         setPending(true);
         setError(null);
         try {
-          await downloadCapturedLease(ownerId, path);
+          await downloadCapturedDocument(ownerId, path);
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "The lease document could not be loaded.");
         } finally {
           setPending(false);
         }
-      }}>{pending ? "Opening lease…" : `Download lease · ${unit}`}</Button>
+      }}>{pending ? "Opening document…" : title}</Button>
       {error && <p role="alert" className="text-destructive">{error}</p>}
     </li>
   );
 }
 
 function RecordSections({ ownerId, property, portfolio }: { ownerId: string; property: Property; portfolio: Portfolio }) {
+  const { entries, pathTo } = useWorkspace();
+  const propertyDecisions = entries.entries.flatMap(entry =>
+    entry.payload.kind === "capital" && entry.payload.status === "decided" && entry.payload.propertyId === property.id
+      ? [{ ...entry, title: entry.payload.title }] : []);
   const { record } = portfolio;
   const units = new Set(record.units?.filter(unit => unit.property_id === property.id).map(unit => unit.id));
   const leases = portfolio.leases.filter(lease => lease.property_id === property.id);
   const leaseIds = new Set(leases.map(lease => lease.id));
   const loans = portfolio.mortgages.filter(loan => loan.property_id === property.id);
+  const mortgageIds = new Set(loans.map(loan => loan.id));
+  const statements = portfolio.statements.filter(statement => mortgageIds.has(statement.mortgage_id))
+    .sort((a, b) => b.statement_date.localeCompare(a.statement_date));
   const expenses = (record.expenses ?? []).filter(expense =>
     expense.property_id === property.id ||
     (expense.property_id === null && expense.unit_id !== null && units.has(expense.unit_id)),
@@ -68,6 +77,8 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
       ? [{ date: loan.start_date.toISOString().slice(0, 10), title: loan.loan_name || "Financing began", basis: "Contractual" }] : []),
     ...leases.flatMap(lease => lease.startDate
       ? [{ date: lease.startDate, title: `Lease began · ${lease.unit_label ?? "Unit unavailable"}`, basis: "Contractual" }] : []),
+    ...propertyDecisions.map(entry => ({ date: entry.created_at, title: entry.title, basis: "Decision recorded" })),
+    ...statements.map(statement => ({ date: statement.statement_date, title: "Principal balance confirmed · " + money(statement.principal_balance), basis: "Statement" })),
     ...improvements.map(item => ({ date: item.date, title: `Capital improvement · ${money(item.amount)}`, basis: "Recorded expense" })),
   ].sort((a, b) => b.date.localeCompare(a.date));
   const receipts = new Map<string, { amount: number; months: Set<string> }>();
@@ -113,7 +124,10 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
             <li key={loan.id}>
               <p className="font-medium">{loan.loan_name || "Mortgage"}</p>
               <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
-              <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : `Recorded balance · ${money(loan.current_balance)}`}</p>
+              <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
+              {statements.find(statement => statement.mortgage_id === loan.id && statement.principal_balance === loan.current_balance) && (
+                <p className="text-muted-foreground">Source · Confirmed statement dated {shortDate(statements.find(statement => statement.mortgage_id === loan.id)?.statement_date ?? null)}</p>
+              )}
             </li>
           ))}</ul> : <p className="text-muted-foreground">No financing records.</p>}
         </Section>
@@ -138,12 +152,19 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
           <p className="text-muted-foreground">Appraisal date and valuation history are unavailable.</p>
         </Section>
         <Section title="Documents">
-          {documents.length ? <ul className="space-y-2">{documents.map(lease =>
-            lease.documentPath && <LeaseDocument key={lease.id} ownerId={ownerId} path={lease.documentPath} unit={lease.unit_label ?? "Unit unavailable"} />,
-          )}</ul> : <p className="text-muted-foreground">No lease documents linked.</p>}
+          {documents.length || statements.length ? <ul className="space-y-2">
+            {documents.map(lease => lease.documentPath && <RecordedDocument key={lease.id} ownerId={ownerId} path={lease.documentPath}
+              title={"Download lease · " + (lease.unit_label ?? "Unit unavailable")} />)}
+            {statements.map(statement => <RecordedDocument key={statement.id} ownerId={ownerId} path={statement.document_path}
+              title={"Download statement · " + shortDate(statement.statement_date)} />)}
+          </ul> : <p className="text-muted-foreground">No lease documents or mortgage statements linked.</p>}
         </Section>
         <Section title="Decisions">
-          <p className="text-muted-foreground">Property-linked decisions are unavailable.</p>
+          {entries.isError ? <p className="text-muted-foreground">Could not load property-linked decisions.</p>
+            : propertyDecisions.length ? <ul className="space-y-2">{propertyDecisions.map(entry => (
+              <li key={entry.id}><Link className="underline" to={pathTo("/decisions/" + entry.id + "/memo")}>{entry.title}</Link></li>
+            ))}</ul>
+            : <p className="text-muted-foreground">No property-linked decisions recorded.</p>}
         </Section>
         <Section title="Performance">
           {receipts.size ? (
