@@ -64,6 +64,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
             ? <div className={cn("space-y-1", testPrice !== null && "italic")}>
                 {testPrice !== null && <p className="text-xs text-muted-foreground">Hypothetical · if bought at {currency(testPrice)}</p>}
                 <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} live />
+                <p className="text-xs text-muted-foreground">Confidence · Price guidance depends on the entered rents, operating costs, financing and exit assumptions.</p>
               </div>
             : <p className="font-medium" role="status">Enter valid assumptions to calculate price guidance.</p>}
           {asking && assumptions && range && (

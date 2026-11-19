@@ -78,6 +78,6 @@ export function balanceEvidenceText(evidence: ReturnType<typeof balanceEvidence>
     [evidence.missing, "missing balance", "missing balances"],
   ] as const;
   const issues = counts.flatMap(([count, single, plural]) => count ? [count + " " + (count === 1 ? single : plural)] : []);
-  if (issues.length) return "Debt evidence · " + issues.join(", ") + ".";
+  if (issues.length) return "Confidence limited · Debt evidence includes " + issues.join(", ") + ".";
   return evidence.confirmed ? "Current balances match confirmed statements." : null;
 }

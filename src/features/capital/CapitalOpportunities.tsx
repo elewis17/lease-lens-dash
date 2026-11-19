@@ -12,7 +12,7 @@ import {
 } from "@/domain/finance/capital";
 import { balanceEvidenceText } from "@/domain/finance/debt";
 import { coverage, money, percent, ratio } from "@/domain/finance/format";
-import type { AssetMetrics } from "@/domain/finance/portfolio";
+import { operatingConfidence, type AssetMetrics } from "@/domain/finance/portfolio";
 import { CapitalLifecycle } from "@/features/decisions/CapitalLifecycle";
 import { capitalHistory } from "@/features/decisions/entries";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
@@ -61,6 +61,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
   const debtEvidence = balanceEvidenceText(asset.debtEvidence);
   const score = projection?.[objective] ?? null;
   const formatScore = objective === "risk" ? ratio : money;
+  const modeledBasis = operatingConfidence([asset]);
 
   return (
     <li className="border-t">
@@ -70,7 +71,8 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
             transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
             <span className="min-w-0">
               <span className="block text-sm font-medium">{row.title}</span>
-              <span className="block text-xs capitalize text-muted-foreground">{stage}{(stage === "identified" || stage === "investigating") && " · Needs verification"}</span>
+              <span className="block text-xs capitalize text-muted-foreground">{stage}</span>
+              <span className="block text-xs text-muted-foreground">Confidence · Needs verification</span>
             </span>
             <span className="flex shrink-0 items-center gap-3 tabular-nums">
               <span className="text-right">
@@ -104,16 +106,22 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
                 </p>
               )}
               {action === "rent" && <p className="text-sm text-muted-foreground">Contractual · Active leases total {money(asset.expectedRent)} per month.</p>}
+              {action === "paydown" && (
+                <p className="text-sm text-muted-foreground">
+                  Recorded loan balance {money(asset.debt)} · Scheduled monthly principal and interest {money(asset.debtService)}.
+                </p>
+              )}
               {action === "sale" && (
                 <p className="text-sm text-muted-foreground">
                   Estimate · Annualized cash flow {money(asset.cashFlow === null ? null : asset.cashFlow * 12)}, DSCR {coverage(asset)}, property value {money(asset.value)}, and current debt {money(asset.debt)}.
                 </p>
               )}
+              {modeledBasis && action !== "paydown" && <p className="text-sm text-muted-foreground">{modeledBasis}</p>}
             </section>
             <section className="space-y-1">
               <h3 className="text-sm font-medium">Cost and risk</h3>
               <p className="text-sm text-muted-foreground">{row.risk}</p>
-              <p className="text-sm text-muted-foreground">{row.missing}</p>
+              <p className="text-sm text-muted-foreground">Confidence · {row.missing}</p>
             </section>
             {action === "paydown" && <PaydownEditor row={row} value={paydownInputs} change={onPaydownChange} />}
             {action === "sale" && <SaleScenario value={saleInputs} change={onSaleChange} net={netProceeds} />}

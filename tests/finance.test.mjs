@@ -71,7 +71,7 @@ test("active and expiring lease dates are inclusive and stale status cannot add 
   assert.equal(isActiveLease({ ...lease, start_date: null }, "2026-11-18"), false);
 });
 
-import { modelPortfolio } from "../src/domain/finance/portfolio.ts";
+import { modelPortfolio, operatingConfidence } from "../src/domain/finance/portfolio.ts";
 import { MetricsCalculator } from "../src/domain/finance/MetricsCalculator.ts";
 import { splitLoan } from "../src/domain/finance/debt.ts";
 import { projectNextYearWealth, projectPortfolio, refinance } from "../src/domain/finance/scenarios.ts";
@@ -137,6 +137,13 @@ test("escrowed, seasoned mortgage separates principal and interest once and neve
     leases: [{ id: "lease", unit_id: "unit", monthly_rent: 1750, start_date: "2026-01-01", end_date: "2026-12-31", status: "active" }],
   };
   const metrics = modelPortfolio([property], record, reviewDate, null);
+  const statement = { mortgage_id: loan.id, principal_balance: loan.current_balance, statement_date: "2026-09-01" };
+  const fromStatement = statement_date => modelPortfolio(
+    [property], { ...record, statements: [{ ...statement, statement_date }] }, reviewDate, null,
+  );
+  assert.match(operatingConfidence(metrics.assets), /principal and interest split.*unverified source date/);
+  assert.match(operatingConfidence(fromStatement("2026-09-01").assets), /stale statement/);
+  assert.doesNotMatch(operatingConfidence(fromStatement("2026-11-15").assets), /stale statement|unverified source date/);
   assert.equal(metrics.opex, 250);
   assert.equal(metrics.noi, 1500);
   assert.equal(metrics.dscr, 1.5);

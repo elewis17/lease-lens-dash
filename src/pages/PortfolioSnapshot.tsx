@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { balanceEvidenceText } from "@/domain/finance/debt";
 import { coverage, money, percent } from "@/domain/finance/format";
-import type { PortfolioMetrics } from "@/domain/finance/portfolio";
+import { operatingConfidence, type PortfolioMetrics } from "@/domain/finance/portfolio";
 
 export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty, initialAppreciation = "", sessionKey }: {
   metrics: PortfolioMetrics; onAddData: () => void; onReviewProperty: (propertyId: string) => void; initialAppreciation?: string; sessionKey: string;
@@ -30,16 +30,17 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   const progress = (amount: number | null, target: string) =>
     amount !== null && Number(target) > 0 && Number.isFinite(Number(target)) ? percent(amount / Number(target)) : "—";
   const debtEvidence = balanceEvidenceText(metrics.debtEvidence);
+  const operatingEvidence = operatingConfidence(metrics.assets);
   const priorities = metrics.assets.filter(asset =>
     ["Distress", "Sell candidate", "Refinance candidate"].includes(asset.verdict.label))
     .sort((left, right) => (left.cashFlow ?? Infinity) - (right.cashFlow ?? Infinity));
   const tiles = [
-    { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest", source: debtEvidence },
-    { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest", source: debtEvidence },
-    { label: "Cap rate", value: percent(metrics.capRate), basis: "Estimate · Annualized NOI divided by property value" },
+    { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest", source: operatingEvidence },
+    { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest", source: operatingEvidence },
+    { label: "Cap rate", value: percent(metrics.capRate), basis: "Estimate · Annualized NOI divided by estimated property value" },
     { label: "Physical occupancy", value: percent(metrics.physicalOccupancy), basis: metrics.occupiedUnits === null || metrics.totalUnits === null
       ? "Unit or lease records missing" : `Contractual · ${metrics.occupiedUnits} of ${metrics.totalUnits} units on current leases` },
-    { label: "Real estate equity", value: money(metrics.equity), basis: "Estimate · Property value less recorded current loan balances", source: debtEvidence },
+    { label: "Real estate equity", value: money(metrics.equity), basis: "Estimate · Undated valuation less recorded current loan balances", source: debtEvidence },
     { label: "Cash-on-cash", value: percent(metrics.cashOnCash), basis: "Invested cash basis is missing" },
   ];
 
@@ -67,6 +68,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
           <ul className="divide-y">
             {priorities.map(asset => {
               const refinance = asset.verdict.label === "Refinance candidate";
+              const evidence = operatingConfidence([asset]) || "Coverage uses the recorded rents, costs and scheduled debt payments.";
               return (
                 <li key={asset.property.id} className="space-y-2 py-3">
                   <p className="font-medium">{asset.property.alias} · {asset.verdict.label}</p>
@@ -74,6 +76,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
                     Estimate · {money(asset.cashFlow)}/mo cash flow and {coverage(asset)} debt-service coverage.
                     {" "}{asset.verdict.detail}
                   </p>
+                  <p className="text-xs text-muted-foreground">{evidence}</p>
                   <p className="text-sm text-muted-foreground">
                     {refinance
                       ? "Confirm the quote and fees before estimating savings."
@@ -114,6 +117,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
             <div className="flex justify-between gap-4"><dt>Loan-to-value · Estimate</dt><dd>{percent(metrics.ltv)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Scheduled principal reduction · Next 12 months</dt><dd>{money(metrics.paydown)}</dd></div>
           </dl>
+          {debtEvidence && <p className="text-xs text-muted-foreground">{debtEvidence}</p>}
           <p className="text-xs text-muted-foreground">Equity requires a current valuation and current balances for every loan. Sale proceeds also require selling costs and payoff quotes.</p>
           <div className="space-y-2 border-t pt-3">
             <h3 className="font-medium">Projected wealth growth · Next 12 months</h3>

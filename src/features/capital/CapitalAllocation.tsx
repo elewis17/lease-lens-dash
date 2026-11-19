@@ -64,6 +64,7 @@ export function CapitalAllocation({ actions, objective, sessionKey, salePlans }:
       <div className="space-y-2 border-t pt-3">
         <h4 className="font-medium">Recommended allocation</h4>
         {suggested.length ? <>
+          <p className="text-sm text-muted-foreground">Confidence · Each amount depends on the terms and timing shown in its opportunity.</p>
           <ul className="space-y-1 text-sm">{suggested.map(action => (
             <li key={action.id}>{action.title} · {money(capitalProjection(action)?.closingCosts)} estimated cost</li>
           ))}</ul>

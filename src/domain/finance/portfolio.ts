@@ -1,5 +1,5 @@
 import { isActiveLease } from "./activeLeases.ts";
-import { splitLoan, balanceAfter, balanceEvidence, type BalanceStatement, type LoanInput } from "./debt.ts";
+import { splitLoan, balanceAfter, balanceEvidence, balanceEvidenceText, type BalanceStatement, type LoanInput } from "./debt.ts";
 import { MetricsCalculator } from "./MetricsCalculator.ts";
 import { operatingExpenses, type ExpenseInput } from "./OpexCalculator.ts";
 import { defaultThresholds, type ThresholdPolicy } from "./thresholds.ts";
@@ -76,6 +76,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
     return {
       ...metrics, property, value, debt, debtService, escrow, loans, expectedRent, effectiveRent, occupancy,
       debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
+      usesEstimatedDebtService: loanRows?.some(loan => loan.includes_escrow === true) ?? false,
       loanRatePct, rateBasis, expenseLines, opex, equity: value === null || debt === null ? null : value - debt,
       verdict,
     };
@@ -116,3 +117,25 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
 export type PortfolioMetrics = ReturnType<typeof modelPortfolio>;
 // The property metrics are inferred from the shared calculation.
 export type AssetMetrics = PortfolioMetrics["assets"][number];
+
+export function operatingConfidence(assets: readonly AssetMetrics[]) {
+  if (assets.some(asset => asset.cashFlow === null)) return "Confidence limited · Rent, expenses, or debt service is missing.";
+  const estimates = [
+    assets.some(asset => asset.expectedRent !== null && asset.expectedRent > 0 && asset.property.vacancy_pct !== 0)
+      ? "vacancy" : null,
+    assets.some(asset => asset.expenseLines.some(line => line.basis === "Estimate"))
+      ? "operating costs" : null,
+    assets.some(asset => asset.usesEstimatedDebtService) ? "principal and interest split" : null,
+  ].filter(Boolean);
+  const missing = assets.some(asset => asset.expenseLines.some(line => line.basis === "Missing"));
+  const modeledDebtSources = new Set(assets.flatMap(asset => {
+    if (!asset.usesEstimatedDebtService) return [];
+    const source = balanceEvidenceText(asset.debtEvidence);
+    return source && (asset.debtEvidence.stale || asset.debtEvidence.undated || asset.debtEvidence.missing) ? [source] : [];
+  }));
+  return [
+    estimates.length ? "Confidence limited · Uses estimates for " + estimates.join(", ") + "." : null,
+    missing ? "Some operating expense categories have no recorded amounts." : null,
+    ...modeledDebtSources,
+  ].filter(Boolean).join(" ");
+}
