@@ -99,6 +99,9 @@ test("portfolio matches the deck's illustrative waterfall, coverage, occupancy, 
   assert.equal(metrics.occupiedUnits, 10);
   assert.equal(metrics.annualizedCashFlow, 57216);
   assert.equal(metrics.receipts, 20197);
+  assert.equal(metrics.month, "2026-10");
+  assert.equal(metrics.previousReceipts.month, "2026-09");
+  assert.equal(metrics.previousReceipts.receipts, null);
   assert.equal((100 * metrics.economicOccupancy).toFixed(1), "93.9");
   assert.equal((100 * metrics.physicalOccupancy).toFixed(1), "90.9");
   assert.equal(metrics.arrears, 1303);
@@ -106,6 +109,20 @@ test("portfolio matches the deck's illustrative waterfall, coverage, occupancy, 
   assert.equal(wealth.appreciation, 63330);
   assert.equal(Math.round(wealth.growth), 144888);
   assert.equal(projectNextYearWealth(metrics, null).growth, null);
+});
+
+test("prior-period receipts and occupancy use the same selected property", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const lease = record.leases[0];
+  const other = record.leases.find(item => item.unit_id === record.units.find(unit => unit.property_id === record.properties[1].id).id);
+  const payments = [
+    { lease_id: lease.id, due_date: "2026-09-01", amount_due: 2000, paid_date: "2026-09-12", paid_amount: 1500 },
+    { lease_id: other.id, due_date: "2026-09-01", amount_due: 3000, paid_date: "2026-09-10", paid_amount: 3000 },
+    ...record.payments,
+  ];
+  const { previousReceipts } = modelPortfolio([record.properties[0]], { ...record, payments }, reviewDate, 6.25);
+  assert.equal(previousReceipts.receipts, 1500);
+  assert.equal(previousReceipts.economicOccupancy, 0.75);
 });
 
 test("post-debt cash flow drives ROI and cash-on-cash, and absent denominators stay missing", () => {

@@ -87,6 +87,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
   const scopedUnits = new Set(record.units?.filter(unit => propertyIds.has(unit.property_id)).map(unit => unit.id));
   const scopedLeases = new Set(record.leases?.filter(lease => scopedUnits.has(lease.unit_id)).map(lease => lease.id));
   const receipts = leaseReceipts(record.payments, scopedLeases, asOf);
+  const previousReceipts = leaseReceipts(record.payments, scopedLeases, receipts.month + "-01");
   const noi = aggregate(asset => asset.noi);
   const value = aggregate(asset => asset.value);
   const debt = aggregate(asset => asset.debt);
@@ -99,7 +100,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
   const loans = assets.every(asset => asset.loans !== null) ? assets.flatMap(asset => asset.loans ?? []) : null;
   const nextBalance = loans !== null ? sumKnown(loans.map(loan => balanceAfter(loan, 12))) : null;
   return {
-    ...metrics, ...receipts, assets, value, debt, debtService, loans, loanRatePct,
+    ...metrics, ...receipts, previousReceipts, assets, value, debt, debtService, loans, loanRatePct,
     debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
     annualizedCashFlow: metrics.cashFlow === null ? null : Math.round(metrics.cashFlow) * 12,
     equity: value === null || debt === null ? null : value - debt,

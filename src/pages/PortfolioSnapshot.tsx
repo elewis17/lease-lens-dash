@@ -9,6 +9,8 @@ import { balanceEvidenceText } from "@/domain/finance/debt";
 import { coverage, money, percent } from "@/domain/finance/format";
 import { operatingConfidence, type PortfolioMetrics } from "@/domain/finance/portfolio";
 
+const signedPoints = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, signDisplay: "exceptZero" });
+
 export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty, initialAppreciation = "", sessionKey }: {
   metrics: PortfolioMetrics; onAddData: () => void; onReviewProperty: (propertyId: string) => void; initialAppreciation?: string; sessionKey: string;
 }) {
@@ -34,6 +36,18 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   const priorities = metrics.assets.filter(asset =>
     ["Distress", "Sell candidate", "Refinance candidate"].includes(asset.verdict.label))
     .sort((left, right) => (left.cashFlow ?? Infinity) - (right.cashFlow ?? Infinity));
+  const deficits = priorities.filter(asset => asset.verdict.label !== "Refinance candidate");
+  const refinance = priorities.find(asset => asset.verdict.label === "Refinance candidate");
+  const finding = deficits.length === 1 ? deficits[0].property.alias + " needs attention."
+    : deficits.length > 1 ? deficits.length + " properties need attention."
+    : refinance ? refinance.property.alias + " qualifies for a refinance review."
+    : metrics.cashFlow === null ? "Cash flow needs more evidence."
+    : metrics.cashFlow > 0 ? "The portfolio is cash-flow positive."
+    : metrics.cashFlow < 0 ? "The portfolio is cash-flow negative." : "The portfolio is breaking even.";
+  const previous = metrics.previousReceipts;
+  const receiptChange = metrics.receipts === null || previous.receipts === null ? null : metrics.receipts - previous.receipts;
+  const occupancyChange = metrics.economicOccupancy === null || previous.economicOccupancy === null
+    ? null : (metrics.economicOccupancy - previous.economicOccupancy) * 100;
   const tiles = [
     { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest", source: operatingEvidence },
     { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest", source: operatingEvidence },
@@ -47,7 +61,10 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   return (
     <section className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold">Portfolio Snapshot</h1>
+        <p className="text-sm text-muted-foreground">Briefing</p>
+        <h1 className="text-3xl font-semibold">{finding}</h1>
+        {metrics.cashFlow !== null && <p className="text-sm">Estimated portfolio cash flow is {money(metrics.cashFlow)} per month.</p>}
+        {refinance && deficits.length > 0 && <p className="text-sm">{refinance.property.alias} qualifies for a refinance review.</p>}
         <VerdictExplanation {...metrics.verdict} />
       </header>
 
@@ -62,12 +79,22 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
         ))}
       </dl>
 
+      <Card className="space-y-3 p-5">
+        <h2 className="text-lg font-semibold">What changed</h2>
+        <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
+        <dl className="space-y-2 tabular-nums">
+          <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange !== null && receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{occupancyChange === null ? "—" : signedPoints.format(occupancyChange) + " pp"}</dd></div>
+        </dl>
+        {(receiptChange === null || occupancyChange === null) && <p className="text-xs text-muted-foreground">A comparison requires a recorded basis for both months.</p>}
+      </Card>
+
       {priorities.length > 0 && (
         <Card className="space-y-3 p-5">
           <h2 className="text-lg font-semibold">Needs you</h2>
           <ul className="divide-y">
             {priorities.map(asset => {
-              const refinance = asset.verdict.label === "Refinance candidate";
+              const isRefinance = asset.verdict.label === "Refinance candidate";
               const evidence = operatingConfidence([asset]) || "Coverage uses the recorded rents, costs and scheduled debt payments.";
               return (
                 <li key={asset.property.id} className="space-y-2 py-3">
@@ -78,7 +105,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
                   </p>
                   <p className="text-xs text-muted-foreground">{evidence}</p>
                   <p className="text-sm text-muted-foreground">
-                    {refinance
+                    {isRefinance
                       ? "Confirm the quote and fees before estimating savings."
                       : "Verify rent and expenses and obtain a payoff quote and selling costs before considering a sale."}
                   </p>
