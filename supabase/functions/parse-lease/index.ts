@@ -2,6 +2,8 @@ const maxFileBytes = 8 * 1024 * 1024;
 const maxRequestBytes = maxFileBytes + 16 * 1024;
 
 const allowedOrigins = new Set([
+  "http://localhost:8000",
+  "http://127.0.0.1:8000",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "https://elewis17.github.io",

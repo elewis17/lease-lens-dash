@@ -17,7 +17,7 @@ function makeRequest({ token = "session-example", origin = appOrigin, file, type
 
 test("only configured origins receive CORS, including the company domain", async () => {
   const handler = createParseHandler(env, () => assert.fail("Preflight should never fetch"));
-  for (const origin of [appOrigin, "https://elewis17.github.io", "http://localhost:5173", "http://127.0.0.1:5173"]) {
+  for (const origin of [appOrigin, "https://elewis17.github.io", "http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:5173", "http://127.0.0.1:5173"]) {
     const response = await handler(makeRequest({ origin, method: "OPTIONS" }));
     assert.equal(response.status, 204);
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
