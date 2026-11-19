@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trash2, Save, X, Plus, Edit, Pencil } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 import { Constants, type Enums } from "@/integrations/supabase/types";
 
@@ -16,8 +16,8 @@ export interface LeaseData {
   tenant: string;
   monthlyRent: number;
   deposit: number;
-  startDate: Date;
-  leaseEnd: Date;
+  startDate: string | null;
+  leaseEnd: string | null;
   property_id?: string;
   // NEW FIELDS
   status?: LeaseStatus | null;
@@ -43,8 +43,8 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
     tenant: "",
     monthlyRent: 0,
     deposit: 0,
-    startDate: new Date(),
-    leaseEnd: new Date(),
+    startDate: null,
+    leaseEnd: null,
     property_id: undefined,
   });
 
@@ -68,7 +68,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
 
   const handleAddNew = () => {
     if (!newLease.tenant.trim() || !newLease.unit_label?.trim()) return;
-    if (!newLease.property_id) return;    
+    if (!newLease.property_id || !newLease.startDate || !newLease.leaseEnd || newLease.leaseEnd < newLease.startDate) return;
 
     onAdd(newLease);
     
@@ -76,8 +76,8 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
       tenant: "",
       monthlyRent: 0,
       deposit: 0,
-      startDate: new Date(),
-      leaseEnd: new Date(),
+      startDate: null,
+      leaseEnd: null,
       property_id: undefined,
     });
   
@@ -163,16 +163,16 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell>
                     <Input
                       type="date"
-                      value={editData.startDate ? format(editData.startDate, "yyyy-MM-dd") : ""}
-                      onChange={(e) => setEditData({ ...editData, startDate: new Date(e.target.value) })}
+                      value={editData.startDate ?? ""}
+                      onChange={(e) => setEditData({ ...editData, startDate: e.target.value || null })}
                       className="h-8 text-sm"
                     />
                   </TableCell>
                   <TableCell>
                     <Input
                       type="date"
-                      value={editData.leaseEnd ? format(editData.leaseEnd, "yyyy-MM-dd") : ""}
-                      onChange={(e) => setEditData({ ...editData, leaseEnd: new Date(e.target.value) })}
+                      value={editData.leaseEnd ?? ""}
+                      onChange={(e) => setEditData({ ...editData, leaseEnd: e.target.value || null })}
                       className="h-8 text-sm"
                     />
                   </TableCell>
@@ -202,8 +202,8 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell className="text-sm">{lease.unit_label ?? "—"}</TableCell>
                   <TableCell className="text-sm capitalize">{lease.status ?? "—"}</TableCell>
                   <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{format(lease.startDate, "MMM d, yyyy")}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{format(lease.leaseEnd, "MMM d, yyyy")}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{lease.startDate ? format(parseISO(lease.startDate), "MMM d, yyyy") : "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{lease.leaseEnd ? format(parseISO(lease.leaseEnd), "MMM d, yyyy") : "—"}</TableCell>
                   <TableCell className="text-sm">${lease.deposit.toLocaleString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -279,16 +279,16 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               <TableCell>
                 <Input
                   type="date"
-                  value={format(newLease.startDate, "yyyy-MM-dd")}
-                  onChange={(e) => setNewLease({ ...newLease, startDate: new Date(e.target.value) })}
+                  value={newLease.startDate ?? ""}
+                  onChange={(e) => setNewLease({ ...newLease, startDate: e.target.value || null })}
                   className="h-8 text-sm"
                 />
               </TableCell>
               <TableCell>
                 <Input
                   type="date"
-                  value={format(newLease.leaseEnd, "yyyy-MM-dd")}
-                  onChange={(e) => setNewLease({ ...newLease, leaseEnd: new Date(e.target.value) })}
+                  value={newLease.leaseEnd ?? ""}
+                  onChange={(e) => setNewLease({ ...newLease, leaseEnd: e.target.value || null })}
                   className="h-8 text-sm"
                 />
               </TableCell>

@@ -1,24 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { DollarSign, Home, TrendingUp, Wallet, LineChart, Percent, Calculator, Info, Database, FileText, Building2} from "lucide-react";
-import { MetricCard } from "@/components/MetricCard";
-import { MetricCardWithInfo } from "@/components/MetricCardWithInfo";   
-import { PropertyFilter } from "@/features/properties/PropertyFilter"
-//import PropertiesTable, { type Property } from "@/components/PropertiesTable";window.location.pathname.replace("/lease-lens-dash", "") || "/"
-import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
-import { OpexCalculator } from "@/domain/finance/OpexCalculator";
-import { MetricsCalculator } from "@/domain/finance/MetricsCalculator";
-import { LeaseTable } from "@/features/leases/LeaseTable";
-import { LeaseUploader } from "@/features/leases/LeaseUploader";
-import { IncomeAndSafetyChart } from "@/components/IncomeAndSafetyChart";
-import { WealthBuildChart } from "@/components/WealthBuildChart";
-import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
-import { QuickActions } from "@/components/QuickActions";
-import { ROISummaryCard } from "@/components/ROISummaryCard";
-import { ScenarioToggle, Scenario } from "@/components/ScenarioToggle";
+import { format } from "date-fns";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Home, TrendingUp, Calculator, Database, FileText } from "lucide-react";
+import { PropertyFilter } from "@/features/properties/PropertyFilter";
+import type { Property } from "@/features/properties/PropertiesTable";
+import type { Mortgage, MortgageInput } from "@/components/MortgagesTable";
 import type { LeaseData } from "@/features/leases/LeaseTable";
-import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DealsScenarios from "@/pages/DealsScenarios";
@@ -26,402 +13,121 @@ import Memo from "@/pages/Memo";
 import PortfolioDecisions from "@/pages/PortfolioDecisions";
 import PortfolioSnapshot from "@/pages/PortfolioSnapshot";
 import DataRoom from "@/pages/DataRoom";
+import { modelPortfolio, type PortfolioRecord } from "@/domain/finance/portfolio";
+import type { DealAssumptions } from "@/domain/finance/underwriting";
 
-type ExpensesBreakdown = {
-  taxes: number;
-  insurance: number;
-  maintenance: number;
-  management: number;
-  utilities: number;
-  hoa: number;
-  misc: number;
-};
+const emptyRecord: PortfolioRecord = { units: null, leases: null, loans: null, expenses: null };
+type View = "snapshot" | "portfolio" | "database" | "deals" | "memo";
 
 const Index = ({ userId }: { userId: string }) => {
-  const [showUploader, setShowUploader] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string>(""); // property_id
-  const [scenario, setScenario] = useState<Scenario>("base");
+  const [selectedProperty, setSelectedProperty] = useState("");
   const [leases, setLeases] = useState<LeaseData[]>([]);
   const [mortgages, setMortgages] = useState<Mortgage[]>([]);
-  const [expenses, setExpenses] = useState<ExpensesBreakdown>({ 
-    taxes: 0,
-    insurance: 0,
-    maintenance: 0,
-    management: 0,
-    utilities: 0,
-    hoa: 0,
-    misc: 0,
-  });
-  const [escrowByProperty, setEscrowByProperty] = useState<Map<string, boolean>>(new Map());
-  const [metrics, setMetrics] = useState({
-    expectedRent: 0,
-    occupancyRate: 0,
-    activeLeases: 0,
-    totalUnits: 0, 
-    arr: 0,
-    mrr: 0,
-    noi: 0,
-    cashFlow: 0,
-    capRate: 0,
-    dcr: 0,
-    roi: 0,
-    cashOnCash: 0,
-    irr10Year: 0,
-  });
-  const [opexMonthly, setOpexMonthly] = useState(0);
-  const [currentProperty, setCurrentProperty] = useState<Tables<"properties"> | null>(null);
+  const [record, setRecord] = useState(emptyRecord);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const loadVersion = useRef(0);
+  const [marketRate, setMarketRate] = useState("");
+  const [dealAssumptions, setDealAssumptions] = useState<DealAssumptions | null>(null);
   const { toast } = useToast();
-  const propertyOptions = (properties ?? []).map(p => ({ id: p.id, name: p.alias || "Property" }));
-  const propertyFilterList = (properties ?? []).map(p => ({ id: p.id, address: p.address ?? p.alias ?? "Property" }));
-  const filteredProperties = selectedProperty ? properties.filter(p => p.id === selectedProperty) : properties;
-  const filteredLeases = selectedProperty ? leases.filter(l => l.property_id === selectedProperty) : leases;
-  const filteredMortgages = selectedProperty ? mortgages.filter(m => m.property_id === selectedProperty) : mortgages;
-  const totalMonthlyExpense = Object.values(expenses).reduce((sum, val) => sum + Number(val ?? 0), 0); // ---- Derived totals for Property Financials ----
-  const getScenarioRates = () => {   // Get scenario-adjusted growth rates
-  const baseRent = currentProperty?.rent_growth_rate || 3;
-  const baseOpex = currentProperty?.opex_inflation_rate || 2.5;
+  const propertyOptions = properties.map(property => ({ id: property.id, name: property.alias }));
+  const filteredProperties = selectedProperty ? properties.filter(property => property.id === selectedProperty) : properties;
+  const filteredLeases = selectedProperty ? leases.filter(lease => lease.property_id === selectedProperty) : leases;
+  const filteredMortgages = selectedProperty ? mortgages.filter(loan => loan.property_id === selectedProperty) : mortgages;
+  const escrowByProperty = new Map(mortgages.flatMap(loan => loan.property_id && loan.includes_escrow ? [[loan.property_id, true] as const] : []));
+  const asOf = format(new Date(), "yyyy-MM-dd");
+  const marketRatePct = marketRate.trim() !== "" && Number.isFinite(Number(marketRate)) && Number(marketRate) >= 0 ? Number(marketRate) : null;
+  const metrics = modelPortfolio(filteredProperties, record, asOf, marketRatePct);
+  const rentScenario = (increase: number) => modelPortfolio(filteredProperties, {
+    ...record,
+    leases: record.leases?.map(lease => ({ ...lease, monthly_rent: lease.monthly_rent * (1 + increase / 100) })) ?? null,
+  }, asOf, marketRatePct);
 
-    
-    switch (scenario) {
-      case "conservative":
-        return { rentGrowth: baseRent - 1, opexInflation: baseOpex + 0.5 };
-      case "optimistic":
-        return { rentGrowth: baseRent + 1.5, opexInflation: baseOpex - 0.5 };
-      default:
-        return { rentGrowth: baseRent, opexInflation: baseOpex };
-    }
-  };
-  const [newProperty, setNewProperty] = useState<{ name: string; address: string }>({
-  name: "",
-  address: "",
-  });
-
-  useEffect(() => {
-    loadProperties();
-  }, []);
-
-  useEffect(() => {
-    if (properties.length === 0) return;  // nothing to load yet
-    loadData();
-  }, [selectedProperty, properties]);
-
-  // sets default only once on mount
-  useEffect(() => {
-    if (selectedProperty === undefined) setSelectedProperty(""); // "" = All
-  }, []);
-
-  const loadProperties = async () => {
+  const loadProperties = useCallback(async () => {
     const { data, error } = await supabase
       .from("properties")
       .select("*")
       .eq("user_id", userId);
       
+    setLoadError(Boolean(error));
+    setLoaded(true);
     if (error) {
-      console.error("Error loading properties:", error);
       setProperties([]);
       setSelectedProperty("");
-      setCurrentProperty(null);
       return;
     }
 
-    // normalize to PropertiesTable’s shape
-    const list: Property[] = (data ?? []).map((p) => ({
-      id: p.id,
-      alias: p.alias ?? p.name ?? p.address ?? "Property",
-      address: p.address ?? null,
-      type: p.type ?? null,
-      sale_price: p.purchase_price ?? p.sale_price ?? null,
-      property_taxes: p.property_taxes ?? null,
-      mgmt_pct: p.mgmt_pct ?? null,
-      vacancy_pct: p.vacancy_pct ?? null,
-      maintenance_pct: p.maintenance_pct ?? null,
+    const list: Property[] = (data ?? []).map(property => ({
+      id: property.id,
+      alias: property.alias ?? property.name ?? property.address,
+      address: property.address,
+      type: property.type,
+      sale_price: property.purchase_price ?? property.sale_price,
+      property_value: property.property_value,
+      property_taxes: property.property_taxes,
+      insurance: property.insurance,
+      mgmt_pct: property.mgmt_pct,
+      vacancy_pct: property.vacancy_pct,
+      maintenance_pct: property.maintenance_pct,
+      rent_growth_rate: property.rent_growth_rate,
+      opex_inflation_rate: property.opex_inflation_rate,
     }));
 
     setProperties(list);
-    // Keep All selected when no specific property is selected.
-    if (!selectedProperty) {
-      setSelectedProperty("");
-      setCurrentProperty(null);
-      }
+    setSelectedProperty(current => list.some(property => property.id === current) ? current : "");
+  }, [userId]);
 
-  };
-
-  const loadData = async () => {
-    // Build once per loadData run
-    const vacancyPctByProperty = new Map<string, number>(
-      (properties ?? []).map(p => [p.id, Number(p.vacancy_pct ?? 0)])
-    );
-    const getPropVacancy = (pid?: string | null) => vacancyPctByProperty.get(pid ?? "") ?? 0;
-    
-    const propertyIds = properties
-      .filter((property) => !selectedProperty || property.id === selectedProperty)
-      .map((property) => property.id);
-    if (propertyIds.length === 0) return;
-
-    const { data: unitsData, error: unitsError } = await supabase
-      .from("units")
-      .select("id, unit_label, property_id")
-      .eq("user_id", userId)
-      .in("property_id", propertyIds);
-
-    const unitLabelById = new Map<string, string>();
-    if (unitsError) {
-      console.error("Error loading units:", unitsError);
-    } else {
-      for (const unit of unitsData ?? []) {
-        if (unit.unit_label !== null) unitLabelById.set(unit.id, unit.unit_label);
-      }
+  const loadData = useCallback(async () => {
+    const version = ++loadVersion.current;
+    const propertyIds = properties.map(property => property.id);
+    if (propertyIds.length === 0) {
+      setRecord(emptyRecord);
+      setLeases([]);
+      setMortgages([]);
+      return;
     }
 
-    const { data: leasesData, error: leasesError } = await supabase
-      .from("leases")
-      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), property_id, unit_id")
-      .eq("user_id", userId)
-      .in("property_id", propertyIds);
-    if (leasesError) console.error("Error loading leases:", leasesError);
+    const [unitsResult, mortgagesResult, expensesResult] = await Promise.all([
+      supabase.from("units").select("id, unit_label, property_id").eq("user_id", userId).in("property_id", propertyIds),
+      supabase.from("mortgages").select("*").eq("user_id", userId).in("property_id", propertyIds),
+      supabase.from("expenses").select("property_id, unit_id, date, amount, category").eq("user_id", userId),
+    ]);
+    const units = unitsResult.data;
+    const unitById = new Map(units?.map(unit => [unit.id, unit]));
+    const leasesResult = unitById.size > 0
+      ? await supabase.from("leases").select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), unit_id")
+        .eq("user_id", userId).in("unit_id", [...unitById.keys()])
+      : { data: units ? [] : null, error: unitsResult.error };
+    const leaseIds = leasesResult.data?.map(lease => lease.id) ?? [];
+    const paymentsResult = leaseIds.length
+      ? await supabase.from("payments").select("lease_id, due_date, amount_due, paid_date, paid_amount")
+        .eq("user_id", userId).in("lease_id", leaseIds)
+      : { data: null };
+    if (version !== loadVersion.current) return;
 
-    const { data: mortgagesData, error: mortgagesError } = await supabase
-      .from("mortgages")
-      .select("*")
-      .eq("user_id", userId)
-      .in("property_id", propertyIds);
-    if (mortgagesError) console.error("Error loading mortgages:", mortgagesError);
+    setRecord({ units, leases: leasesResult.data, loans: mortgagesResult.data, expenses: expensesResult.data, payments: paymentsResult.data });
+    setLeases((leasesResult.data ?? []).map(lease => ({
+      id: lease.id,
+      property_id: unitById.get(lease.unit_id)?.property_id,
+      tenant: lease.tenant?.name ?? "Unknown",
+      monthlyRent: lease.monthly_rent,
+      deposit: lease.deposit ?? 0,
+      startDate: lease.start_date,
+      leaseEnd: lease.end_date,
+      status: lease.status,
+      unit_id: lease.unit_id,
+      unit_label: unitById.get(lease.unit_id)?.unit_label ?? "—",
+    })));
+    setMortgages((mortgagesResult.data ?? []).map(loan => ({
+      ...loan,
+      start_date: loan.start_date ? new Date(loan.start_date) : null,
+    })));
+  }, [properties, userId]);
 
-    const { data: expensesData } = await supabase
-      .from("expenses")
-      .select("*")
-      .eq("user_id", userId)
-      .in("property_id", propertyIds);
+  useEffect(() => { void loadProperties(); }, [loadProperties]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
-    const propertyData = selectedProperty
-      ? (await supabase
-          .from("properties")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("id", propertyIds[0])
-          .single()).data
-      : null;
-
-    // Build expenses breakdown (typed) for UI + metrics
-    const expensesByCategory: ExpensesBreakdown = {
-      taxes: 0,
-      insurance: 0,
-      maintenance: 0,
-      management: 0,
-      utilities: 0,
-      hoa: 0,
-      misc: 0,
-    };
-    (expensesData ?? []).forEach((exp) => {
-      const amount = Number(exp?.amount) || 0;
-      const category = exp?.category;
-      if (category === 'tax') expensesByCategory.taxes += amount;
-      else if (category === 'insurance') expensesByCategory.insurance += amount;
-      else if (category === 'repairs') expensesByCategory.maintenance += amount;
-      else if (String(category) === 'management') expensesByCategory.management += amount;
-      else if (category === 'utilities') expensesByCategory.utilities += amount;
-      else if (category === 'hoa') expensesByCategory.hoa += amount;
-      else expensesByCategory.misc += amount;
-    });
-
-    const rentByProperty = new Map<string, number>(); // adjusted (vacancy) monthly rent per property
-
-    setExpenses(expensesByCategory);
-    setCurrentProperty(propertyData);
-
-
-    // Process mortgages
-    const processedMortgages = (mortgagesData ?? []).map((mtg) => ({
-      id: mtg.id,
-      property_id: mtg.property_id,
-      loan_name: mtg.loan_name,
-      principal_original: mtg.principal_original === null || mtg.principal_original === undefined
-        ? null : Number(mtg.principal_original),
-      current_balance: mtg.current_balance === null || mtg.current_balance === undefined
-        ? null : Number(mtg.current_balance),
-      principal: mtg.principal === null || mtg.principal === undefined
-        ? null : Number(mtg.principal), // legacy, but independent
-      interest_rate: Number(mtg.interest_rate ?? 0),
-      term_months: Number(mtg.term_months ?? 0),
-      start_date: mtg.start_date ? new Date(mtg.start_date) : null,
-      monthly_payment: Number(mtg.monthly_payment ?? 0),
-      includes_escrow: Boolean(mtg.includes_escrow ?? false),   // NEW
-    }));
-
-    // Build a quick lookup: does this property have any escrowed mortgage?
-    const escrowMap = new Map<string, boolean>();
-      processedMortgages.forEach((m) => {
-        if (!m.property_id) return;
-        const current = escrowMap.get(m.property_id) ?? false;
-        escrowMap.set(m.property_id, current || !!m.includes_escrow);
-      });
-      setEscrowByProperty(escrowMap);
-
-    setMortgages(processedMortgages);
-
-    // Calculate total debt service from mortgages
-    const totalDebtService = processedMortgages.reduce((sum, mtg) => sum + mtg.monthly_payment, 0);
-
-    // Calculate metrics
-    let totalMRR = 0;
-    let totalExpected = 0;
-
-    // ✅ use a set to count unique active unit IDs
-    const now = new Date();
-
-    const processedLeases = (leasesData ?? []).map((lease) => {
-      const monthlyRent = Number(lease?.monthly_rent ?? 0);
-      const pid = lease.property_id;
-      const propVacancyPct = getPropVacancy(pid);
-      const adjustedRent = monthlyRent * (1 - propVacancyPct / 100);
-      // AFTER: track adjusted rent per property
-      if (pid) rentByProperty.set(pid, (rentByProperty.get(pid) ?? 0) + adjustedRent);
-
-      totalMRR += adjustedRent;
-      totalExpected += monthlyRent;
-
-      // ----- active check (status OR dates) -----
-      const status = String(lease?.status ?? "").toLowerCase();
-      const start = lease?.start_date ? new Date(lease.start_date) : null;
-      const end   = lease?.end_date ? new Date(lease.end_date) : null;
-
-      const isActiveByStatus = status === "active" || status === "expiring";
-      const isActiveByDates  = !!(start && end && start <= now && now <= end);
-      const isActive = isActiveByStatus || isActiveByDates;
-
-      // ----- property filter -----
-      const matchesSelection = selectedProperty ? pid === selectedProperty : true;
-
-      return {
-        id: lease.id,
-        property_id: pid ?? "Unknown",
-        tenant: lease.tenant?.name || "Unknown",
-        monthlyRent,
-        //vacancyRate: vacancyRatePct, --- to be removed
-        deposit: Number(lease?.deposit ?? 0),
-        startDate: start ?? new Date(),
-        leaseEnd: end ?? new Date(),
-
-        status: lease.status ?? null,
-  
-        // NEW
-        unit_id: lease.unit_id ?? null,
-        unit_label: lease.unit_id ? unitLabelById.get(lease.unit_id) ?? "—" : "—",
-      };
-    });
-
-        // ACTIVE LEASES = leases with valid active date window OR active status
-    const activeLeaseCount = (leasesData ?? []).filter((l) => {
-      const status = String(l.status ?? "").toLowerCase();
-      const start = l.start_date ? new Date(l.start_date) : null;
-      const end = l.end_date ? new Date(l.end_date) : null;
-      const now = new Date();
-
-      const isActiveStatus = status === "active" || status === "expiring";
-      const isActiveDates  = !!(start && end && start <= now && now <= end);
-
-      return isActiveStatus || isActiveDates;
-    }).length;
-
-    // use unique active units as the numerator
-    const activeLeases = activeLeaseCount;
-
-    // ----- Value basis (selected property vs All) -----
-    const propertyValue = Number(
-      selectedProperty
-        ? (propertyData?.sale_price ?? propertyData?.purchase_price ?? 0)
-        : (properties ?? []).reduce((s, p: any) => s + Number(p?.sale_price ?? p?.purchase_price ?? 0), 0)
-    );
-
-    // --- OPEX & Metrics via domain calculators ---
-    const annualDebt = totalDebtService * 12;
-
-    // (A) Compute OPEX/NOI in single vs portfolio mode
-    let noiAnnual = 0;
-    let opexMonthlyCalc = 0;
-
-    if (selectedProperty && propertyData) {
-      const pid = selectedProperty;
-      const rentThisProperty = rentByProperty.get(pid) ?? 0;
-      const escrow = escrowByProperty.get(selectedProperty) ?? false;
-      const mtgRow = processedMortgages.find(m => m.property_id === pid) ?? null;
-
-      opexMonthlyCalc = OpexCalculator.monthlyForProperty(propertyData, {
-        monthlyRent: rentThisProperty,
-        mortgageIncludesEscrow: escrow,
-         mortgageRow: mtgRow,
-      });
-
-      noiAnnual = MetricsCalculator.noiAnnual(rentThisProperty, propertyData, {
-        monthlyRent: rentThisProperty,
-        mortgageIncludesEscrow: escrow,
-      });
-
-    } else {
-      // "All properties" – sum per-property OPEX and NOI
-      opexMonthlyCalc = (properties ?? []).reduce((sum, p) => {
-        const rent = rentByProperty.get(p.id) ?? 0;
-        const escrow = escrowByProperty.get(p.id) ?? false;
-        const mtgRowForP = processedMortgages.find(m => m.property_id === p.id) ?? null;
-
-        return sum + OpexCalculator.monthlyForProperty(p, {
-          monthlyRent: rent,
-          mortgageIncludesEscrow: escrow,
-          mortgageRow: mtgRowForP,
-        });
-      }, 0);
-
-      // "All properties" – sum per-property NOI
-      noiAnnual = (properties ?? []).reduce((sum, p) => {
-        const rent = rentByProperty.get(p.id) ?? 0;
-        const escrow = escrowByProperty.get(p.id) ?? false;
-        return sum + MetricsCalculator.noiAnnual(rent, p, {
-          monthlyRent: rent,
-          mortgageIncludesEscrow: escrow,
-        });
-      }, 0);
-    }
-
-    // Cash flow (annual) = NOI - debt service
-    const cashFlowAnnual = noiAnnual - annualDebt;
-
-    // Estimate equity (same approach you had)
-    const totalOriginalPrincipal = processedMortgages.reduce((s, m) => s + Number(m.principal || 0), 0);
-    let equityEstimate = propertyValue - totalOriginalPrincipal;
-    if (equityEstimate <= 0) equityEstimate = propertyValue * 0.25;
-
-    // KPIs via MetricsCalculator
-    const capRate     = MetricsCalculator.capRate(noiAnnual, propertyValue);
-    const dcr         = MetricsCalculator.dcr(noiAnnual, annualDebt);
-    const roi         = MetricsCalculator.roiAnnual(cashFlowAnnual, propertyValue);
-    const cashOnCash  = MetricsCalculator.cashOnCash(cashFlowAnnual, equityEstimate);
-    const irr10Year   = MetricsCalculator.irr10Year(propertyValue, cashFlowAnnual, equityEstimate);
-    const { totalUnits, activeUnits, occupancyRate } = MetricsCalculator.occupancyRate(leasesData ?? [], unitsData ?? [], selectedProperty, properties.map(p=>p.id));
-
-    // Guard helper
-    const safe = (n: number) => (Number.isFinite(n) ? n : 0);
-
-    setOpexMonthly(opexMonthlyCalc);
-    setLeases(processedLeases);
-    setMetrics({
-      expectedRent: totalExpected,
-      occupancyRate,
-      activeLeases: activeLeaseCount,
-      totalUnits,
-      arr: totalMRR * 12,
-      mrr: totalMRR,
-      noi: noiAnnual / 12,
-      cashFlow: cashFlowAnnual / 12,
-      capRate,
-      dcr,
-      roi,
-      cashOnCash,
-      irr10Year,  
-    });
-  };
-
-  //LEASE HANDLERS
   const handleUpdateLease = async (leaseId: string, data: Partial<LeaseData>) => {
     // 1. Load existing lease so we can update tenant/unit
     const { data: lease, error: fetchErr } = await supabase
@@ -462,19 +168,8 @@ const Index = ({ userId }: { userId: string }) => {
     if (data.monthlyRent !== undefined) leasePayload.monthly_rent = data.monthlyRent;
     if (data.deposit !== undefined) leasePayload.deposit = data.deposit;
 
-    if (data.startDate) {
-      leasePayload.start_date =
-        data.startDate instanceof Date
-          ? data.startDate.toISOString()
-          : data.startDate;
-    }
-
-    if (data.leaseEnd) {
-      leasePayload.end_date =
-        data.leaseEnd instanceof Date
-          ? data.leaseEnd.toISOString()
-          : data.leaseEnd;
-    }
+    if (data.startDate) leasePayload.start_date = data.startDate;
+    if (data.leaseEnd) leasePayload.end_date = data.leaseEnd;
 
     if (data.status) leasePayload.status = data.status;
 
@@ -511,6 +206,9 @@ const Index = ({ userId }: { userId: string }) => {
   };
 
   const handleAddLease = async (data: Omit<LeaseData, "id">) => {
+    const { startDate, leaseEnd: endDate } = data;
+    if (!startDate || !endDate || endDate < startDate) return;
+
     // 1) Resolve target property
     const targetPropertyId = data.property_id ?? selectedProperty;
     if (!properties.some((property) => property.id === targetPropertyId)) {
@@ -630,8 +328,8 @@ const Index = ({ userId }: { userId: string }) => {
       unit_id: unitId,
       monthly_rent: Number(data.monthlyRent ?? 0),
       deposit: Number(data.deposit ?? 0),
-      start_date: data.startDate.toISOString(),
-      end_date: data.leaseEnd.toISOString(),
+      start_date: startDate,
+      end_date: endDate,
       status: data.status ?? "active",
     };
 
@@ -777,7 +475,8 @@ const Index = ({ userId }: { userId: string }) => {
       alias: data.alias,
       address: data.address,
       type: data.type ?? null,
-      sale_price: data.sale_price ?? null,
+      purchase_price: data.sale_price ?? null,
+      property_value: data.property_value ?? null,
       property_taxes: data.property_taxes ?? null,
       mgmt_pct: data.mgmt_pct ?? null,
       vacancy_pct: data.vacancy_pct ?? null,
@@ -822,6 +521,7 @@ const Index = ({ userId }: { userId: string }) => {
       payload.address = patch.address;
     }
     if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price;
+    if (patch.property_value !== undefined) payload.property_value = patch.property_value;
 
     // If your migration with the new columns is applied, these will also succeed (harmless if ignored by types)
     if (patch.alias !== undefined) payload.alias = patch.alias ?? null;
@@ -839,7 +539,7 @@ const Index = ({ userId }: { userId: string }) => {
       .update(payload)
       .eq("user_id", userId)
       .eq("id", id)
-      .select("id, address, purchase_price, alias, name, type, sale_price, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct, insurance")
+      .select("id, address, purchase_price, alias, name, type, sale_price, property_value, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct, insurance")
       .single();
 
     if (error || !updated) {
@@ -858,12 +558,13 @@ const Index = ({ userId }: { userId: string }) => {
               ...p,
               alias: updated.alias ?? p.alias ?? updated.address ?? "Property",
               address: updated.address ?? p.address ?? null,
-              sale_price: Number(updated.purchase_price ?? updated.sale_price ?? 0),
-              property_taxes: Number(updated.property_taxes ?? p.property_taxes ?? 0),
-              mgmt_pct: Number(updated.mgmt_pct ?? p.mgmt_pct ?? 0),
-              vacancy_pct: Number(updated.vacancy_pct ?? p.vacancy_pct ?? 0),
-              maintenance_pct: Number(updated.maintenance_pct ?? p.maintenance_pct ?? 0),
-              insurance: Number(updated.insurance ?? p.insurance ?? 0),
+              sale_price: updated.purchase_price ?? updated.sale_price,
+              property_value: updated.property_value,
+              property_taxes: updated.property_taxes,
+              mgmt_pct: updated.mgmt_pct,
+              vacancy_pct: updated.vacancy_pct,
+              maintenance_pct: updated.maintenance_pct,
+              insurance: updated.insurance,
             }
           : p
       )
@@ -919,46 +620,9 @@ const Index = ({ userId }: { userId: string }) => {
     });
   };
 
-  // Helper to format a property label from the selected/current property
-  const formatPropertyLabel = (p: any | null) => String(p?.alias ?? p?.name ?? "Property");
-
   const [navCollapsed, setNavCollapsed] = useState(false);
-
-  /**
-   * UI-only: Left navigation shell (collapsible).
-   * - Collapsed: icon-only rail
-   * - Expanded: icon + label
-   */
-  const [view, setView] = useState<"snapshot" | "portfolio" | "database" | "deals" | "memo">("snapshot");
-
-  /**
-   * UI-only: AI Brief container.
-   * This is intentionally “dumb” for now; we’ll plug synthesis/modeling later.
-   */
-  const [whatIf, setWhatIf] = useState<{
-    refi: boolean;
-    rent: boolean;
-    costSeg: boolean;
-  }>({ refi: false, rent: false, costSeg: false });
-
-  if (showUploader) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Upload New Lease</h1>
-            <button onClick={() => setShowUploader(false)} className="text-muted-foreground hover:text-foreground">
-              ← Back to Dashboard
-            </button>
-          </div>
-          <LeaseUploader onUploadComplete={() => {
-            setShowUploader(false);
-            loadData();
-          }} />
-        </div>
-      </div>
-    );
-  }
+  const [view, setView] = useState<View>("snapshot");
+  const openDataRoom = () => setView("database");
 
 const LeftNav = ({
   collapsed,
@@ -967,7 +631,7 @@ const LeftNav = ({
   collapsed: boolean;
   onToggle: () => void;
 }) => {
-  const items = [
+  const items: { key: View; label: string; icon: typeof Home }[] = [
     { key: "snapshot", label: "Portfolio Snapshot", icon: Home },
     { key: "portfolio", label: "Portfolio Decisions", icon: TrendingUp },
     { key: "deals", label: "Deal Underwriting", icon: Calculator },
@@ -1000,14 +664,13 @@ const LeftNav = ({
           </button>
         </div>
 
-        {items.map((it, idx) => {
+        {items.map((it) => {
           const Icon = it.icon;
-          const active = false; // routing will handle this later
           return (
             <button
               key={it.key}
               type="button"
-              onClick={() => setView(it.key as any)}
+              onClick={() => setView(it.key)}
               className={[
                 "w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
                 view === it.key
@@ -1028,367 +691,9 @@ const LeftNav = ({
         })}
       </nav>
 
-      <div className="mt-auto px-3 py-3 border-t border-border text-[11px] text-muted-foreground">
-        {!collapsed ? "Demo-ready layout" : "—"}
-      </div>
     </aside>
   );
 };
-
-const formatMoney = (n: number) =>
-  Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—";
-
-const formatNum = (n: number) =>
-  Number.isFinite(n) ? n.toFixed(2) : "—";
-
-  const REFI_RATE = 0.0625;
-  const scopedMortgages =
-  selectedProperty === ""
-    ? mortgages
-    : mortgages.filter(m => m.property_id === selectedProperty);
-  const currentDebtService = scopedMortgages.reduce((sum, m) => sum + (m.monthly_payment || 0), 0);
-
-    // Ref i assumptions (keep simple + explicit)
-  const refiRate = 6.25;      // %
-  const refiTermMonths = 360; // 30-yr
-
-  // Pick a sensible balance for the selected property (fallback to first scoped mortgage)
-  const refiBalance =
-    selectedProperty === ""
-      ? 0
-      : Number(
-          scopedMortgages[0]?.current_balance ??
-          scopedMortgages[0]?.principal ??
-          0
-        );
-
-  // Standard amortized payment (P&I only)
-  const calcMonthlyPI = (principal: number, annualRatePct: number, termMonths: number) => {
-    if (!principal || !annualRatePct || !termMonths) return 0;
-    const r = (annualRatePct / 100) / 12;
-    const n = termMonths;
-    return (principal * r) / (1 - Math.pow(1 + r, -n));
-  };
-
-  const refiMonthlyPayment = calcMonthlyPI(refiBalance, refiRate, refiTermMonths);
-
-  const refiDebtService =
-    selectedProperty === ""
-      ? currentDebtService // no portfolio refi yet
-      : refiMonthlyPayment;
-
-
-  const annualCashFlowDelta = (currentDebtService - refiDebtService) * 12;
-
-  // metrics.noi is MONTHLY NOI; DCR needs ANNUAL NOI / ANNUAL debt service
-  const baseNoiAnnual = metrics.noi * 12;
-
-  const refiDcr = MetricsCalculator.dcr(metrics.noi * 12, refiDebtService * 12);
-
-  // What-If: Raise rents 5% (simple, assumes OPEX unchanged)
-  const rentDeltaMonthly = metrics.expectedRent * 0.05;
-  const rentDeltaAnnual = rentDeltaMonthly * 12;
-  const rentDcr = MetricsCalculator.dcr(baseNoiAnnual + rentDeltaAnnual, currentDebtService * 12);
-
-  // What-If: Bonus depreciation / cost seg (tax benefit, not operating cash flow)
-  // Assumptions are intentionally explicit + conservative defaults.
-  const taxRate = 0.32;        // placeholder marginal rate
-  const costSegPct = 0.25;     // % of value reclassified (varies widely)
-  const bonusPct = 0.60;       // bonus depreciation rate (varies by year/law)
-
-  // Value basis: selected property if possible, else portfolio sum
-  const valueBasis = Number(
-    selectedProperty
-      ? (currentProperty?.sale_price ?? currentProperty?.purchase_price ?? 0)
-      : (properties ?? []).reduce((s: number, p: any) => s + Number(p?.sale_price ?? p?.purchase_price ?? 0), 0)
-  );
-
-  const estYear1TaxSavings =
-    valueBasis > 0 ? valueBasis * costSegPct * bonusPct * taxRate : 0;
-
-  const AIBriefShell = () => (
-    <section className="rounded-2xl border border-border bg-card/70 backdrop-blur-sm shadow-sm p-6">
-      <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-        <div className="flex-1 flex flex-col">
-         <div className="flex items-center justify-between mb-3">
-          <div className="text-lg font-semibold">AI Investment Brief</div>
-
-          <details className="relative">
-            <summary
-              className="list-none inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 cursor-pointer"
-              aria-label="About AI Investment Brief"
-              title="About AI Investment Brief"
-            >
-              <Info className="h-4 w-4" />
-            </summary>
-
-            <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
-              <button
-                aria-label="Close"
-                className="absolute inset-0 bg-black/20"
-                onClick={(e) => {
-                  const d = (e.currentTarget.closest("details") as HTMLDetailsElement | null);
-                  if (d) d.open = false;
-                }}
-              />
-              <div className="relative z-10 w-full max-w-lg rounded-xl bg-white p-4 sm:p-5 shadow-2xl ring-1 ring-black/10 text-[13px]">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold text-gray-900">How verdicts are determined</p>
-                  <button
-                    className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:text-gray-700"
-                    aria-label="Close"
-                    onClick={(e) => {
-                      const d = (e.currentTarget.closest("details") as HTMLDetailsElement | null);
-                      if (d) d.open = false;
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                 <div className="mt-3 space-y-3 text-sm text-gray-700">
-                  <p>
-                    We calculate Cash Flow, Debt Coverage (DCR), and 10-Year IRR from your
-                    leases, expenses, and mortgage data. A rule-based decision engine then
-                    classifies the property using simple financial thresholds:
-                  </p>
-
-                  <ul className="space-y-2 text-[13px]">
-                    <li>
-                      <strong>Distress:</strong> Negative cash flow and DCR below 1.0
-                      (not covering debt).
-                    </li>
-
-                    <li>
-                      <strong>Sell:</strong> Low returns (IRR under 6%) with weak coverage.
-                    </li>
-
-                    <li>
-                      <strong>Refinance:</strong> Strong coverage (DCR ≥ 1.3) and excess
-                      cash flow buffer.
-                    </li>
-
-                    <li>
-                      <strong>Hold:</strong> Healthy coverage and returns at or above target.
-                    </li>
-
-                    <li>
-                      <strong>Hold + Optimize:</strong> Stable but below-target returns;
-                      operational upside exists.
-                    </li>
-                  </ul>
-
-                  <p className="text-xs text-muted-foreground">
-                    The verdict updates automatically as your assumptions change.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-
-
-        {(() => {
-          // --- Verdict Engine (deterministic) ---
-          const dcr = Number(metrics.dcr ?? 0);
-          const irr = Number(metrics.irr10Year ?? 0);
-          const cashFlow = Number(metrics.cashFlow ?? 0); // monthly
-          const noi = Number(metrics.noi ?? 0);           // monthly
-          const debt = Number(currentDebtService ?? 0);   // monthly
-
-          const denom = debt > 0 ? debt : Math.max(noi, 1);
-          const marginPct = denom > 0 ? (cashFlow / denom) * 100 : 0;
-
-          type VerdictKey = "SELL" | "REFINANCE" | "HOLD" | "HOLD_OPTIMIZE" | "DISTRESS";
-          const rules: Array<{
-            key: VerdictKey;
-            label: string;
-            when: boolean;
-            rationale: string;
-          }> = [
-            {
-              key: "DISTRESS",
-              label: "DISTRESS / HIGH RISK",
-              when: cashFlow < 0 && dcr < 1.0,
-              rationale: `Negative cash flow and weak coverage (DCR ${dcr.toFixed(2)}).`,
-            },
-            {
-              key: "SELL",
-              label: "SELL",
-              when: irr < 6 && dcr < 1.05 && marginPct < 5,
-              rationale: `Structural underperformance (IRR ${irr.toFixed(2)}%) with limited buffer.`,
-            },
-            {
-              key: "REFINANCE",
-              label: "REFINANCE",
-              when: dcr >= 1.3 && marginPct >= 15 && debt > 0,
-              rationale: `Strong coverage (DCR ${dcr.toFixed(2)}) and buffer; optimize debt terms.`,
-            },
-            {
-              key: "HOLD",
-              label: "HOLD",
-              when: dcr >= 1.2 && cashFlow > 0 && irr >= 8,
-              rationale: `Stable hold profile (DCR ${dcr.toFixed(2)}, IRR ${irr.toFixed(2)}%).`,
-            },
-            {
-              key: "HOLD_OPTIMIZE",
-              label: "HOLD + OPTIMIZE",
-              when: dcr >= 1.05 && cashFlow >= 0 && irr > 0 && irr < 8,
-              rationale: `Stable but sub-target returns (IRR ${irr.toFixed(2)}%); operational upside exists.`,
-            },
-          ];
-
-          const picked = rules.find(r => r.when) ?? {
-            key: "HOLD_OPTIMIZE" as VerdictKey,
-            label: "HOLD + OPTIMIZE",
-            rationale: "Insufficient inputs to classify strongly; defaulting to operational focus.",
-          };
-
-          const verdictBadge =
-            picked.key === "DISTRESS" || picked.key === "SELL"
-              ? "bg-rose-50 text-rose-700"
-              : picked.key === "HOLD_OPTIMIZE"
-              ? "bg-amber-50 text-amber-800"
-              : "bg-emerald-50 text-emerald-700";
-
-          return (
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${verdictBadge}`}>
-                Verdict: {picked.label}
-              </span>
-
-              <span className="text-xs text-muted-foreground">
-                {picked.rationale}
-              </span>
-            </div>
-          );
-        })()}
-
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>
-              <strong>Primary risk:</strong>{" "}
-              {metrics.dcr < 1
-                ? "Debt coverage is below 1.0, indicating negative leverage."
-                : metrics.cashFlow < 0
-                ? "Property is cash-flow negative at current financing."
-                : "No immediate operational risk detected."}
-            </li>
-
-            <li>
-              <strong>Recommended action:</strong>{" "}
-              {metrics.cashFlow < 0 && metrics.dcr < 1
-                ? "Explore refinancing or principal paydown to restore coverage."
-                : metrics.irr10Year < 8
-                ? "Hold and optimize operations; returns are below long-term targets."
-                : "Hold strategy supported by current performance."}
-            </li>
-
-            <li>
-              <strong>Confidence level:</strong>{" "}
-              {metrics.totalUnits > 0 && metrics.activeLeases > 0
-                ? "High — based on active lease, debt, and expense data."
-                : "Medium — projections rely on partial inputs."}
-            </li>
-          </ul>
-
-          <div className="mt-4 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
-            {metrics.cashFlow < 0 && metrics.dcr < 1
-              ? "Current loan structure is the primary constraint on performance; improving debt terms would have a larger impact than operational changes."
-              : metrics.irr10Year < 8
-              ? "Returns are being driven by long-term appreciation rather than near-term cash flow, suggesting a hold-and-optimize strategy."
-              : "Cash flow and leverage are aligned, supporting a stable hold strategy under current assumptions."}
-          </div>
-        </div>
-
-        <div className="w-full lg:w-80 rounded-xl border border-border bg-background p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold">AI What-If</div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={whatIf.refi}
-                onChange={(e) => setWhatIf((p) => ({ ...p, refi: e.target.checked }))}
-              />
-              Refinance at 6.25%
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={whatIf.rent}
-                onChange={(e) => setWhatIf((p) => ({ ...p, rent: e.target.checked }))}
-              />
-              Raise rents 5%
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={whatIf.costSeg}
-                onChange={(e) => setWhatIf((p) => ({ ...p, costSeg: e.target.checked }))}
-              />
-              Bonus depreciation / cost seg
-            </label>
-
-            {(whatIf.refi || whatIf.rent || whatIf.costSeg) && (
-            <div className="mt-2 space-y-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              {whatIf.refi && (
-                selectedProperty === "" ? (
-                  <div>
-                    <span className="font-medium text-foreground">Refi @ 6.25%:</span>{" "}
-                    Select a property to estimate refinance impact.
-                  </div>
-                ) : (
-                  <div>
-                    <span className="font-medium text-foreground">Refi @ 6.25%:</span>{" "}
-                    +${formatMoney(annualCashFlowDelta)} / yr cash flow, DCR → {formatNum(refiDcr)}
-                  </div>
-                )
-              )}
-
-              {whatIf.rent && (
-                <div>
-                  <span className="font-medium text-foreground">Raise rents 5%:</span>{" "}
-                  +${formatMoney(rentDeltaAnnual)} / yr NOI (assumes OPEX unchanged), DCR → {formatNum(rentDcr)}
-                </div>
-              )}
-
-              {whatIf.costSeg && (
-                <div>
-                  <span className="font-medium text-foreground">Bonus dep / cost seg:</span>{" "}
-                  est. ${formatMoney(estYear1TaxSavings)} year-1 tax savings
-                  <span className="ml-2 text-[11px] text-muted-foreground">
-                    (assumes {Math.round(costSegPct * 100)}% reclass, {Math.round(bonusPct * 100)}% bonus, {Math.round(taxRate * 100)}% tax rate)
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-          </div>
-        </div>
-      </div>
-
-      {/* Property row UNDER the brief (matches the mock) */}
-      <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {properties.length > 0 && (
-            <PropertyFilter
-              properties={properties.map((p) => ({
-                id: p.id,
-                address: p.address ?? "",
-                alias: p.alias,
-              }))}
-              selectedProperty={selectedProperty}
-              onPropertyChange={setSelectedProperty}
-            />
-          )}
-        </div>
-      </div>
-    </section>
-  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background flex">
@@ -1398,14 +703,16 @@ const formatNum = (n: number) =>
 
       <main className="container mx-auto px-4 sm:px-8 py-8 space-y-8 pb-24">
         
-        {view === "snapshot" && (
-          <PortfolioSnapshot
-            properties={properties}
-            leases={leases}
-            mortgages={mortgages}
-            metrics={metrics}
-          />
+        {["snapshot", "portfolio", "database"].includes(view) && properties.length > 0 && (
+          <PropertyFilter properties={propertyOptions.map(property => ({
+            id: property.id,
+            alias: property.name,
+            address: properties.find(row => row.id === property.id)?.address ?? "",
+          }))} selectedProperty={selectedProperty} onPropertyChange={setSelectedProperty} />
         )}
+        {!loaded && <p role="status" className="text-sm text-muted-foreground">Loading portfolio records…</p>}
+        {loadError && <p role="alert" className="text-sm">Property records could not be loaded.</p>}
+        {loaded && !loadError && view === "snapshot" && <PortfolioSnapshot metrics={metrics} onAddData={openDataRoom} />}
 
         {view === "database" && (
           <DataRoom
@@ -1428,22 +735,16 @@ const formatNum = (n: number) =>
           />
         )}
 
-        {view === "deals" && <DealsScenarios />}
+        {view === "deals" && <DealsScenarios initialAssumptions={dealAssumptions} onAssumptionsChange={setDealAssumptions} />}
 
-        {view === "memo" && <Memo />}
+        {view === "memo" && <Memo assumptions={dealAssumptions} onOpenUnderwriting={() => setView("deals")} />}
 
-        {view === "portfolio" && (
-          <PortfolioDecisions
-            properties={properties}
-            leases={leases}
-            mortgages={mortgages}
-            metrics={metrics}
-          />
+        {loaded && !loadError && view === "portfolio" && (
+          <PortfolioDecisions metrics={metrics} onAddData={openDataRoom} marketRate={marketRate}
+            onMarketRateChange={setMarketRate} rentScenario={rentScenario} />
         )}
-        
       </main>
 
-      {/*<QuickActions onUploadClick={() => setShowUploader(true)} /> //Floating footer with buttons*/}
     </div>
 
     </div>
