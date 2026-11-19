@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ export interface LeaseData {
   id: string;
   tenant: string;
   monthlyRent: number;
-  deposit: number;
+  deposit: number | null;
   startDate: string | null;
   leaseEnd: string | null;
   property_id?: string;
@@ -25,40 +25,34 @@ export interface LeaseData {
   unit_label?: string | null; // from units table (joined in Index.tsx)
 }
 
+export type ManualLeaseInput = Partial<Omit<LeaseData, "id" | "monthlyRent" | "deposit">> & {
+  monthlyRent?: number | string;
+  deposit?: number | string | null;
+};
+
 type PropertyOption = { id: string; name: string }; // NEW
 
 interface LeaseTableProps {
   leases: LeaseData[];
-  onUpdate: (id: string, data: Partial<LeaseData>) => void;
+  onUpdate: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   onDelete: (id: string) => void;
-  onAdd: (data: Omit<LeaseData, "id">) => void;
+  onAdd: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   propertyOptions: PropertyOption[]; 
 }
 
 export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}: LeaseTableProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Partial<LeaseData>>({});
+  const [editData, setEditData] = useState<ManualLeaseInput>({});
   const [isAdding, setIsAdding] = useState(false);
-  const [newLease, setNewLease] = useState<Omit<LeaseData, "id">>({
-    tenant: "",
-    monthlyRent: 0,
-    deposit: 0,
-    startDate: null,
-    leaseEnd: null,
-    property_id: undefined,
-  });
+  const [newLease, setNewLease] = useState<ManualLeaseInput>({});
+  const [saving, setSaving] = useState(false);
+  const draftId = useRef<string | null>(null);
+  const inFlight = useRef(false);
 
   const handleEdit = (lease: LeaseData) => {
     setEditingId(lease.id);
     setEditData(lease);
-  };
-
-  const handleSave = () => {
-    if (editingId && editData) {
-      onUpdate(editingId, editData);
-      setEditingId(null);
-      setEditData({});
-    }
+    setIsAdding(false);
   };
 
   const handleCancel = () => {
@@ -66,23 +60,24 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
     setEditData({});
   };
 
-  const handleAddNew = () => {
-    if (!newLease.tenant.trim() || !newLease.unit_label?.trim()) return;
-    if (!newLease.property_id || !newLease.startDate || !newLease.leaseEnd || newLease.leaseEnd < newLease.startDate) return;
-
-    onAdd(newLease);
-    
-    setNewLease({
-      tenant: "",
-      monthlyRent: 0,
-      deposit: 0,
-      startDate: null,
-      leaseEnd: null,
-      property_id: undefined,
-    });
-  
-    setIsAdding(false);
-  
+  const save = async (editing: boolean) => {
+    if (inFlight.current) return;
+    const id = editing ? editingId : draftId.current;
+    if (!id) return;
+    inFlight.current = true;
+    setSaving(true);
+    try {
+      const saved = editing ? await onUpdate(id, editData) : await onAdd(id, newLease);
+      if (!saved) return;
+      if (editing) handleCancel();
+      else {
+        setNewLease({});
+        setIsAdding(false);
+      }
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
   };
 
   return (
@@ -141,11 +136,12 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell>
                     <select
                       className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
-                      value={editData.status ?? "active"}
+                      value={editData.status ?? ""}
                       onChange={({ target: { value } }) => {
-                        if (isLeaseStatus(value)) setEditData({ ...editData, status: value });
+                        setEditData({ ...editData, status: isLeaseStatus(value) ? value : null });
                       }}
                     >
+                      <option value="">Unspecified</option>
                       <option value="active">Active</option>
                       <option value="expiring">Expiring</option>
                       <option value="vacant">Vacant</option>
@@ -155,14 +151,14 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell>
                     <Input
                       type="number"
-                      value={editData.monthlyRent || 0}
-                      onChange={(e) => setEditData({ ...editData, monthlyRent: parseFloat(e.target.value) })}
+                      aria-label="Monthly rent" value={editData.monthlyRent ?? ""}
+                      onChange={(e) => setEditData({ ...editData, monthlyRent: e.target.value })}
                       className="h-8 text-sm"
                     />
                   </TableCell>
                   <TableCell>
                     <Input
-                      type="date"
+                      type="date" aria-label="Lease start date"
                       value={editData.startDate ?? ""}
                       onChange={(e) => setEditData({ ...editData, startDate: e.target.value || null })}
                       className="h-8 text-sm"
@@ -170,7 +166,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   </TableCell>
                   <TableCell>
                     <Input
-                      type="date"
+                      type="date" aria-label="Lease end date"
                       value={editData.leaseEnd ?? ""}
                       onChange={(e) => setEditData({ ...editData, leaseEnd: e.target.value || null })}
                       className="h-8 text-sm"
@@ -179,17 +175,17 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell>
                     <Input
                       type="number"
-                      value={editData.deposit || 0}
-                      onChange={(e) => setEditData({ ...editData, deposit: parseFloat(e.target.value) })}
+                      aria-label="Deposit" value={editData.deposit ?? ""}
+                      onChange={(e) => setEditData({ ...editData, deposit: e.target.value })}
                       className="h-8 text-sm"
                     />
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={handleSave} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={() => void save(true)} aria-label="Save lease" disabled={saving} className="hover:scale-105 transition-transform">
                         <Save className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={handleCancel} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={handleCancel} aria-label="Cancel lease edit" disabled={saving} className="hover:scale-105 transition-transform">
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -204,13 +200,13 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{lease.startDate ? format(parseISO(lease.startDate), "MMM d, yyyy") : "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{lease.leaseEnd ? format(parseISO(lease.leaseEnd), "MMM d, yyyy") : "—"}</TableCell>
-                  <TableCell className="text-sm">${lease.deposit.toLocaleString()}</TableCell>
+                  <TableCell className="text-sm">{lease.deposit == null ? "—" : `$${lease.deposit.toLocaleString()}`}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} disabled={saving} className="hover:scale-105 transition-transform">
                         <Pencil className="h-3 w-3 mr-1" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} aria-label={`Delete lease for ${lease.tenant}`} className="hover:scale-105 transition-transform">
                         <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
                     </div>
@@ -224,7 +220,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               <TableCell className="sticky left-0 bg-primary/5 backdrop-blur-sm">
                 <Input
                   placeholder="Tenant name"
-                  value={newLease.tenant}
+                  value={newLease.tenant ?? ""}
                   onChange={(e) => setNewLease({ ...newLease, tenant: e.target.value })}
                   className="h-8 text-sm"
                 />
@@ -256,12 +252,13 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               <TableCell>
                 <select
                   className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
-                  value={newLease.status ?? "active"}
+                  value={newLease.status ?? ""}
                   onChange={({ target: { value } }) => {
-                    if (isLeaseStatus(value)) setNewLease({ ...newLease, status: value });
+                    setNewLease({ ...newLease, status: isLeaseStatus(value) ? value : null });
                   }}
                 >
-                  <option value="active">Active</option>
+                  <option value="">Unspecified</option>
+                      <option value="active">Active</option>
                   <option value="expiring">Expiring</option>
                   <option value="vacant">Vacant</option>
                   <option value="expired">Inactive</option>
@@ -271,14 +268,14 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 <Input
                   type="number"
                   placeholder="Rent"
-                  value={newLease.monthlyRent}
-                  onChange={(e) => setNewLease({ ...newLease, monthlyRent: parseFloat(e.target.value) || 0 })}
+                  aria-label="Monthly rent" value={newLease.monthlyRent ?? ""}
+                  onChange={(e) => setNewLease({ ...newLease, monthlyRent: e.target.value })}
                   className="h-8 text-sm"
                 />
               </TableCell>
               <TableCell>
                 <Input
-                  type="date"
+                  type="date" aria-label="Lease start date"
                   value={newLease.startDate ?? ""}
                   onChange={(e) => setNewLease({ ...newLease, startDate: e.target.value || null })}
                   className="h-8 text-sm"
@@ -286,7 +283,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               </TableCell>
               <TableCell>
                 <Input
-                  type="date"
+                  type="date" aria-label="Lease end date"
                   value={newLease.leaseEnd ?? ""}
                   onChange={(e) => setNewLease({ ...newLease, leaseEnd: e.target.value || null })}
                   className="h-8 text-sm"
@@ -296,17 +293,17 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 <Input
                   type="number"
                   placeholder="Deposit"
-                  value={newLease.deposit}
-                  onChange={(e) => setNewLease({ ...newLease, deposit: parseFloat(e.target.value) || 0 })}
+                  aria-label="Deposit" value={newLease.deposit ?? ""}
+                  onChange={(e) => setNewLease({ ...newLease, deposit: e.target.value })}
                   className="h-8 text-sm"
                 />
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={handleAddNew} disabled={!newLease.property_id || !newLease.tenant.trim() || !newLease.unit_label?.trim()} className="hover:scale-105 transition-transform">
+                  <Button variant="ghost" size="sm" onClick={() => void save(false)} aria-label="Save lease" disabled={saving} className="hover:scale-105 transition-transform">
                     <Save className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)} className="hover:scale-105 transition-transform">
+                  <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)} aria-label="Cancel new lease" disabled={saving} className="hover:scale-105 transition-transform">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -318,7 +315,12 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
       </div>
       {!isAdding && (
         <div className="p-3 border-t border-border">
-          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)} className="w-full hover:scale-105 transition-transform">
+          <Button variant="outline" size="sm" disabled={saving} onClick={() => {
+            draftId.current = crypto.randomUUID();
+            setNewLease({});
+            handleCancel();
+            setIsAdding(true);
+          }} className="w-full hover:scale-105 transition-transform">
             <Plus className="h-4 w-4 mr-2" />
             Add New Lease
           </Button>

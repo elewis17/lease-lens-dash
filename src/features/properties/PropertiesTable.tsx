@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,8 @@ export type Property = {
 
 export interface PropertiesTableProps {
   properties: Property[];
-  onAdd: (data: Omit<Property, "id">) => void;
-  onUpdate: (id: string, data: Partial<Property>) => void;
+  onAdd: (data: Partial<Property>) => Promise<boolean>;
+  onUpdate: (id: string, data: Partial<Property>) => Promise<boolean>;
   onDelete: (id: string) => void;
   escrowByProperty?: Record<string, boolean>; // NEW
 }
@@ -47,14 +47,15 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
   const [isAdding, setIsAdding] = useState(false);
   const [editData, setEditData] = useState<Partial<Property>>({});
 
-  const aliasSet = useMemo(() => new Set(properties.map(p => p.alias.trim().toLowerCase())), [properties]);
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
 
   const startEdit = (row: Property) => {
     setEditingId(row.id);
     setEditData({
       alias: row.alias,
       address: row.address ?? "",
-      type: row.type ?? "Single-Family",
+      type: row.type,
       sale_price: row.sale_price ?? null,
       property_value: row.property_value ?? null,
       property_taxes: row.property_taxes ?? undefined,
@@ -71,41 +72,17 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
     setIsAdding(false);
   };
 
-  const saveEdit = () => {
-    if (!editingId) return;
-    const alias = (editData.alias ?? "").trim();
-    if (!alias) return;
-    // uniqueness check (allow keeping same alias on current row)
-    const currentAlias = properties.find(p => p.id === editingId)?.alias?.trim().toLowerCase();
-    const taken = aliasSet.has(alias.toLowerCase()) && alias.toLowerCase() !== currentAlias;
-    if (taken) return;
-
-    onUpdate(editingId, {
-      ...editData,
-      insurance: editData.insurance ?? null,
-      property_taxes: editData.property_taxes ?? null,
-    });
-    cancelEdit();
-  };
-
-  const saveAdd = () => {
-    const alias = (editData.alias ?? "").trim();
-    if (!alias) return;
-    if (aliasSet.has(alias.toLowerCase())) return;
-
-    onAdd({
-      alias,
-      address: (editData.address as string) || null,
-      type: (editData.type as PropertyType) || "Single-Family",
-      sale_price: editData.sale_price ?? null,
-      property_value: editData.property_value ?? null,
-      insurance: editData.insurance ?? null,
-      property_taxes: editData.property_taxes ?? null,
-      mgmt_pct: editData.mgmt_pct ?? null,
-      vacancy_pct: editData.vacancy_pct ?? null,
-      maintenance_pct: editData.maintenance_pct ?? null,
-    });
-    cancelEdit();
+  const save = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true);
+    try {
+      const saved = editingId ? await onUpdate(editingId, editData) : await onAdd(editData);
+      if (saved) cancelEdit();
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
   };
 
   return (
@@ -173,16 +150,17 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     <TableCell className="px-4 py-2">
                       <select
                         className="h-8 w-full rounded-md border border-input bg-background px-2"
-                        value={(editData.type as PropertyType) ?? "Single-Family"}
-                        onChange={(e) => setEditData({ ...editData, type: e.target.value as PropertyType })}
+                        value={editData.type ?? ""}
+                        onChange={(e) => setEditData({ ...editData, type: e.target.value || null })}
                       >
+                        <option value="">Select type…</option>
                         {["Single-Family","Multi-Family","Commercial","Industrial"].map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </TableCell>
                     <TableCell className="px-4 py-2">
                       <Input
                         type="number"
-                        value={editData.sale_price ?? ""}
+                        aria-label="Purchase price" value={editData.sale_price ?? ""}
                         onChange={(e) => {
                           const v = e.target.value ? Number(e.target.value) : undefined;
                           setEditData(ed => ({ ...ed, sale_price: v ?? null }));
@@ -196,7 +174,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                         onChange={event => setEditData({ ...editData, property_value: event.target.value === "" ? null : Number(event.target.value) })} className="h-8" />
                     </TableCell>
                     <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
+                      <Input type="number" aria-label="Vacancy percentage" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
                     </TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex items-center gap-2">
@@ -205,7 +183,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                           return (
                             <Input
                               type="number"
-                              value={escrowed ? "" : (editData.property_taxes ?? "")}
+                              aria-label="Annual taxes" value={escrowed ? "" : (editData.property_taxes ?? "")}
                               onChange={(e) =>
                                 setEditData({
                                   ...editData,
@@ -227,7 +205,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                         return (
                           <Input
                             type="number"
-                            value={escrowed ? "" : (editData.insurance ?? "")}
+                            aria-label="Annual insurance" value={escrowed ? "" : (editData.insurance ?? "")}
                             onChange={(e) =>
                               setEditData({
                                 ...editData,
@@ -242,15 +220,15 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                       })()}
                     </TableCell>
                     <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
+                      <Input type="number" aria-label="Management percentage" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
                     </TableCell>          
                     <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
+                      <Input type="number" aria-label="Maintenance percentage" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
                     </TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={save} aria-label="Save property" disabled={saving}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEdit} aria-label="Cancel property edit" disabled={saving}><X className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </>
@@ -300,8 +278,8 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     <TableCell className="px-4 py-2">{pct(p.maintenance_pct ?? undefined)}</TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => onDelete(p.id)} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)} disabled={saving}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => onDelete(p.id)} aria-label={`Delete property ${p.alias}`} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </>
@@ -330,10 +308,11 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                 <TableCell className="px-4 py-2">
                   <select
                     className="h-8 w-full rounded-md border border-input bg-background px-2"
-                    value={(editData.type as PropertyType) ?? "Single-Family"}
-                    onChange={(e) => setEditData({ ...editData, type: e.target.value as PropertyType })}
+                    value={editData.type ?? ""}
+                    onChange={(e) => setEditData({ ...editData, type: e.target.value || null })}
                   >
-                    {["Single-Family","Multi-Family","Commercial","Industrial"].map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="">Select type…</option>
+                        {["Single-Family","Multi-Family","Commercial","Industrial"].map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </TableCell>
                 <TableCell className="px-4 py-2">
@@ -352,7 +331,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                       <Input aria-label="Current value estimate" type="number" min="0" value={editData.property_value ?? ""}
                         onChange={event => setEditData({ ...editData, property_value: event.target.value === "" ? null : Number(event.target.value) })} className="h-8" />
                     </TableCell>
-                    <TableCell className="px-4 py-2"><Input type="number" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
+                    <TableCell className="px-4 py-2"><Input type="number" aria-label="Vacancy percentage" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2">
                   <div className="flex items-center gap-2">
                     {(() => {
@@ -361,7 +340,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                       return (
                         <Input
                           type="number"
-                          value={escrowed ? "" : (editData.property_taxes ?? "")}
+                          aria-label="Annual taxes" value={escrowed ? "" : (editData.property_taxes ?? "")}
                           onChange={(e) =>
                             setEditData({
                               ...editData,
@@ -381,7 +360,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                 <TableCell className="px-4 py-2">
                   <Input
                     type="number"
-                    value={editData.insurance ?? ""}
+                    aria-label="Annual insurance" value={editData.insurance ?? ""}
                     onChange={(e) =>
                       setEditData({
                         ...editData,
@@ -392,12 +371,12 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     placeholder=""
                   />
                 </TableCell>
-                <TableCell className="px-4 py-2"><Input type="number" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
-                <TableCell className="px-4 py-2"><Input type="number" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
+                <TableCell className="px-4 py-2"><Input type="number" aria-label="Management percentage" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
+                <TableCell className="px-4 py-2"><Input type="number" aria-label="Maintenance percentage" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2">
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="ghost" onClick={saveAdd}><Check className="h-4 w-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={save} aria-label="Save property" disabled={saving}><Check className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={cancelEdit} aria-label="Cancel property edit" disabled={saving}><X className="h-4 w-4" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -411,9 +390,10 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
           <Button
             size="sm"
             variant="outline"
+            disabled={saving}
             onClick={() => {
               setIsAdding(true) ;
-              setEditData({ type: "Single-Family", mgmt_pct: 8, vacancy_pct: 5, maintenance_pct: 5 });
+              setEditData({});
             }}
             className="w-full hover:scale-105 transition-transform"//"shadow-sm"
           >

@@ -556,6 +556,40 @@ export type Database = {
       }
     }
     Functions: {
+      confirm_parsed_lease: {
+        Args: {
+          p_lease_id: string
+          p_property_id: string
+          p_unit_label: string
+          p_tenant_name: string
+          p_start_date: string
+          p_end_date: string
+          p_monthly_rent: number
+          p_deposit: number | null
+          p_late_fee: number | null
+          p_grace_days: number | null
+          p_notice_days: number | null
+          p_doc_path: string
+          p_parsed: Json
+          p_confidence: Json
+        }
+        Returns: string
+      }
+      save_manual_lease: {
+        Args: {
+          p_lease_id: string
+          p_edit: boolean
+          p_property_id: string
+          p_unit_label: string
+          p_tenant_name: string
+          p_start_date: string
+          p_end_date: string
+          p_monthly_rent: number
+          p_deposit: number | null
+          p_status: Database["public"]["Enums"]["lease_status"] | null
+        }
+        Returns: string
+      }
       update_property_unit_count: {
         Args: { target_property: string }
         Returns: number

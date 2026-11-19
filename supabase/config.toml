@@ -1,1 +1,4 @@
 project_id = "yndickmijniiyvnpyljm"
+[functions.parse-lease]
+entrypoint = "./functions/parse-lease/index.ts"
+verify_jwt = false
