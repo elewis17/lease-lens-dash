@@ -1,3 +1,5 @@
+import { useSessionState } from "@/features/navigation/sessionState";
+import { CapitalOpportunities } from "@/features/capital/CapitalOpportunities";
 import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,10 +15,13 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
   sessionKey: string;
   rentScenario: (increase: number) => PortfolioMetrics;
 }) {
+  const [termYears, setTermYears] = useSessionState(`${scenarios.sessionKey}:termYears`, "");
+  const [costPct, setCostPct] = useSessionState(`${scenarios.sessionKey}:costPct`, "");
+
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
-        <h1 className="text-3xl font-semibold">Portfolio Decisions</h1>
+        <h1 className="text-3xl font-semibold">Where should the next dollar go?</h1>
         <p className="text-muted-foreground">Add records in the Data Room to compare assets and model changes.</p>
         <Button onClick={onAddData}>Open Data Room</Button>
       </section>
@@ -32,9 +37,11 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
   return (
     <section className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold">Portfolio Decisions</h1>
+        <h1 className="text-3xl font-semibold">Where should the next dollar go?</h1>
         <VerdictExplanation {...metrics.verdict} />
       </header>
+      <CapitalOpportunities assets={metrics.assets} sessionKey={scenarios.sessionKey}
+        quote={{ rate: scenarios.marketRate, years: termYears, cost: costPct }} />
       <dl className="grid gap-3 sm:grid-cols-3">
         {[
           ["Monthly cash flow", money(metrics.cashFlow)],
@@ -63,7 +70,8 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
           </table>
         </div>
       </Card>
-      <PortfolioWhatIf metrics={metrics} {...scenarios} />
+      <PortfolioWhatIf metrics={metrics} {...scenarios}
+        termYears={termYears} setTermYears={setTermYears} costPct={costPct} setCostPct={setCostPct} />
     </section>
   );
 }

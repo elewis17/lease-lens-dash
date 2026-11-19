@@ -5,15 +5,17 @@ import { money, coverage } from "@/domain/finance/format";
 import { refinance } from "@/domain/finance/scenarios";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 
-export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentScenario, sessionKey }: {
+export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentScenario, sessionKey, termYears, setTermYears, costPct, setCostPct }: {
   metrics: PortfolioMetrics;
   marketRate: string;
   onMarketRateChange: (rate: string) => void;
   sessionKey: string;
+  termYears: string;
+  setTermYears: (term: string) => void;
+  costPct: string;
+  setCostPct: (cost: string) => void;
   rentScenario: (increase: number) => PortfolioMetrics;
 }) {
-  const [termYears, setTermYears] = useSessionState(`${sessionKey}:termYears`, "");
-  const [costPct, setCostPct] = useSessionState(`${sessionKey}:costPct`, "");
   const [rentPct, setRentPct] = useSessionState(`${sessionKey}:rentPct`, "");
   const [buildingBasis, setBuildingBasis] = useSessionState(`${sessionKey}:buildingBasis`, "");
   const [eligibleShare, setEligibleShare] = useSessionState(`${sessionKey}:eligibleShare`, "");

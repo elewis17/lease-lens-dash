@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { capitalOpportunities, rankCapitalOpportunities } from "../src/domain/finance/capital.ts";
 import { isActiveLease } from "../src/domain/finance/activeLeases.ts";
 import { defaultThresholds } from "../src/domain/finance/thresholds.ts";
 import { kirkwoodExample, modelDeal, priceGates, solveIrr } from "../src/domain/finance/underwriting.ts";
@@ -214,4 +215,31 @@ test("refinance uses all balances and shows net first-year cash after closing co
   const refi = refinance(metrics, 6.25, 360, 2);
   assert.equal(refi.closingCosts, 28000);
   assert.equal(Math.round(refi.firstYearNet), Math.round(refi.annualRunRateImpact - 28000));
+});
+
+test("Capital ranks refinance scenarios by separate cash, net worth, and coverage objectives", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const { assets } = modelPortfolio(record.properties, record, reviewDate, 5);
+  const actionRows = capitalOpportunities(assets, { rate: "5", years: "25", cost: "2" });
+  const first = objective => rankCapitalOpportunities(actionRows, objective)[0].title;
+  assert.equal(first("cash"), "Refinance North Ave Fourplex");
+  assert.equal(first("wealth"), "Refinance Monroe Duplex");
+  assert.equal(first("risk"), "Refinance Ponce Cottage");
+  const ponce = actionRows.find(row => row.title === "Refinance Ponce Cottage").refinance;
+  assert.equal(ponce.closingCosts, 3900);
+  assert.equal(Math.round(ponce.firstYearNet), -189);
+  assert.equal(Math.round(ponce.cash), 33212);
+  assert.equal(Math.round(ponce.wealth), 40403);
+  assert.equal(ponce.risk.toFixed(2), "0.43");
+  assert.equal(actionRows.find(row => row.action === "vacancy").refinance, null);
+  assert.equal(actionRows.find(row => row.action === "sale").refinance, null);
+});
+
+test("Capital preserves missing refinance costs and treats zero-cost cash yield as undefined", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const { assets } = modelPortfolio(record.properties, record, reviewDate, 6.25);
+  const missing = capitalOpportunities(assets, { rate: "6.25", years: "30", cost: " " });
+  assert.equal(missing.find(row => row.action === "refinance").refinance, null);
+  const noCost = capitalOpportunities(assets, { rate: "6.25", years: "30", cost: "0" });
+  assert.equal(noCost.find(row => row.action === "refinance").refinance.cashYield, null);
 });

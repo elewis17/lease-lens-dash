@@ -3,7 +3,9 @@ import { MetricsCalculator } from "./MetricsCalculator.ts";
 import { sumKnown, type PortfolioMetrics } from "./portfolio.ts";
 import { monthlyPayment } from "./underwriting.ts";
 
-export function refinance(metrics: PortfolioMetrics, ratePct: number, termMonths: number, closingCostPct: number) {
+type RefinanceInputs = Pick<PortfolioMetrics, "debt" | "debtService" | "loans" | "noi">;
+
+export function refinance(metrics: RefinanceInputs, ratePct: number, termMonths: number, closingCostPct: number) {
   if (![ratePct, closingCostPct].every(value => Number.isFinite(value) && value >= 0) ||
       !Number.isSafeInteger(termMonths) || termMonths <= 0 ||
       metrics.debt === null || metrics.debt <= 0 || metrics.debtService === null || metrics.loans === null ||
