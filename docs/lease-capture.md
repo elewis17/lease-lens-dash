@@ -4,7 +4,9 @@ Open Data Room and select **Upload lease**. Photos in JPEG, PNG, or WebP and PDF
 
 The review shows the extracted values and available field-level confidence. Unknown optional terms stay empty. Confirming stores the original file under the owner's private storage prefix. An owner-scoped database function then writes the lease, tenant, unit association, raw extracted fields, and extraction confidence together. It recalculates the property's unit count in the same transaction. The request ID makes a repeat confirmation safe. If a file upload succeeded but the database save failed, retry confirmation with the same capture to reuse the private object. A capture abandoned after a failed save can leave a private, unlinked object.
 
-The server uses Gemini's native binary input for PDFs and photos. Only its server-side key is needed. The application warns about sending the chosen document to the extraction provider before upload.
+The server uses Gemini 3.5 Flash-Lite's native binary input for PDFs and photos. Google lists it as the replacement for Gemini 2.5 Flash and documents PDF, image, and structured-output support. [Google model documentation](https://aistudio.google.com/docs/models/gemini-3.5-flash-lite) Only its server-side key is needed. The application warns about sending the chosen document to the extraction provider before upload.
+
+Lovable manages a project-specific key for its built-in connector. The original DealStack gateway request sent text. Lovable documents PDF field extraction explicitly for Claude on newer TanStack Start apps. This repository uses React and Vite. The documentation leaves PDF request support for this repository's earlier Gemini gateway unverified. [Lovable chat model documentation](https://docs.lovable.dev/features/ai-chat)
 
 ## Preview and staging
 

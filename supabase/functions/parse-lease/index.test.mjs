@@ -81,14 +81,21 @@ test("authenticated PDF and PNG are sent as bytes and only expected fields retur
         assert.equal(options.headers.Authorization, "Bearer session-example");
         return Response.json({ id: "owner" });
       }
-      const { contents } = JSON.parse(options.body);
+      assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent");
+      const { contents, generationConfig } = JSON.parse(options.body);
+      assert.equal(generationConfig.responseMimeType, "application/json");
       const input = contents[0].parts[0].inlineData;
       assert.equal(input.mimeType, type);
       assert.equal(input.data, file.toString("base64"));
-      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+      const result = JSON.stringify({
         tenantName: "Sample Tenant", monthlyRent: 1450, deposit: 0, arbitrary: "ignored",
         confidence: { tenantName: 0.9, monthlyRent: 1.1, deposit: 0.7 },
-      }) }] } }] });
+      });
+      return Response.json({ candidates: [{ content: { parts: [
+        { text: "Internal thought", thought: true },
+        { text: result.slice(0, 22) },
+        { text: result.slice(22) },
+      ] } }] });
     });
     const response = await handler(makeRequest({ type, file }));
     assert.equal(response.status, 200);

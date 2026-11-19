@@ -124,7 +124,7 @@ export function createParseHandler(env: Env, requestFetch: typeof fetch = fetch)
 
       const key = env("GEMINI_API_KEY");
       if (!key) throw new Error();
-      const extraction = await requestFetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+      const extraction = await requestFetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent", {
         method: "POST",
         headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
         signal: AbortSignal.timeout(45000),
@@ -147,7 +147,8 @@ export function createParseHandler(env: Env, requestFetch: typeof fetch = fetch)
       if (extraction.status === 429) return reply({ error: "Lease extraction is busy. Try again." }, 429);
       if (!extraction.ok) throw new Error();
       const result = await extraction.json();
-      const output = result.candidates?.[0]?.content?.parts?.find((part: { text?: string }) => part.text)?.text;
+      const candidateParts = result.candidates?.[0]?.content?.parts as { text?: string; thought?: boolean }[] | undefined;
+      const output = candidateParts?.map(part => part.thought ? "" : part.text ?? "").join("");
       if (!output || output.length > 20000) throw new Error();
       return reply(safeResult(JSON.parse(output)));
     } catch {
