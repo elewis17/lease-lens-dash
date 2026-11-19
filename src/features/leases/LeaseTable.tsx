@@ -14,6 +14,7 @@ const isLeaseStatus = (value: string): value is LeaseStatus =>
 export interface LeaseData {
   id: string;
   tenant: string;
+  documentPath?: string | null;
   monthlyRent: number;
   deposit: number | null;
   startDate: string | null;
@@ -25,7 +26,7 @@ export interface LeaseData {
   unit_label?: string | null; // from units table (joined in Index.tsx)
 }
 
-export type ManualLeaseInput = Partial<Omit<LeaseData, "id" | "monthlyRent" | "deposit">> & {
+export type ManualLeaseInput = Partial<Omit<LeaseData, "id" | "monthlyRent" | "deposit" | "documentPath">> & {
   monthlyRent?: number | string;
   deposit?: number | string | null;
 };

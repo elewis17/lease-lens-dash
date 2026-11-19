@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
@@ -12,6 +12,7 @@ type DataRoomProps = {
   selectedProperty: string;
   onLeaseCaptured: () => Promise<void>;
   filteredProperties: Property[];
+  renderPropertyName: (property: Property) => ReactNode;
   filteredLeases: LeaseData[];
   filteredMortgages: Mortgage[];
   mortgages: Mortgage[];
@@ -64,6 +65,7 @@ export default function DataRoom({
   selectedProperty,
   onLeaseCaptured,
   filteredProperties,
+  renderPropertyName,
   filteredLeases,
   filteredMortgages,
   mortgages,
@@ -166,6 +168,7 @@ export default function DataRoom({
         </div>
         <PropertiesTable
           properties={filteredProperties}
+          renderName={renderPropertyName}
           onAdd={onAddProperty}
           onUpdate={onUpdateProperty}
           onDelete={onDeleteProperty}

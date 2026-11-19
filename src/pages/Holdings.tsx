@@ -1,3 +1,4 @@
+import { PropertyRecord } from "@/features/properties/PropertyRecord";
 import DataRoom from "./DataRoom";
 import { PortfolioStatus } from "@/features/portfolio/PortfolioStatus";
 import { useRecordActions } from "@/features/portfolio/useRecordActions";
@@ -19,6 +20,9 @@ export default function Holdings() {
         selectedProperty={selectedProperty}
         onLeaseCaptured={query.refresh}
         filteredProperties={filteredProperties}
+        renderPropertyName={property => (
+          <PropertyRecord ownerId={userId} property={property} portfolio={query.portfolio} />
+        )}
         filteredLeases={filteredLeases}
         filteredMortgages={filteredMortgages}
         mortgages={mortgages}

@@ -54,3 +54,19 @@ export async function saveCapturedLease(capture: LeaseCapture, review: LeaseRevi
   });
   if (error || data !== capture.id) throw new Error("The lease could not be saved. Check the selected property and confirm again.");
 }
+
+export async function downloadCapturedLease(ownerId: string, path: string) {
+  await signedInOwner(ownerId);
+  const relative = path.startsWith(`${ownerId}/`) ? path.slice(ownerId.length + 1) : "";
+  if (!/^[0-9a-f-]{36}\/lease\.(pdf|jpg|jpeg|png|webp)$/i.test(relative)) {
+    throw new Error("The recorded document reference is unavailable.");
+  }
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error || !data) throw new Error("The lease document could not be loaded. Try again.");
+  const url = URL.createObjectURL(data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = relative.split("/")[1];
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

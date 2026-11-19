@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ export type Property = {
   address: string | null;
   type: string | null;
   sale_price: number | null;
+  purchase_price?: number | null;
   property_value?: number | null;
   rent_growth_rate?: number | null;
   opex_inflation_rate?: number | null;
@@ -29,6 +30,8 @@ export type Property = {
 
 export interface PropertiesTableProps {
   properties: Property[];
+  readOnly?: boolean;
+  renderName: (property: Property) => ReactNode;
   onAdd: (data: Partial<Property>) => Promise<boolean>;
   onUpdate: (id: string, data: Partial<Property>) => Promise<boolean>;
   onDelete: (id: string) => void;
@@ -40,7 +43,7 @@ const fmtMoney = (n?: number | null) =>
 
 const pct = (n?: number | null) => (n == null || isNaN(n) ? "—" : `${n}%`);
 
-export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete, escrowByProperty}: PropertiesTableProps) {
+export default function PropertiesTable({ properties, renderName, readOnly = false, onAdd, onUpdate, onDelete, escrowByProperty}: PropertiesTableProps) {
   const escrowMap = escrowByProperty ?? {}; // optional default
   const isEscrowed = (propertyId?: string | null) => !!(propertyId && escrowMap[propertyId]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -234,7 +237,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                   </>
                 ) : (
                   <>
-                    <TableCell className="px-4 py-2 font-medium">{p.alias}</TableCell>
+                    <TableCell className="px-4 py-2 font-medium">{renderName(p)}</TableCell>
                     <TableCell className="px-4 py-2">{p.address ?? "—"}</TableCell>
                     <TableCell className="px-4 py-2">{p.type ?? "—"}</TableCell>
                     <TableCell className="px-4 py-2">{fmtMoney(p.sale_price ?? undefined)}</TableCell>
@@ -278,8 +281,8 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     <TableCell className="px-4 py-2">{pct(p.maintenance_pct ?? undefined)}</TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)} disabled={saving}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => onDelete(p.id)} aria-label={`Delete property ${p.alias}`} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)} disabled={saving || readOnly} aria-label={`Edit property ${p.alias}`}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => onDelete(p.id)} disabled={saving || readOnly} aria-label={`Delete property ${p.alias}`} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </>
@@ -390,7 +393,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
           <Button
             size="sm"
             variant="outline"
-            disabled={saving}
+            disabled={saving || readOnly}
             onClick={() => {
               setIsAdding(true) ;
               setEditData({});

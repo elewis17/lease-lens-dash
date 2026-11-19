@@ -29,6 +29,7 @@ function toProperty(property: Tables<"properties">): Property {
     alias: property.alias ?? property.name ?? property.address,
     address: property.address,
     type: property.type,
+    purchase_price: property.purchase_price,
     sale_price: property.purchase_price ?? property.sale_price,
     property_value: property.property_value,
     property_taxes: property.property_taxes,
@@ -64,7 +65,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     readAll("expenses", (start, end) => supabase.from("expenses").select("property_id, unit_id, date, amount, category")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("leases", (start, end) => supabase.from("leases")
-      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), unit_id")
+      .select("id, monthly_rent, status, start_date, end_date, deposit, doc_url, tenant:tenants(name), unit_id")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("payments", (start, end) => supabase.from("payments").select("lease_id, due_date, amount_due, paid_date, paid_amount")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
@@ -80,6 +81,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     tenant: lease.tenant?.name ?? "Unknown",
     monthlyRent: lease.monthly_rent,
     deposit: lease.deposit ?? null,
+    documentPath: lease.doc_url ?? null,
     startDate: lease.start_date,
     leaseEnd: lease.end_date,
     status: lease.status,
