@@ -2,6 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (() => {
+        let preference;
+        try { preference = localStorage.getItem("theme"); } catch {}
+        const theme = preference === "dark" || preference === "light"
+          ? preference : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.classList.add(theme);
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DealStack | AI Decision Engine</title>
     <meta name="description" content="Underwrite deals, evaluate portfolios, and allocate capital with confidence. DealStack is the decision engine for real estate investors and private equity teams." />

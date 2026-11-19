@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { useAuth } from "@/context/auth";
 import { rememberWorkspaceLocation } from "@/features/navigation/sessionState";
 import UserMenu from "@/components/ui/UserMenu";
@@ -9,23 +9,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user } = useAuth();
 
-  // Theme state (light / dark)
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem("theme") || "light"
-  );
-
-  useEffect(() => {
-    // Apply theme to <html>
-    document.documentElement.classList.remove("light", "dark");
-    document.documentElement.classList.add(theme);
-
-    // Persist
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+  const { resolvedTheme, setTheme } = useTheme();
+  const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors">
@@ -44,10 +29,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3">
           {/* THEME TOGGLE (pill shaped) */}
           <button
-            onClick={toggleTheme}
+            type="button"
+            onClick={() => setTheme(nextTheme)}
             className="px-4 py-1.5 rounded-full border border-border text-sm transition-colors bg-card text-card-foreground"
           >
-            {theme === "dark" ? "Dark Mode" : "Light Mode"}
+            Use {nextTheme} theme
           </button>
 
           {/* Log In button – only when logged out */}
