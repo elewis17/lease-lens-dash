@@ -1,5 +1,4 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { StatementCapture } from "@/features/leases/StatementCapture";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
@@ -30,37 +29,6 @@ type DataRoomProps = {
   onDeleteMortgage: (id: string) => void;
 };
 
-const DataSignal = ({
-  icon: Icon,
-  title,
-  value,
-  cue,
-  description,
-}: {
-  icon: React.ElementType;
-  title: string;
-  value: string | number;
-  cue: string;
-  description: string;
-}) => (
-  <div className="rounded-xl bg-muted/30 p-4">
-    <div className="flex items-start gap-3">
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Icon className="h-4 w-4" />
-      </span>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-foreground">{value} {title}</p>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {cue}
-          </span>
-        </div>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  </div>
-);
-
 export default function DataRoom({
   ownerId,
   selectedProperty,
@@ -90,73 +58,10 @@ export default function DataRoom({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-[28px] border bg-card p-6 sm:p-8 text-foreground">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground">
-              <Database className="h-4 w-4" />
-              Data Room
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">Decision Data Room</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              The source data behind underwriting, portfolio decisions, investment memos, and valuation support.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 rounded-2xl bg-muted p-4 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Properties</p>
-              <p className="text-2xl font-bold">{filteredProperties.length}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Leases</p>
-              <p className="text-2xl font-bold">{filteredLeases.length}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Mortgages</p>
-              <p className="text-2xl font-bold">{filteredMortgages.length}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Decision-ready data signals</h2>
-            <p className="text-sm text-muted-foreground">
-              These cues show how each dataset supports the rest of the system.
-            </p>
-          </div>
-          <span className="w-fit rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            feeds underwriting + memo
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <DataSignal
-            icon={Home}
-            value={filteredProperties.length}
-            title="properties"
-            cue="used in snapshot"
-            description="Property value, type, taxes, insurance, vacancy, and maintenance assumptions drive portfolio value and operating reality."
-          />
-          <DataSignal
-            icon={FileText}
-            value={filteredLeases.length}
-            title="leases"
-            cue="supports rent quality"
-            description="Lease records feed contracted rent, occupancy, and estimated cash flow."
-          />
-          <DataSignal
-            icon={Landmark}
-            value={filteredMortgages.length}
-            title="mortgages"
-            cue="feeds debt stress"
-            description="Debt balances, payments, rates, and escrow flags drive DSCR, cash flow, and coverage."
-          />
-        </div>
-      </section>
+      <header className="space-y-2">
+        <h1 className="text-3xl font-semibold">Holdings</h1>
+        <p className="text-sm text-muted-foreground">Open a property to review its records and sources.</p>
+      </header>
 
       <section className="space-y-3">
         <div>

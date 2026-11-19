@@ -44,11 +44,36 @@ function modelRefinance(asset: AssetMetrics, quote: RefinanceQuote) {
   };
 }
 
+export type RentPlan = { rent: string; expenses: string; cost: string; start: string };
+export const emptyRentPlan: RentPlan = { rent: "", expenses: "", cost: "", start: "" };
+
+export function modelRentPlan(asset: AssetMetrics, inputs: RentPlan) {
+  const raw = [inputs.rent, inputs.expenses, inputs.cost, inputs.start];
+  if (raw.some(value => value.trim() === "" || !Number.isFinite(Number(value)) || Number(value) < 0)) return null;
+  const [rent, expenses, closingCosts, start] = raw.map(Number);
+  if (!Number.isInteger(start) || start > 12) return null;
+  const monthlyNoi = rent - expenses;
+  const annualRunRateImpact = monthlyNoi * 12;
+  const firstYearCash = (12 - start) * monthlyNoi;
+  const cash = (capitalHorizonYears * 12 - start) * monthlyNoi - closingCosts;
+  if (![annualRunRateImpact, firstYearCash, cash].every(Number.isFinite)) return null;
+  return {
+    closingCosts, start, monthlyNoi, annualRunRateImpact, firstYearNet: firstYearCash - closingCosts,
+    cash, wealth: cash, risk: asset.debtService !== null && asset.debtService > 0 ? monthlyNoi / asset.debtService : null,
+    cashYield: closingCosts > 0 ? firstYearCash / closingCosts : null,
+  };
+}
+
 const opportunityDetails = {
   refinance: {
     name: "Refinance",
     risk: "An indicative rate can change. A longer term may increase the balance still owed, even if the monthly payment falls.",
     missing: "Confirm a property-specific rate, term, fees, and any prepayment charges.",
+  },
+  rent: {
+    name: "Reset rents at",
+    risk: "Renewal timing, concessions, and turnover may change the realized rent increase.",
+    missing: "Confirm rents against comparable listings and current leases before acting.",
   },
   vacancy: {
     name: "Fill vacancy at",
@@ -71,30 +96,37 @@ export type CapitalOpportunity = {
   risk: string;
   missing: string;
   refinance: ReturnType<typeof modelRefinance>;
+  rentPlan?: ReturnType<typeof modelRentPlan>;
 };
 
-export function capitalOpportunities(assets: AssetMetrics[], quote: RefinanceQuote): CapitalOpportunity[] {
+export function capitalOpportunities(assets: AssetMetrics[], quote: RefinanceQuote, rentPlans: Readonly<Record<string, RentPlan>> = {}): CapitalOpportunity[] {
   const result: CapitalOpportunity[] = [];
   for (const asset of assets) {
     const add = (action: Action) => {
       const { name, risk, missing } = opportunityDetails[action];
+      const id = `${asset.property.id}:${action}`;
+      const inputs = rentPlans[id];
       result.push({
-        id: `${asset.property.id}:${action}`,
+        id,
+        rentPlan: inputs && (action === "vacancy" || action === "rent") ? modelRentPlan(asset, inputs) : null,
         action, title: `${name} ${asset.property.alias}`,
         asset, risk, missing, refinance: action === "refinance" ? modelRefinance(asset, quote) : null,
       });
     };
     if (asset.verdict.label === "Refinance candidate") add("refinance");
     if (asset.occupancy && asset.occupancy.occupiedUnits < asset.occupancy.totalUnits) add("vacancy");
+    if (rentPlans[asset.property.id + ":rent"] && (asset.expectedRent ?? 0) > 0) add("rent");
     if (asset.verdict.label === "Distress" || asset.verdict.label === "Sell candidate") add("sale");
   }
   return result;
 }
 
+export const capitalProjection = (action: CapitalOpportunity) => action.refinance ?? action.rentPlan ?? null;
+
 export function rankCapitalOpportunities(opportunities: CapitalOpportunity[], objective: CapitalObjective) {
   return [...opportunities].sort((a, b) => {
-    const left = a.refinance?.[objective] ?? null;
-    const right = b.refinance?.[objective] ?? null;
+    const left = capitalProjection(a)?.[objective] ?? null;
+    const right = capitalProjection(b)?.[objective] ?? null;
     if (left === null && right !== null) return 1;
     if (right === null && left !== null) return -1;
     return (right ?? 0) - (left ?? 0) || a.title.localeCompare(b.title);
@@ -125,7 +157,7 @@ export function recommendCapital(actions: CapitalOpportunity[], objective: Capit
   let remaining = deployable;
   const properties = new Set<string>();
   return rankCapitalOpportunities(actions, objective).filter(action => {
-    const projection = action.refinance;
+    const projection = capitalProjection(action);
     const property = action.asset.property.id;
     if (!projection || (projection[objective] ?? 0) <= 0 || projection.closingCosts > remaining || properties.has(property)) return false;
     remaining -= projection.closingCosts;
@@ -134,14 +166,24 @@ export function recommendCapital(actions: CapitalOpportunity[], objective: Capit
   });
 }
 
-export function combinedRefinance(actions: CapitalOpportunity[], monthsToStart: number, metrics: { noi: number | null; debtService: number | null }) {
-  if (!Number.isInteger(monthsToStart) || monthsToStart < 0 || monthsToStart > 12 || !actions.length ||
-    actions.some(action => !action.refinance || action.asset.debtService === null) || capitalConflicts(actions).length) return null;
+export function combinedCapitalPlan(actions: CapitalOpportunity[], monthsToStart: number | null, metrics: { noi: number | null; debtService: number | null }) {
+  const validRefinanceTiming = monthsToStart !== null && Number.isInteger(monthsToStart) && monthsToStart >= 0 && monthsToStart <= 12;
+  if (!actions.length || actions.some(action => !capitalProjection(action)) || capitalConflicts(actions).length) return null;
   let costs = 0;
   let runRate = 0;
   let firstYear = 0;
   let debtService = metrics.debtService;
+  let noi = metrics.noi;
   for (const action of actions) {
+    if (action.rentPlan) {
+      const { closingCosts, annualRunRateImpact, firstYearNet, monthlyNoi } = action.rentPlan;
+      costs += closingCosts;
+      runRate += annualRunRateImpact;
+      firstYear += firstYearNet;
+      if (noi !== null) noi += monthlyNoi;
+      continue;
+    }
+    if (!validRefinanceTiming || monthsToStart === null) return null;
     const model = action.refinance;
     if (!model || action.asset.debtService === null) return null;
     const activeMonths = 12 - monthsToStart;
@@ -160,10 +202,13 @@ export function combinedRefinance(actions: CapitalOpportunity[], monthsToStart: 
     firstYear += baseline - activeMonths * replacement - (activeMonths > 0 ? cost : 0);
     if (debtService !== null) debtService += replacement - action.asset.debtService;
   }
-  const dscr = metrics.noi !== null && debtService !== null && debtService > 0 ? metrics.noi / debtService : null;
+  const dscr = noi !== null && debtService !== null && debtService > 0 ? noi / debtService : null;
   return { costs, runRate, firstYear, dscr };
 }
 
+
+export type SalePlan = { price: string; costs: string; payoff: string; date: string };
+export const emptySalePlan: SalePlan = { price: "", costs: "", payoff: "", date: "" };
 
 export function netSaleProceeds(price: string, costs: string, payoff: string) {
   const parsed = [price, costs, payoff].map(value => value.trim() === "" ? NaN : Number(value));

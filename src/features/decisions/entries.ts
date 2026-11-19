@@ -24,6 +24,8 @@ const acquisition = z.object({
   projection,
 });
 const capitalProjection = z.object({
+  saleInputs: z.object({ price: z.string(), costs: z.string(), payoff: z.string(), date: z.string(), netProceeds: amount }).optional(),
+  rentInputs: z.object({ rent: z.string(), expenses: z.string(), cost: z.string(), start: z.string() }).optional(),
   quote: z.object({ rate: z.string(), years: z.string(), cost: z.string() }),
   annualCashChange: amount.nullable(), initialCost: amount.nullable(), tenYearCashChange: amount.nullable(),
   tenYearWealthChange: amount.nullable(), coverageChange: amount.nullable(),

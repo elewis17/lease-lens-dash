@@ -91,7 +91,7 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
         )}
         <PolicySettings store={context.entries} />
         <ScrollRestoration ownerId={userId} />
-        <div key={pathnameForView} className={pathnameForView.endsWith("/holdings") ? undefined : "animate-fade-in"}><Outlet context={context} /></div>
+        <div key={pathnameForView} className={/\/(holdings|underwrite)\/?$/.test(pathnameForView) ? undefined : "animate-fade-in"}><Outlet context={context} /></div>
       </div>
     </div>
   );

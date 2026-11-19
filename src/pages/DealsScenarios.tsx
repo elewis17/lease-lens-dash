@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { propertyTypes, type ThresholdPolicy } from "@/domain/finance/thresholds";
-import { modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
+import { breakEvenInputs, modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
 
 import { money as currency, ratio, percent } from "@/domain/finance/format";
 
 import { assumptionsFrom, fields, holdYears, type AssumptionInputs } from "@/features/underwriting/draft";
+import { SensitivityTable } from "@/features/underwriting/SensitivityTable";
 import { RentSensitivity } from "@/features/underwriting/RentSensitivity";
 
 function priceRange(asking: number, test: number, walkAway: number, maxOffer: number | null) {
@@ -35,6 +36,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
   const testPrice = values.testPrice ? Number(values.testPrice) : null;
   const assumptions = asking && { ...asking, price: testPrice ?? asking.price };
   const model = assumptions && modelDeal(assumptions);
+  const breakEvens = assumptions && breakEvenInputs(assumptions, policy.buy);
   const gates = assumptions && priceGates(assumptions, policy.buy, policy.lender);
   const range = asking && assumptions && gates?.walkAway != null
     ? priceRange(asking.price, assumptions.price, gates.walkAway, gates.maxOffer)
@@ -110,6 +112,14 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
           <p className="text-sm text-muted-foreground">
             Walk-away uses the {ratio(policy.lender.minimumDscr)} lender floor. Above max offer, verify rent, a rate buydown, or a larger down payment before proceeding.
           </p>
+          {model && <div className="space-y-2 border-t pt-3">
+            <h4 className="text-sm font-medium">Break-evens · Estimate</h4>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div><dt>Minimum monthly rent</dt><dd className="font-medium">{currency(breakEvens?.rent)}</dd></div>
+              <div><dt>Maximum loan rate</dt><dd className="font-medium">{breakEvens?.annualRate == null ? "—" : (breakEvens.annualRate * 100).toFixed(2) + "%"}</dd></div>
+            </dl>
+            <p className="text-xs text-muted-foreground">Moves one assumption at a time to pass both buy gates. A dash means there is no supported break-even with the other inputs fixed.</p>
+          </div>}
           {model?.dscr === null && <p className="text-sm text-muted-foreground">DSCR requires scheduled debt service.</p>}
           {model?.irr === null && <p className="text-sm text-muted-foreground">Projected cash flows do not establish a unique IRR.</p>}
         </Card>
@@ -139,6 +149,8 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
           </div>
         </Card>
       </div>
+
+      {assumptions && model && <SensitivityTable assumptions={assumptions} minimumIrr={policy.buy.minimumIrr} />}
 
       <Card className="space-y-3 p-5">
         <h3 className="text-lg font-semibold">Scenario analysis</h3>

@@ -19,7 +19,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold">Portfolio Snapshot</h1>
         <p className="text-muted-foreground">No properties yet. Add a property and its leases, operating costs, and financing to calculate the snapshot.</p>
-        <Button onClick={onAddData}>Open Data Room</Button>
+        <Button onClick={onAddData}>Open Holdings</Button>
       </section>
     );
   }

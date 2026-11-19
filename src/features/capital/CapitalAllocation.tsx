@@ -1,12 +1,12 @@
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { money, ratio } from "@/domain/finance/format";
-import { capitalBudget, capitalConflicts, combinedRefinance, recommendCapital, type CapitalObjective, type CapitalOpportunity } from "@/domain/finance/capital";
+import { capitalBudget, capitalConflicts, capitalProjection, combinedCapitalPlan, netSaleProceeds, recommendCapital, type CapitalObjective, type CapitalOpportunity, type SalePlan } from "@/domain/finance/capital";
 import { useSessionState } from "@/features/navigation/sessionState";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 
-export function CapitalAllocation({ actions, objective, sessionKey }: {
-  actions: CapitalOpportunity[]; objective: CapitalObjective; sessionKey: string;
+export function CapitalAllocation({ actions, objective, sessionKey, salePlans }: {
+  actions: CapitalOpportunity[]; objective: CapitalObjective; sessionKey: string; salePlans: Readonly<Record<string, SalePlan>>;
 }) {
   const { metrics } = useWorkspace();
   const [available, setAvailable] = useSessionState(sessionKey + ":available", "");
@@ -26,8 +26,8 @@ export function CapitalAllocation({ actions, objective, sessionKey }: {
   const selected = combinationChoices.filter(action => chosen.includes(action.id));
   const conflicts = capitalConflicts(selected);
   const start = delay.trim() ? Number(delay) : null;
-  const plan = start === null ? null : combinedRefinance(suggested, start, metrics);
-  const selectionPlan = start === null ? null : combinedRefinance(selected, start, metrics);
+  const plan = combinedCapitalPlan(suggested, start, metrics);
+  const selectionPlan = combinedCapitalPlan(selected, start, metrics);
 
   const budgetField = (label: string, value: string, change: (text: string) => void) => (
     <label className="space-y-1 text-sm">
@@ -51,16 +51,26 @@ export function CapitalAllocation({ actions, objective, sessionKey }: {
         <label className="space-y-1 text-sm"><span>Monthly capital starts</span><Input type="date" value={arrivalDate} onChange={event => setArrivalDate(event.target.value)} /></label>
       </div>
       {arrival && arrivalDate && <p className="text-sm italic">Hypothetical · If {money(Number(arrival))} arrives monthly from {arrivalDate}, it is available from that date.</p>}
+      {actions.flatMap(action => {
+        const sale = salePlans[action.id];
+        if (!sale || action.action !== "sale") return [];
+        const proceeds = netSaleProceeds(sale.price, sale.costs, sale.payoff);
+        if (proceeds === null || proceeds <= 0) return [];
+        return [<p key={action.id} className="text-sm italic">
+          Hypothetical · {money(proceeds)} in net proceeds if {action.asset.property.alias} sells.
+          {sale.date ? " Expected " + sale.date + "." : " Closing date is unconfirmed."} The current budget excludes this amount.
+        </p>];
+      })}
       <div className="space-y-2 border-t pt-3">
         <h4 className="font-medium">Recommended allocation</h4>
         {suggested.length ? <>
           <ul className="space-y-1 text-sm">{suggested.map(action => (
-            <li key={action.id}>{action.title} · {money(action.refinance?.closingCosts)} estimated cost</li>
+            <li key={action.id}>{action.title} · {money(capitalProjection(action)?.closingCosts)} estimated cost</li>
           ))}</ul>
-          <label className="block max-w-xs space-y-1 text-sm">
+          {suggested.some(action => action.refinance) && <label className="block max-w-xs space-y-1 text-sm">
             <span>Months until modeled refinance closes</span>
             <Input type="number" min="0" max="12" step="1" value={delay} onChange={event => setDelay(event.target.value)} />
-          </label>
+          </label>}
           <PlanResult model={plan} missing="Enter timing from zero to twelve months to calculate first-year net cash." />
         </> : <p className="text-sm text-muted-foreground">No modeled opportunity with a positive result for this objective fits the current budget.</p>}
       </div>
@@ -81,11 +91,11 @@ export function CapitalAllocation({ actions, objective, sessionKey }: {
   );
 }
 
-function PlanResult({ model, missing }: { model: ReturnType<typeof combinedRefinance>; missing: string }) {
+function PlanResult({ model, missing }: { model: ReturnType<typeof combinedCapitalPlan>; missing: string }) {
   return model ? (
     <p className="text-sm italic">
-      Hypothetical · If closed on the modeled schedule: {money(model.costs)} upfront at closing, {money(model.runRate)}/yr once live,
-      {money(model.firstYear)} net in the first 12 months, and {ratio(model.dscr)} blended DSCR once live. Verify rate, fees, and timing first.
+      Hypothetical · On the modeled schedule: {money(model.costs)} upfront costs, {money(model.runRate)}/yr once live,
+      {money(model.firstYear)} net in the first 12 months, and {ratio(model.dscr)} blended DSCR once live. Verify amounts, costs, and timing first.
     </p>
   ) : <p className="text-sm text-muted-foreground">{missing}</p>;
 }

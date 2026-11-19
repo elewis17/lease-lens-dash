@@ -22,8 +22,8 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
     return (
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold">Where should the next dollar go?</h1>
-        <p className="text-muted-foreground">Add records in the Data Room to compare assets and model changes.</p>
-        <Button onClick={onAddData}>Open Data Room</Button>
+        <p className="text-muted-foreground">Add records in the Holdings to compare assets and model changes.</p>
+        <Button onClick={onAddData}>Open Holdings</Button>
       </section>
     );
   }

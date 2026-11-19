@@ -21,6 +21,11 @@ export function InvestmentPipeline() {
   const [error, setError] = useState<string | null>(null);
   const deals = currentDeals(entries.entries);
   const active = deals.find(deal => deal.payload.dealId === activeDealId);
+  const activeMatchesDraft = !!(active && dealAssumptions && active.payload.propertyType === draft.propertyType &&
+    Object.entries(active.payload.assumptions).every(([key, value]) => dealAssumptions[key as keyof typeof dealAssumptions] === value));
+  const activePrice = activeMatchesDraft && active
+    ? modelComparison(active.payload.assumptions, policyFor(active.payload.propertyType)).price : null;
+  const canSave = Boolean(dealAssumptions) && !entries.isError && !entries.isPending;
 
   const start = (next: Editor) => {
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -69,6 +74,13 @@ export function InvestmentPipeline() {
             {active ? "Save assumptions" : "Add a deal"}
           </Button>
         </div>
+      </div>
+      <div className="fixed inset-x-4 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 lg:hidden">
+        {activePrice !== null && active
+          ? <Button className="min-h-11 w-full" onClick={() => start({ mode: "offer", deal: active })}>Record offer at {money(activePrice)}</Button>
+          : <Button className="min-h-11 w-full" disabled={!canSave} onClick={() => start({ mode: "save", deal: active })}>
+              {active ? "Save assumptions" : "Save deal"}
+            </Button>}
       </div>
       {entries.isError ? (
         <p role="alert">Could not load the pipeline. <button type="button" className="underline" onClick={() => void entries.refetch()}>Try again</button></p>

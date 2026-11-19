@@ -133,3 +133,41 @@ export function priceGates(input: DealAssumptions, buy: BuyThresholds = defaultT
   const verdict = acquisitionVerdict({ dscr: model.dscr, irr: model.irr }, maxOffer, { ...defaultThresholds, buy, lender });
   return { maxOffer, walkAway, verdict } as const;
 }
+
+export function breakEvenInputs(assumptions: DealAssumptions, buy: BuyThresholds = defaultThresholds.buy) {
+  if (!modelDeal(assumptions) || assumptions.downPayment >= 1) return { rent: null, annualRate: null };
+  const passes = (candidate: DealAssumptions) => {
+    const result = modelDeal(candidate);
+    return result !== null && passesBuyGates(result, buy);
+  };
+  let rentUpper = Math.max(1, Math.ceil(assumptions.rentMonthly));
+  const rentPasses = (rentMonthly: number) => passes({ ...assumptions, rentMonthly });
+  while (rentUpper <= 100_000_000 && !rentPasses(rentUpper)) rentUpper *= 2;
+  let rent: number | null = null;
+  if (rentUpper <= 100_000_000) {
+    let low = 0;
+    while (low < rentUpper) {
+      const middle = Math.floor((low + rentUpper) / 2);
+      if (rentPasses(middle)) rentUpper = middle;
+      else low = middle + 1;
+    }
+    rent = rentUpper;
+  }
+
+  const ratePasses = (basisPoints: number) => passes({ ...assumptions, annualRate: basisPoints / 10_000 });
+  let annualRate: number | null = null;
+  if (ratePasses(0)) {
+    let low = 0;
+    let high = Math.max(100, Math.ceil(assumptions.annualRate * 10_000));
+    while (high <= 100_000 && ratePasses(high)) high *= 2;
+    if (high <= 100_000) {
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        if (ratePasses(middle)) low = middle;
+        else high = middle - 1;
+      }
+      annualRate = low / 10_000;
+    }
+  }
+  return { rent, annualRate };
+}

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { capitalOpportunities, rankCapitalOpportunities } from "../src/domain/finance/capital.ts";
+import { capitalBudget, capitalConflicts, capitalOpportunities, combinedCapitalPlan, netSaleProceeds, rankCapitalOpportunities, recommendCapital } from "../src/domain/finance/capital.ts";
 import { isActiveLease } from "../src/domain/finance/activeLeases.ts";
 import { defaultThresholds } from "../src/domain/finance/thresholds.ts";
-import { kirkwoodExample, modelDeal, priceGates, solveIrr } from "../src/domain/finance/underwriting.ts";
+import { breakEvenInputs, kirkwoodExample, modelDeal, priceGates, solveIrr } from "../src/domain/finance/underwriting.ts";
 
 test("Kirkwood reproduces the deck examples and preserves whole-dollar gate boundaries", () => {
   const deal = modelDeal(kirkwoodExample);
@@ -242,4 +242,42 @@ test("Capital preserves missing refinance costs and treats zero-cost cash yield 
   assert.equal(missing.find(row => row.action === "refinance").refinance, null);
   const noCost = capitalOpportunities(assets, { rate: "6.25", years: "30", cost: "0" });
   assert.equal(noCost.find(row => row.action === "refinance").refinance.cashYield, null);
+});
+
+
+test("underwriting break-evens clear both gates at the displayed precision", () => {
+  const { rent, annualRate } = breakEvenInputs(kirkwoodExample);
+  assert.equal(rent, 5714);
+  assert.equal(annualRate, 0.0563);
+  for (const input of [{ rentMonthly: rent }, { annualRate }]) {
+    assert.equal(priceGates({ ...kirkwoodExample, ...input }).verdict, "Buy");
+  }
+  assert.notEqual(priceGates({ ...kirkwoodExample, rentMonthly: rent - 1 }).verdict, "Buy");
+  assert.notEqual(priceGates({ ...kirkwoodExample, annualRate: 0.0564 }).verdict, "Buy");
+});
+
+test("Capital combines rent and refinance timing without spending the reserve or counting sale proceeds early", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const metrics = modelPortfolio(record.properties, record, reviewDate, 6.25);
+  const glen = metrics.assets.find(asset => asset.property.alias === "Glen Iris Triplex");
+  const monroe = metrics.assets.find(asset => asset.property.alias === "Monroe Duplex");
+  const rentPlans = {
+    [glen.property.id + ":vacancy"]: { rent: "375", expenses: "50", cost: "5000", start: "2" },
+    [monroe.property.id + ":rent"]: { rent: "360", expenses: "14.40", cost: "0", start: "1" },
+  };
+  const opportunities = capitalOpportunities(metrics.assets, { rate: "6.25", years: "24", cost: "2" }, rentPlans);
+  const budget = capitalBudget("26000", "15000");
+  const selected = recommendCapital(opportunities, "cash", budget);
+  assert.equal(selected.length, 3);
+  const plan = combinedCapitalPlan(selected, 2, metrics);
+  const individual = selected.map(action => combinedCapitalPlan([action], 2, metrics));
+  assert.equal(Math.round(plan.runRate), Math.round(individual.reduce((sum, result) => sum + result.runRate, 0)));
+  assert.equal(Math.round(plan.firstYear), Math.round(individual.reduce((sum, result) => sum + result.firstYear, 0)));
+  assert.ok(plan.costs <= budget);
+  assert.ok(plan.dscr > metrics.dscr);
+  assert.equal(netSaleProceeds("271000", "16260", "210000"), 44740);
+  const refinance = selected.find(action => action.action === "refinance");
+  const conflict = [refinance, { ...refinance, action: "sale", refinance: null }];
+  assert.ok(capitalConflicts(conflict)[0].startsWith("Conflict"));
+  assert.equal(combinedCapitalPlan(conflict, 2, metrics), null);
 });

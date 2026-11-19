@@ -33,7 +33,17 @@ export function CapitalMemo({ entry }: { entry: Entry & { payload: CapitalEntry 
       </Card>
       <Card className="space-y-3 p-4">
         <h2 className="text-lg font-semibold">Frozen assumptions</h2>
-        {projection.annualCashChange !== null
+        {projection.saleInputs ? (
+          <p className="text-sm italic">
+            Hypothetical · If sold for {money(Number(projection.saleInputs.price))}, less {money(Number(projection.saleInputs.costs))} in selling costs and a {money(Number(projection.saleInputs.payoff))} payoff,
+            net proceeds would be {money(projection.saleInputs.netProceeds)}{projection.saleInputs.date ? " at the " + projection.saleInputs.date + " closing." : " at closing."}
+          </p>
+        ) : projection.rentInputs ? (
+          <p className="text-sm italic">
+            Hypothetical · If monthly rent increases by {money(Number(projection.rentInputs.rent))}, monthly operating costs increase by {money(Number(projection.rentInputs.expenses))},
+            and rent starts after {projection.rentInputs.start} months.
+          </p>
+        ) : projection.annualCashChange !== null
           ? <p className="text-sm italic">Hypothetical · If refinanced at {projection.quote.rate}% over {projection.quote.years} years with {projection.quote.cost}% upfront costs.</p>
           : <p className="text-sm text-muted-foreground">The decision record had insufficient evidence for a modeled cash impact.</p>}
       </Card>

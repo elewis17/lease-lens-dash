@@ -120,16 +120,24 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
           <p className="text-muted-foreground">The acquisition date is unavailable.</p>
         </Section>
         <Section title="Financing">
-          {loans.length ? <ul className="space-y-2">{loans.map(loan => (
-            <li key={loan.id}>
-              <p className="font-medium">{loan.loan_name || "Mortgage"}</p>
-              <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
-              <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
-              {statements.find(statement => statement.mortgage_id === loan.id && statement.principal_balance === loan.current_balance) && (
-                <p className="text-muted-foreground">Source · Confirmed statement dated {shortDate(statements.find(statement => statement.mortgage_id === loan.id)?.statement_date ?? null)}</p>
-              )}
-            </li>
-          ))}</ul> : <p className="text-muted-foreground">No financing records.</p>}
+          {loans.length ? <ul className="space-y-2">{loans.map(loan => {
+            const source = statements.find(statement => statement.mortgage_id === loan.id);
+            const backedByStatement = source?.principal_balance === loan.current_balance && !!source;
+            const age = source ? Math.max(0, Math.floor((Date.now() - Date.parse(source.statement_date)) / 86_400_000)) : null;
+            return (
+              <li key={loan.id}>
+                <p className="font-medium">{loan.loan_name || "Mortgage"}</p>
+                <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
+                <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
+                {backedByStatement && source ? (
+                  <p className={age !== null && age > 45 ? "text-warning" : "text-muted-foreground"}>
+                    Source · Confirmed statement dated {shortDate(source.statement_date)}{age !== null ? " · " + age + " days old" : ""}
+                    {age !== null && age > 45 ? " · Check for a newer statement." : ""}
+                  </p>
+                ) : loan.current_balance != null && <p className="text-muted-foreground">Balance source date unverified.</p>}
+              </li>
+            );
+          })}</ul> : <p className="text-muted-foreground">No financing records.</p>}
         </Section>
         <Section title="Leases">
           {leases.length ? <ul className="space-y-2">{leases.map(lease => (
