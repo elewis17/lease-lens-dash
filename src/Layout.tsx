@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { rememberWorkspaceLocation } from "@/features/navigation/returnTo";
 import UserMenu from "@/components/ui/UserMenu";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   // Theme state (light / dark)
@@ -51,7 +53,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Log In button – only when logged out */}
           {!user && (
             <button
-              onClick={() => navigate("/auth/login")}
+              onClick={() => {
+                rememberWorkspaceLocation(location);
+                navigate("/auth/login");
+              }}
               className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
             >
               Sign in

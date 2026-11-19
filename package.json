@@ -9,8 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:gh": "vite build --mode gh",
-    "predeploy": "npm run build:gh && node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
+    "build:gh": "vite build --mode gh && node scripts/prepare-pages.mjs",
+    "predeploy": "npm run build:gh",
     "deploy": "gh-pages -d dist -b gh-pages",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },

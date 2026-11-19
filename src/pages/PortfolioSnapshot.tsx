@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useSessionState } from "@/features/navigation/sessionState";
 import { Input } from "@/components/ui/input";
 import { projectNextYearWealth } from "@/domain/finance/scenarios";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,10 @@ import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { coverage, money, percent } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 
-export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciation = "" }: {
-  metrics: PortfolioMetrics; onAddData: () => void; initialAppreciation?: string;
+export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciation = "", sessionKey }: {
+  metrics: PortfolioMetrics; onAddData: () => void; initialAppreciation?: string; sessionKey: string;
 }) {
-  const [appreciationRate, setAppreciationRate] = useState(initialAppreciation);
+  const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">

@@ -9,6 +9,7 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
   onAddData: () => void;
   marketRate: string;
   onMarketRateChange: (rate: string) => void;
+  sessionKey: string;
   rentScenario: (increase: number) => PortfolioMetrics;
 }) {
   if (!metrics.assets.length) {
