@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
-import { Button } from "@/components/ui/button";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { LeaseTable, type LeaseData, type ManualLeaseInput } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
@@ -16,7 +15,6 @@ type DataRoomProps = {
   filteredLeases: LeaseData[];
   filteredMortgages: Mortgage[];
   mortgages: Mortgage[];
-  properties: Property[];
   propertyOptions: PropertyOption[];
   escrowByProperty: Map<string, boolean>;
   onAddProperty: (data: Partial<Property>) => Promise<boolean>;
@@ -69,7 +67,6 @@ export default function DataRoom({
   filteredLeases,
   filteredMortgages,
   mortgages,
-  properties,
   propertyOptions,
   escrowByProperty,
   onAddProperty,
@@ -82,37 +79,11 @@ export default function DataRoom({
   onUpdateMortgage,
   onDeleteMortgage,
 }: DataRoomProps) {
-  const [showLeaseUpload, setShowLeaseUpload] = useState(false);
   const [leaseSaved, setLeaseSaved] = useState(false);
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]
   );
-
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    const compute = () => {
-      const th = el.querySelector<HTMLElement>('th.bg-rose-50\\/60, th.bg-rose-50\\/40');
-      if (!th) return;
-
-      const thRect = th.getBoundingClientRect();
-      const containerRect = el.getBoundingClientRect();
-      setPos({
-        left: thRect.left - containerRect.left + 4,
-        top: thRect.top - containerRect.top - 6,
-      });
-    };
-
-    compute();
-    window.addEventListener("resize", compute);
-    return () => window.removeEventListener("resize", compute);
-  }, [filteredProperties.length]);
-
 
   return (
     <div className="space-y-8">
@@ -193,24 +164,13 @@ export default function DataRoom({
             Supports valuation, operating assumptions, and portfolio-level decision context.
           </p>
         </div>
-        <div ref={wrapRef} className="relative">
-          {pos && (
-            <span
-              className="absolute z-20 inline-flex -translate-y-full items-center rounded-t-lg bg-rose-100 px-3 py-0.5 text-xs font-medium text-rose-700 shadow-sm pointer-events-none"
-              style={{ left: pos.left, top: pos.top }}
-            >
-              OPEX
-            </span>
-          )}
-
-          <PropertiesTable
-            properties={filteredProperties}
-            onAdd={onAddProperty}
-            onUpdate={onUpdateProperty}
-            onDelete={onDeleteProperty}
-            escrowByProperty={escrowObject}
-          />
-        </div>
+        <PropertiesTable
+          properties={filteredProperties}
+          onAdd={onAddProperty}
+          onUpdate={onUpdateProperty}
+          onDelete={onDeleteProperty}
+          escrowByProperty={escrowObject}
+        />
       </section>
 
       <section className="space-y-3">
@@ -223,22 +183,12 @@ export default function DataRoom({
           </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        {showLeaseUpload ? (
-          <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
-            onClose={() => setShowLeaseUpload(false)}
-            onUploadComplete={async () => {
-              setShowLeaseUpload(false);
-              setLeaseSaved(true);
-              await onLeaseCaptured();
-            }} />
-        ) : (
-          <Button variant="outline" disabled={!properties.length}
-            className="fixed inset-x-4 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 min-h-11 lg:static"
-            onClick={() => {
-            setLeaseSaved(false);
-            setShowLeaseUpload(true);
-          }}>Upload lease</Button>
-        )}
+        <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
+          onOpen={() => setLeaseSaved(false)}
+          onUploadComplete={async () => {
+            setLeaseSaved(true);
+            await onLeaseCaptured();
+          }} />
         <LeaseTable
           leases={filteredLeases}
           onUpdate={onUpdateLease}

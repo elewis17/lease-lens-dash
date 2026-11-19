@@ -22,7 +22,6 @@ export default function Holdings() {
         filteredLeases={filteredLeases}
         filteredMortgages={filteredMortgages}
         mortgages={mortgages}
-        properties={properties}
         propertyOptions={propertyOptions}
         escrowByProperty={escrowByProperty}
         onAddProperty={saveProperty}
