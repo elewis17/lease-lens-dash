@@ -4,6 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Pencil, Check, X, Trash2, Info } from "lucide-react";
+import { coverage, money } from "@/domain/finance/format";
+import type { AssetMetrics } from "@/domain/finance/portfolio";
 
 export type PropertyType = "Single-Family" | "Multi-Family" | "Commercial" | "Industrial";
 export type Property = {
@@ -30,6 +32,7 @@ export type Property = {
 
 export interface PropertiesTableProps {
   properties: Property[];
+  metrics: readonly AssetMetrics[];
   readOnly?: boolean;
   renderName: (property: Property) => ReactNode;
   onAdd: (data: Partial<Property>) => Promise<boolean>;
@@ -38,12 +41,7 @@ export interface PropertiesTableProps {
   escrowByProperty?: Record<string, boolean>; // NEW
 }
 
-const fmtMoney = (n?: number | null) =>
-  n == null || isNaN(n) ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-
-const pct = (n?: number | null) => (n == null || isNaN(n) ? "—" : `${n}%`);
-
-export default function PropertiesTable({ properties, renderName, readOnly = false, onAdd, onUpdate, onDelete, escrowByProperty}: PropertiesTableProps) {
+export default function PropertiesTable({ properties, metrics, renderName, readOnly = false, onAdd, onUpdate, onDelete, escrowByProperty}: PropertiesTableProps) {
   const escrowMap = escrowByProperty ?? {}; // optional default
   const isEscrowed = (propertyId?: string | null) => !!(propertyId && escrowMap[propertyId]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,6 +86,39 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
     }
   };
 
+  if (!isAdding && editingId === null) {
+    const byId = new Map(metrics.map(asset => [asset.property.id, asset]));
+    return (
+      <div className="space-y-3">
+        {properties.length > 0 && <ul aria-label="Property summary" className="divide-y border-y">
+          {properties.map(property => {
+            const asset = byId.get(property.id);
+            return (
+              <li key={property.id} className="grid items-center gap-x-4 gap-y-2 py-3 sm:grid-cols-[minmax(9rem,1fr)_minmax(15rem,1.5fr)_auto]">
+                <div>
+                  {renderName(property)}
+                  {asset && <p className="text-xs text-muted-foreground">{asset.verdict.label}</p>}
+                </div>
+                <dl className="grid grid-cols-3 gap-2 text-sm tabular-nums">
+                  <div><dt className="text-xs text-muted-foreground">Rent / mo · Contractual</dt><dd>{money(asset?.expectedRent)}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Cash flow / mo · Estimate</dt><dd>{money(asset?.cashFlow)}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">DSCR · Estimate</dt><dd>{asset ? coverage(asset) : "—"}</dd></div>
+                </dl>
+                {!readOnly && <div className="flex gap-1 sm:justify-end">
+                  <Button variant="ghost" size="icon" onClick={() => startEdit(property)} aria-label={`Edit property ${property.alias}`}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => onDelete(property.id)} aria-label={`Delete property ${property.alias}`} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                </div>}
+              </li>
+            );
+          })}
+        </ul>}
+        {!readOnly && <Button variant="outline" onClick={() => { setIsAdding(true); setEditData({}); }}>
+          <Plus className="mr-2 h-4 w-4" /> Add Property
+        </Button>}
+      </div>
+    );
+  }
+
   return (
     <Card className="rounded-xl border-border overflow-hidden">
       <div className="overflow-x-auto">
@@ -130,170 +161,115 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
             </TableRow>
           </TableHeader>
           <TableBody>
-            {properties.map((p) => (
+            {properties.filter(property => property.id === editingId).map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/30 transition-colors">
-                {editingId === p.id ? (
-                  <>
-                    <TableCell className="px-4 py-2">
-                      <Input aria-label="Property name"
-                        value={editData.alias ?? ""}
-                        onChange={(e) => setEditData({ ...editData, alias: e.target.value })}
-                        className="h-8"
-                        placeholder="Property name (unique)"
-                      />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <Input aria-label="Address"
-                        value={(editData.address as string) ?? ""}
-                        onChange={(e) => setEditData({ ...editData, address: e.target.value })}
-                        className="h-8"
-                        placeholder="123 Main St"
-                      />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <select aria-label="Property type"
-                        className="h-8 w-full rounded-md border border-input bg-background px-2"
-                        value={editData.type ?? ""}
-                        onChange={(e) => setEditData({ ...editData, type: e.target.value || null })}
-                      >
-                        <option value="">Select type…</option>
-                        {["Single-Family","Multi-Family","Commercial","Industrial"].map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
+                <TableCell className="px-4 py-2">
+                  <Input autoFocus aria-label="Property name"
+                    value={editData.alias ?? ""}
+                    onChange={(e) => setEditData({ ...editData, alias: e.target.value })}
+                    className="h-8"
+                    placeholder="Property name (unique)"
+                  />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <Input aria-label="Address"
+                    value={(editData.address as string) ?? ""}
+                    onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                    className="h-8"
+                    placeholder="123 Main St"
+                  />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <select aria-label="Property type"
+                    className="h-8 w-full rounded-md border border-input bg-background px-2"
+                    value={editData.type ?? ""}
+                    onChange={(e) => setEditData({ ...editData, type: e.target.value || null })}
+                  >
+                    <option value="">Select type…</option>
+                    {["Single-Family","Multi-Family","Commercial","Industrial"].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <Input
+                    type="number"
+                    aria-label="Purchase price" value={editData.sale_price ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value ? Number(e.target.value) : undefined;
+                      setEditData(ed => ({ ...ed, sale_price: v ?? null }));
+                    }}
+                    className="h-8"
+                    placeholder="e.g., 450000"
+                  />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <Input aria-label="Current value estimate" type="number" min="0" value={editData.property_value ?? ""}
+                    onChange={event => setEditData({ ...editData, property_value: event.target.value === "" ? null : Number(event.target.value) })} className="h-8" />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <Input type="number" aria-label="Vacancy percentage" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const escrowed = isEscrowed(editingId);
+                      return (
+                        <Input
+                          type="number"
+                          aria-label="Annual taxes" value={escrowed ? "" : (editData.property_taxes ?? "")}
+                          onChange={(e) =>
+                            setEditData({
+                              ...editData,
+                              property_taxes: e.target.value ? Number(e.target.value) : undefined,
+                            })
+                          }
+                          className="h-8"
+                          disabled={escrowed}
+                          placeholder={escrowed ? "in mortgage" : ""}
+                        />
+                      );
+                    })()}
+
+                  </div>
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  {(() => {
+                    const escrowed = isEscrowed(editingId);
+                    return (
                       <Input
                         type="number"
-                        aria-label="Purchase price" value={editData.sale_price ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value ? Number(e.target.value) : undefined;
-                          setEditData(ed => ({ ...ed, sale_price: v ?? null }));
-                        }}
+                        aria-label="Annual insurance" value={escrowed ? "" : (editData.insurance ?? "")}
+                        onChange={(e) =>
+                          setEditData({
+                            ...editData,
+                            insurance: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
                         className="h-8"
-                        placeholder="e.g., 450000"
+                        disabled={escrowed}
+                        placeholder={escrowed ? "in mortgage" : ""}
                       />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <Input aria-label="Current value estimate" type="number" min="0" value={editData.property_value ?? ""}
-                        onChange={event => setEditData({ ...editData, property_value: event.target.value === "" ? null : Number(event.target.value) })} className="h-8" />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <Input type="number" aria-label="Vacancy percentage" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const escrowed = isEscrowed(editingId);
-                          return (
-                            <Input
-                              type="number"
-                              aria-label="Annual taxes" value={escrowed ? "" : (editData.property_taxes ?? "")}
-                              onChange={(e) =>
-                                setEditData({
-                                  ...editData,
-                                  property_taxes: e.target.value ? Number(e.target.value) : undefined,
-                                })
-                              }
-                              className="h-8"
-                              disabled={escrowed}
-                              placeholder={escrowed ? "in mortgage" : ""}
-                            />
-                          );
-                        })()}
-
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      {(() => {
-                        const escrowed = isEscrowed(editingId);
-                        return (
-                          <Input
-                            type="number"
-                            aria-label="Annual insurance" value={escrowed ? "" : (editData.insurance ?? "")}
-                            onChange={(e) =>
-                              setEditData({
-                                ...editData,
-                                insurance: e.target.value ? Number(e.target.value) : undefined,
-                              })
-                            }
-                            className="h-8"
-                            disabled={escrowed}
-                            placeholder={escrowed ? "in mortgage" : ""}
-                          />
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <Input type="number" aria-label="Management percentage" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
-                    </TableCell>          
-                    <TableCell className="px-4 py-2">
-                      <Input type="number" aria-label="Maintenance percentage" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={save} aria-label="Save property" disabled={saving}><Check className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={cancelEdit} aria-label="Cancel property edit" disabled={saving}><X className="h-4 w-4" /></Button>
-                      </div>
-                    </TableCell>
-                  </>
-                ) : (
-                  <>
-                    <TableCell className="px-4 py-2 font-medium">{renderName(p)}</TableCell>
-                    <TableCell className="px-4 py-2">{p.address ?? "—"}</TableCell>
-                    <TableCell className="px-4 py-2">{p.type ?? "—"}</TableCell>
-                    <TableCell className="px-4 py-2">{fmtMoney(p.sale_price ?? undefined)}</TableCell>
-                    <TableCell className="px-4 py-2">{fmtMoney(p.property_value)}</TableCell>
-                    <TableCell className="px-4 py-2">{pct(p.vacancy_pct ?? undefined)}</TableCell>
-                    {(() => {
-                      const escrowed = isEscrowed(p.id);
-                      const value = fmtMoney(
-                        p.property_taxes
-                      );
-                      return (
-                        <TableCell className={`px-4 py-2 ${escrowed ? "text-muted-foreground" : ""}`}>
-                          <div className="flex items-center gap-2">
-                            <span>{value}</span>
-                            {escrowed && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                in mortgage
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      );
-                    })()}
-                    {(() => {
-                      const escrowed = isEscrowed(p.id);
-                      const value = fmtMoney(p.insurance ?? undefined);
-                      return (
-                        <TableCell className={`px-4 py-2 ${escrowed ? "text-muted-foreground" : ""}`}>
-                          <div className="flex items-center gap-2">
-                            <span>{value}</span>
-                            {escrowed && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                in mortgage
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      );
-                    })()}
-                    <TableCell className="px-4 py-2">{pct(p.mgmt_pct ?? undefined)}</TableCell> 
-                    <TableCell className="px-4 py-2">{pct(p.maintenance_pct ?? undefined)}</TableCell>
-                    <TableCell className="px-4 py-2">
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)} disabled={saving || readOnly} aria-label={`Edit property ${p.alias}`}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => onDelete(p.id)} disabled={saving || readOnly} aria-label={`Delete property ${p.alias}`} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    </TableCell>
-                  </>
-                )}
+                    );
+                  })()}
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <Input type="number" aria-label="Management percentage" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <Input type="number" aria-label="Maintenance percentage" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
+                </TableCell>
+                <TableCell className="px-4 py-2">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={save} aria-label="Save property" disabled={saving}><Check className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={cancelEdit} aria-label="Cancel property edit" disabled={saving}><X className="h-4 w-4" /></Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
 
             {isAdding && (
               <TableRow className="bg-primary/5">
                 <TableCell className="px-4 py-2">
-                  <Input aria-label="Property name"
+                  <Input autoFocus aria-label="Property name"
                     placeholder="Property name (required)"
                     value={editData.alias ?? ""}
                     onChange={(e) => setEditData({ ...editData, alias: e.target.value })}
@@ -339,7 +315,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                   <div className="flex items-center gap-2">
                     {(() => {
                       // if your add row selects a property first, use that id; else leave false
-                      const escrowed = false; 
+                      const escrowed = false;
                       return (
                         <Input
                           type="number"
@@ -386,23 +362,6 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
             )}
           </TableBody>
         </Table>
-      </div>
-      {/* Footer controls at the bottom, like other sections */}
-      <div className="px-4 py-3 border-t border-border bg-muted/20">
-        {!isAdding && editingId === null && (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={saving || readOnly}
-            onClick={() => {
-              setIsAdding(true) ;
-              setEditData({});
-            }}
-            className="w-full"
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add Property
-          </Button>
-        )}
       </div>
     </Card>
   );

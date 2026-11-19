@@ -73,6 +73,10 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
               <span className="block text-sm font-medium">{row.title}</span>
               <span className="block text-xs capitalize text-muted-foreground">{stage}</span>
               <span className="block text-xs text-muted-foreground">Confidence · Needs verification</span>
+              {projection && <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs italic tabular-nums text-muted-foreground">
+                <span>Capital required {money(projection.closingCosts)}</span>
+                <span>First-year cash yield {percent("cashYield" in projection ? projection.cashYield : null)}</span>
+              </span>}
             </span>
             <span className="flex shrink-0 items-center gap-3 tabular-nums">
               <span className="text-right">

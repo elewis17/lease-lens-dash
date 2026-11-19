@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { useSessionState } from "@/features/navigation/sessionState";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
   const [equityGoal, setEquityGoal] = useSessionState(sessionKey + ":equityGoal", "");
   const [cashGoal, setCashGoal] = useSessionState(sessionKey + ":cashGoal", "");
+  const wealthHeading = useRef<HTMLHeadingElement>(null);
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
@@ -60,9 +62,6 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
     { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest", source: operatingEvidence },
     { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest", source: operatingEvidence },
     { label: "Cap rate", value: percent(metrics.capRate), basis: "Estimate · Annualized NOI divided by estimated property value" },
-    { label: "Physical occupancy", value: percent(metrics.physicalOccupancy), basis: metrics.occupiedUnits === null || metrics.totalUnits === null
-      ? "Unit or lease records missing" : `Contractual · ${metrics.occupiedUnits} of ${metrics.totalUnits} units on current leases` },
-    { label: "Real estate equity", value: money(metrics.equity), basis: "Estimate · Undated valuation less recorded current loan balances", source: debtEvidence },
     { label: "Cash-on-cash", value: percent(metrics.cashOnCash), basis: "Invested cash basis is missing" },
   ];
 
@@ -76,6 +75,109 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
         <VerdictExplanation {...metrics.verdict} />
       </header>
 
+      <section aria-label="Wealth at a glance" className="flex flex-wrap items-center gap-x-8 gap-y-4 border-y py-4">
+        <dl className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
+          <div><dt className="text-xs text-muted-foreground">Real estate equity · Estimate</dt>
+            <dd className="text-xl font-semibold tabular-nums">{money(metrics.equity)}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Debt · Recorded balances</dt>
+            <dd className="text-xl font-semibold tabular-nums">{money(metrics.debt)}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Equity growth · 12-month projection</dt>
+            <dd className="text-xl font-semibold tabular-nums">{money(wealth.growth)}</dd></div>
+        </dl>
+        <Button variant="outline" onClick={() => {
+          wealthHeading.current?.focus({ preventScroll: true });
+          wealthHeading.current?.scrollIntoView({ block: "start" });
+        }}>View wealth</Button>
+      </section>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
+        <div className="space-y-4">
+          <Card className="space-y-3 p-5">
+            <h2 className="text-lg font-semibold">What changed</h2>
+            <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
+            <dl className="space-y-2 tabular-nums">
+              <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange !== null && receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{occupancyChange === null ? "—" : signedPoints.format(occupancyChange) + " pp"}</dd></div>
+            </dl>
+            {(receiptChange === null || occupancyChange === null) && <p className="text-xs text-muted-foreground">A comparison requires a recorded basis for both months.</p>}
+          </Card>
+
+          <Card className="space-y-4 p-5">
+            <h2 className="text-lg font-semibold">Where the month’s rent goes</h2>
+            <dl className="space-y-2 tabular-nums">
+              <div className="flex justify-between gap-4"><dt>Contractual rent / mo</dt><dd>{money(metrics.expectedRent)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Vacancy adjustment / mo · Estimate</dt><dd>{money(metrics.expectedRent === null || metrics.effectiveRent === null ? null : metrics.effectiveRent - metrics.expectedRent)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Operating expenses / mo · Estimate</dt><dd>{money(metrics.opex)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Principal and interest / mo</dt><dd>{money(metrics.debtService)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Cash flow · Annualized from rounded monthly run-rate</dt><dd>{money(metrics.annualizedCashFlow)}</dd></div>
+            </dl>
+            <dl className="space-y-2 border-t pt-3 tabular-nums">
+              <div className="flex justify-between gap-4"><dt>Recorded cash receipts · {metrics.month}</dt><dd>{money(metrics.receipts)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Economic occupancy · {metrics.month}</dt><dd>{percent(metrics.economicOccupancy)}</dd></div>
+              <div className="flex justify-between gap-4"><dt>Recorded arrears</dt><dd>{money(metrics.arrears)}</dd></div>
+            </dl>
+            <p className="text-xs text-muted-foreground">Economic occupancy uses recorded receipts divided by contractual amounts due on payment records for the completed month. Arrears use recorded amounts overdue.</p>
+          </Card>
+        </div>
+        <aside className="space-y-4">
+          <Card className="space-y-4 p-5">
+            <h2 className="text-lg font-semibold">Where money is leaking</h2>
+            <section aria-label="Actual losses" className="space-y-2">
+              <h3 className="font-medium">Actual losses</h3>
+              <p className="text-sm text-muted-foreground">— · Verified losses require a complete record of cash paid, including debt payments.</p>
+            </section>
+            {cashShortfalls.length > 0 && <section aria-label="Estimated cash flow shortfalls" className="space-y-2 border-t pt-3">
+              <h3 className="font-medium">Estimated cash flow shortfalls</h3>
+              <ul className="space-y-2">
+                {cashShortfalls.map(({ asset, annual }) => <li key={asset.property.id} className="text-sm">
+                  {asset.property.alias} · <span className="tabular-nums">{money(annual)}/yr annualized</span>
+                </li>)}
+              </ul>
+            </section>}
+            <section aria-label="Missed income" className="space-y-2 border-t pt-3">
+              <h3 className="font-medium">Missed income</h3>
+              {vacancyGaps.length > 0 ? <ul className="space-y-2">
+                {vacancyGaps.map(({ asset, annual }) => <li key={asset.property.id} className="text-sm italic">
+                  <p>{asset.property.alias} · {money(annual)}/yr potential rent</p>
+                  <p className="text-xs text-muted-foreground">Hypothetical · If vacancy fell from {asset.property.vacancy_pct}% to {vacancyTarget}%</p>
+                </li>)}
+              </ul> : <p className="text-sm text-muted-foreground">{vacancyTarget === null
+                ? "— · Vacancy opportunity requires a supported vacancy target." : "No modeled vacancy above the illustrative target."}</p>}
+              <p className="text-sm text-muted-foreground">— · Below-market rent requires verified comparable rents.</p>
+            </section>
+          </Card>
+          {priorities.length > 0 && (
+            <Card className="space-y-3 p-5">
+              <h2 className="text-lg font-semibold">Needs you</h2>
+              <ul className="divide-y">
+                {priorities.map(asset => {
+                  const isRefinance = asset.verdict.label === "Refinance candidate";
+                  const evidence = operatingConfidence([asset]) || "Coverage uses the recorded rents, costs and scheduled debt payments.";
+                  return (
+                    <li key={asset.property.id} className="space-y-2 py-3">
+                      <p className="font-medium">{asset.property.alias} · {asset.verdict.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Estimate · {money(asset.cashFlow)}/mo cash flow and {coverage(asset)} debt-service coverage.
+                        {" "}{asset.verdict.detail}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{evidence}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isRefinance
+                          ? "Confirm the quote and fees before estimating savings."
+                          : "Verify rent and expenses and obtain a payoff quote and selling costs before considering a sale."}
+                      </p>
+                      <Button variant="outline" onClick={() => onReviewProperty(asset.property.id)}>
+                        Review {asset.property.alias} in Capital
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          )}
+        </aside>
+      </div>
+
       <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(tile => (
           <Card key={tile.label} className="p-4">
@@ -87,115 +189,29 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
         ))}
       </dl>
 
-      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-        <Card className="space-y-3 p-5">
-          <h2 className="text-lg font-semibold">What changed</h2>
-          <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
+      <Card className="space-y-4 p-5">
+        <h2 ref={wealthHeading} tabIndex={-1} className="scroll-mt-4 text-lg font-semibold focus-visible:outline-ring">Equity position</h2>
+        <dl className="space-y-2 tabular-nums">
+          <div className="flex justify-between gap-4"><dt>Property value · Estimate, source date unverified</dt><dd>{money(metrics.value)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>Debt · Recorded current balances</dt><dd>{money(metrics.debt)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>Loan-to-value · Estimate</dt><dd>{percent(metrics.ltv)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>Scheduled principal reduction · Next 12 months</dt><dd>{money(metrics.paydown)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>Physical occupancy · Contracted units</dt><dd>{percent(metrics.physicalOccupancy)}</dd></div>
+        </dl>
+        {debtEvidence && <p className="text-xs text-muted-foreground">{debtEvidence}</p>}
+        <p className="text-xs text-muted-foreground">Equity requires a current valuation and current balances for every loan. Sale proceeds also require selling costs and payoff quotes.</p>
+        <div className="space-y-2 border-t pt-3">
+          <h3 className="font-medium">Projected wealth growth · Next 12 months</h3>
+          <label className="block text-sm">Expected annual appreciation (%)
+            <Input type="number" step="any" value={appreciationRate} onChange={event => setAppreciationRate(event.target.value)} />
+          </label>
           <dl className="space-y-2 tabular-nums">
-            <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange !== null && receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{occupancyChange === null ? "—" : signedPoints.format(occupancyChange) + " pp"}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Appreciation · Estimate</dt><dd>{money(wealth.appreciation)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Projected growth · Estimate</dt><dd>{money(wealth.growth)}</dd></div>
           </dl>
-          {(receiptChange === null || occupancyChange === null) && <p className="text-xs text-muted-foreground">A comparison requires a recorded basis for both months.</p>}
-        </Card>
-
-        <Card className="space-y-4 p-5">
-          <h2 className="text-lg font-semibold">Where money is leaking</h2>
-          <section aria-label="Actual losses" className="space-y-2">
-            <h3 className="font-medium">Actual losses</h3>
-            <p className="text-sm text-muted-foreground">— · Verified losses require a complete record of cash paid, including debt payments.</p>
-          </section>
-          {cashShortfalls.length > 0 && <section aria-label="Estimated cash flow shortfalls" className="space-y-2 border-t pt-3">
-            <h3 className="font-medium">Estimated cash flow shortfalls</h3>
-            <ul className="space-y-2">
-              {cashShortfalls.map(({ asset, annual }) => <li key={asset.property.id} className="text-sm">
-                {asset.property.alias} · <span className="tabular-nums">{money(annual)}/yr annualized</span>
-              </li>)}
-            </ul>
-          </section>}
-          <section aria-label="Missed income" className="space-y-2 border-t pt-3">
-            <h3 className="font-medium">Missed income</h3>
-            {vacancyGaps.length > 0 ? <ul className="space-y-2">
-              {vacancyGaps.map(({ asset, annual }) => <li key={asset.property.id} className="text-sm italic">
-                <p>{asset.property.alias} · {money(annual)}/yr potential rent</p>
-                <p className="text-xs text-muted-foreground">Hypothetical · If vacancy fell from {asset.property.vacancy_pct}% to {vacancyTarget}%</p>
-              </li>)}
-            </ul> : <p className="text-sm text-muted-foreground">{vacancyTarget === null
-              ? "— · Vacancy opportunity requires a supported vacancy target." : "No modeled vacancy above the illustrative target."}</p>}
-            <p className="text-sm text-muted-foreground">— · Below-market rent requires verified comparable rents.</p>
-          </section>
-        </Card>
-      </div>
-
-      {priorities.length > 0 && (
-        <Card className="space-y-3 p-5">
-          <h2 className="text-lg font-semibold">Needs you</h2>
-          <ul className="divide-y">
-            {priorities.map(asset => {
-              const isRefinance = asset.verdict.label === "Refinance candidate";
-              const evidence = operatingConfidence([asset]) || "Coverage uses the recorded rents, costs and scheduled debt payments.";
-              return (
-                <li key={asset.property.id} className="space-y-2 py-3">
-                  <p className="font-medium">{asset.property.alias} · {asset.verdict.label}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Estimate · {money(asset.cashFlow)}/mo cash flow and {coverage(asset)} debt-service coverage.
-                    {" "}{asset.verdict.detail}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{evidence}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {isRefinance
-                      ? "Confirm the quote and fees before estimating savings."
-                      : "Verify rent and expenses and obtain a payoff quote and selling costs before considering a sale."}
-                  </p>
-                  <Button variant="outline" onClick={() => onReviewProperty(asset.property.id)}>
-                    Review {asset.property.alias} in Capital
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="space-y-4 p-5">
-          <h2 className="text-lg font-semibold">Operating reality</h2>
-          <dl className="space-y-2 tabular-nums">
-            <div className="flex justify-between gap-4"><dt>Contractual rent / mo</dt><dd>{money(metrics.expectedRent)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Vacancy adjustment / mo · Estimate</dt><dd>{money(metrics.expectedRent === null || metrics.effectiveRent === null ? null : metrics.effectiveRent - metrics.expectedRent)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Operating expenses / mo · Estimate</dt><dd>{money(metrics.opex)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Principal and interest / mo</dt><dd>{money(metrics.debtService)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Cash flow · Annualized from rounded monthly run-rate</dt><dd>{money(metrics.annualizedCashFlow)}</dd></div>
-          </dl>
-          <dl className="space-y-2 border-t pt-3 tabular-nums">
-            <div className="flex justify-between gap-4"><dt>Recorded cash receipts · {metrics.month}</dt><dd>{money(metrics.receipts)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Economic occupancy · {metrics.month}</dt><dd>{percent(metrics.economicOccupancy)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Recorded arrears</dt><dd>{money(metrics.arrears)}</dd></div>
-          </dl>
-          <p className="text-xs text-muted-foreground">Economic occupancy uses recorded receipts divided by contractual amounts due on payment records for the completed month. Arrears use recorded amounts overdue.</p>
-        </Card>
-        <Card className="space-y-4 p-5">
-          <h2 className="text-lg font-semibold">Equity position</h2>
-          <dl className="space-y-2 tabular-nums">
-            <div className="flex justify-between gap-4"><dt>Property value · Estimate, source date unverified</dt><dd>{money(metrics.value)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Debt · Recorded current balances</dt><dd>{money(metrics.debt)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Loan-to-value · Estimate</dt><dd>{percent(metrics.ltv)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Scheduled principal reduction · Next 12 months</dt><dd>{money(metrics.paydown)}</dd></div>
-          </dl>
-          {debtEvidence && <p className="text-xs text-muted-foreground">{debtEvidence}</p>}
-          <p className="text-xs text-muted-foreground">Equity requires a current valuation and current balances for every loan. Sale proceeds also require selling costs and payoff quotes.</p>
-          <div className="space-y-2 border-t pt-3">
-            <h3 className="font-medium">Projected wealth growth · Next 12 months</h3>
-            <label className="block text-sm">Expected annual appreciation (%)
-              <Input type="number" step="any" value={appreciationRate} onChange={event => setAppreciationRate(event.target.value)} />
-            </label>
-            <dl className="space-y-2 tabular-nums">
-              <div className="flex justify-between gap-4"><dt>Appreciation · Estimate</dt><dd>{money(wealth.appreciation)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Projected growth · Estimate</dt><dd>{money(wealth.growth)}</dd></div>
-            </dl>
-            <p className="text-xs text-muted-foreground">Adds the annualized cash flow, scheduled principal reduction, and entered appreciation. Requires all three.</p>
-          </div>
-        </Card>
-      </div>
+          <p className="text-xs text-muted-foreground">Adds the annualized cash flow, scheduled principal reduction, and entered appreciation. Requires all three.</p>
+        </div>
+      </Card>
 
       <Card className="space-y-3 p-5">
         <h2 className="text-lg font-semibold">Expense evidence</h2>

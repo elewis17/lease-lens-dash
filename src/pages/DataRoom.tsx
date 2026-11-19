@@ -1,3 +1,5 @@
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
+import { money, percent } from "@/domain/finance/format";
 import { useMemo, useState, type ReactNode } from "react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { StatementCapture } from "@/features/leases/StatementCapture";
@@ -51,6 +53,7 @@ export default function DataRoom({
   onDeleteMortgage,
 }: DataRoomProps) {
   const [leaseSaved, setLeaseSaved] = useState(false);
+  const { metrics } = useWorkspace();
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]
@@ -61,6 +64,14 @@ export default function DataRoom({
       <header className="space-y-2">
         <h1 id="holdings-title" tabIndex={-1} className="text-3xl font-semibold">Holdings</h1>
         <p className="text-sm text-muted-foreground">Open a property to review its records and sources.</p>
+        {filteredProperties.length > 0 && <dl aria-label="Holdings at a glance" className="grid grid-cols-2 gap-4 border-y py-3 text-sm sm:grid-cols-3">
+          <div><dt className="text-xs text-muted-foreground">Real estate equity · Estimate</dt>
+            <dd className="font-semibold tabular-nums">{money(metrics.equity)}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Debt · Recorded balances</dt>
+            <dd className="font-semibold tabular-nums">{money(metrics.debt)}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Physical occupancy · Contracted units</dt>
+            <dd className="font-semibold tabular-nums">{percent(metrics.physicalOccupancy)}</dd></div>
+        </dl>}
       </header>
 
       <section className="space-y-3">
@@ -74,6 +85,7 @@ export default function DataRoom({
         </div>
         <PropertiesTable
           properties={filteredProperties}
+          metrics={metrics.assets}
           renderName={renderPropertyName}
           onAdd={onAddProperty}
           onUpdate={onUpdateProperty}

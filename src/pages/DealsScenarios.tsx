@@ -101,8 +101,14 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
           <dl className="grid grid-cols-2 gap-4">
             <div><dt className="text-sm text-muted-foreground">Max offer</dt><dd className="text-xl font-semibold">{currency(gates?.maxOffer)}</dd></div>
             <div><dt className="text-sm text-muted-foreground">Walk-away</dt><dd className="text-xl font-semibold">{currency(gates?.walkAway)}</dd></div>
-            <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year DSCR</dt><dd>{ratio(model?.dscr)}</dd></div>
-            <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">{holdYears}-year modelled IRR</dt><dd>{percent(model?.irr)}</dd></div>
+            <div className={testPrice !== null ? "italic" : undefined}>
+              <dt className="text-sm text-muted-foreground">First-year DSCR</dt><dd>{ratio(model?.dscr)}</dd>
+              {model?.dscr != null && <dd className={cn("text-xs", dscrPasses ? "text-brand" : "text-destructive")}>{dscrPasses ? "Pass" : "Fail"} · {ratio(policy.buy.minimumDscr)} minimum</dd>}
+            </div>
+            <div className={testPrice !== null ? "italic" : undefined}>
+              <dt className="text-sm text-muted-foreground">{holdYears}-year modelled IRR</dt><dd>{percent(model?.irr)}</dd>
+              {model?.irr != null && <dd className={cn("text-xs", irrPasses ? "text-brand" : "text-destructive")}>{irrPasses ? "Pass" : "Fail"} · {percent(policy.buy.minimumIrr)} minimum</dd>}
+            </div>
             <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash flow / mo</dt><dd>{currency(model?.cashFlow)}</dd></div>
             <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash yield</dt><dd>{percent(model?.cashYield)}</dd></div>
           </dl>
