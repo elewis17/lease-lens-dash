@@ -52,7 +52,14 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
             }
           }}>
           <Command>
-            <CommandInput ref={searchInput} aria-label="Search properties" placeholder="Search property..." />
+            <CommandInput ref={searchInput} aria-label="Search properties" placeholder="Search property..."
+              onKeyDown={event => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  restoreFocus.current = true;
+                  setOpen(false);
+                }
+              }} />
             <CommandEmpty>No property found.</CommandEmpty>
             <CommandGroup>
             {/* All properties option */}
