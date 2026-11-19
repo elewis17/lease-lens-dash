@@ -116,7 +116,9 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
   const [deleteError, setDeleteError] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const deleteInFlight = useRef(false);
+  const deleteTrigger = useRef<HTMLElement | null>(null);
   const requestDelete = (kind: RecordKind, id: string, name: string) => {
+    deleteTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDeleteError(false);
     setDeleteTarget({ kind, id, name });
   };
@@ -135,6 +137,7 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
         return;
       }
       if (kind === "property" && selectedProperty === id) clearProperty();
+      deleteTrigger.current = null;
       setDeleteTarget(null);
       await refresh();
       toast({ title: "Record deleted" });
@@ -151,7 +154,12 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
     <AlertDialog open={deleteTarget !== null} onOpenChange={open => {
           if (!open && !deleteInFlight.current) setDeleteTarget(null);
         }}>
-          {deleteTarget && <AlertDialogContent>
+          {deleteTarget && <AlertDialogContent onCloseAutoFocus={event => {
+            event.preventDefault();
+            const trigger = deleteTrigger.current;
+            if (trigger?.isConnected && !trigger.matches(":disabled")) trigger.focus();
+            else document.getElementById("holdings-title")?.focus();
+          }}>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {deleteTarget.kind}?</AlertDialogTitle>
               <AlertDialogDescription>

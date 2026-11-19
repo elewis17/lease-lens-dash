@@ -135,7 +135,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                 {editingId === p.id ? (
                   <>
                     <TableCell className="px-4 py-2">
-                      <Input
+                      <Input aria-label="Property name"
                         value={editData.alias ?? ""}
                         onChange={(e) => setEditData({ ...editData, alias: e.target.value })}
                         className="h-8"
@@ -143,7 +143,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                       />
                     </TableCell>
                     <TableCell className="px-4 py-2">
-                      <Input
+                      <Input aria-label="Address"
                         value={(editData.address as string) ?? ""}
                         onChange={(e) => setEditData({ ...editData, address: e.target.value })}
                         className="h-8"
@@ -151,7 +151,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                       />
                     </TableCell>
                     <TableCell className="px-4 py-2">
-                      <select
+                      <select aria-label="Property type"
                         className="h-8 w-full rounded-md border border-input bg-background px-2"
                         value={editData.type ?? ""}
                         onChange={(e) => setEditData({ ...editData, type: e.target.value || null })}
@@ -293,7 +293,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
             {isAdding && (
               <TableRow className="bg-primary/5">
                 <TableCell className="px-4 py-2">
-                  <Input
+                  <Input aria-label="Property name"
                     placeholder="Property name (required)"
                     value={editData.alias ?? ""}
                     onChange={(e) => setEditData({ ...editData, alias: e.target.value })}
@@ -301,7 +301,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                   />
                 </TableCell>
                 <TableCell className="px-4 py-2">
-                  <Input
+                  <Input aria-label="Address"
                     placeholder="Address"
                     value={(editData.address as string) ?? ""}
                     onChange={(e) => setEditData({ ...editData, address: e.target.value })}
@@ -309,7 +309,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                   />
                 </TableCell>
                 <TableCell className="px-4 py-2">
-                  <select
+                  <select aria-label="Property type"
                     className="h-8 w-full rounded-md border border-input bg-background px-2"
                     value={editData.type ?? ""}
                     onChange={(e) => setEditData({ ...editData, type: e.target.value || null })}
@@ -319,7 +319,7 @@ export default function PropertiesTable({ properties, renderName, readOnly = fal
                   </select>
                 </TableCell>
                 <TableCell className="px-4 py-2">
-                  <Input
+                  <Input aria-label="Purchase price"
                     type="number"
                     placeholder="Purchase price"
                     value={editData.sale_price ?? ""}

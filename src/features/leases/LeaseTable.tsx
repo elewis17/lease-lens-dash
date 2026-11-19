@@ -104,14 +104,14 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               {editingId === lease.id ? (
                 <>
                   <TableCell className="sticky left-0 bg-card backdrop-blur-sm">
-                    <Input
+                    <Input aria-label="Tenant name"
                       value={editData.tenant || ""}
                       onChange={(e) => setEditData({ ...editData, tenant: e.target.value })}
                       className="h-8 text-sm"
                     />
                   </TableCell>
                   <TableCell>
-                    <select
+                    <select aria-label="Property"
                       className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                       value={editData.property_id ?? ""}
                       onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
@@ -124,7 +124,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   </TableCell>
                   {/* Unit */}
                   <TableCell>
-                    <Input
+                    <Input aria-label="Unit label"
                       placeholder="Unit"
                       value={editData.unit_label || ""}
                       onChange={(e) =>
@@ -135,7 +135,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   </TableCell>
                   {/* Status */}
                   <TableCell>
-                    <select
+                    <select aria-label="Lease status"
                       className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                       value={editData.status ?? ""}
                       onChange={({ target: { value } }) => {
@@ -204,7 +204,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell className="text-sm">{lease.deposit == null ? "—" : `$${lease.deposit.toLocaleString()}`}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} disabled={saving} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} aria-label={`Edit lease for ${lease.tenant}`} disabled={saving} className="hover:scale-105 transition-transform">
                         <Pencil className="h-3 w-3 mr-1" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} aria-label={`Delete lease for ${lease.tenant}`} className="hover:scale-105 transition-transform">
@@ -219,7 +219,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
           {isAdding && (
             <TableRow className="bg-primary/5 animate-fade-in">
               <TableCell className="sticky left-0 bg-primary/5 backdrop-blur-sm">
-                <Input
+                <Input aria-label="Tenant name"
                   placeholder="Tenant name"
                   value={newLease.tenant ?? ""}
                   onChange={(e) => setNewLease({ ...newLease, tenant: e.target.value })}
@@ -227,7 +227,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                 />
               </TableCell>
               <TableCell>
-                <select
+                <select aria-label="Property"
                   className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                   value={newLease.property_id ?? ""}
                   onChange={(e) => setNewLease({ ...newLease, property_id: e.target.value || undefined })}>
@@ -239,7 +239,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               </TableCell>
                {/* Unit */}
               <TableCell>
-                <Input
+                <Input aria-label="Unit label"
                   placeholder="Unit"
                   value={newLease.unit_label || ""}
                   onChange={(e) =>
@@ -251,7 +251,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
 
               {/* Status */}
               <TableCell>
-                <select
+                <select aria-label="Lease status"
                   className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                   value={newLease.status ?? ""}
                   onChange={({ target: { value } }) => {

@@ -59,7 +59,7 @@ export default function DataRoom({
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold">Holdings</h1>
+        <h1 id="holdings-title" tabIndex={-1} className="text-3xl font-semibold">Holdings</h1>
         <p className="text-sm text-muted-foreground">Open a property to review its records and sources.</p>
       </header>
 

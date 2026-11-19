@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { capitalBudget, capitalConflicts, capitalOpportunities, combinedCapitalPlan, netSaleProceeds, rankCapitalOpportunities, recommendCapital } from "../src/domain/finance/capital.ts";
+import { leaseReceipts } from "../src/domain/finance/receipts.ts";
 import { isActiveLease } from "../src/domain/finance/activeLeases.ts";
 import { defaultThresholds } from "../src/domain/finance/thresholds.ts";
 import { breakEvenInputs, kirkwoodExample, modelDeal, priceGates, solveIrr } from "../src/domain/finance/underwriting.ts";
@@ -280,4 +281,16 @@ test("Capital combines rent and refinance timing without spending the reserve or
   const conflict = [refinance, { ...refinance, action: "sale", refinance: null }];
   assert.ok(capitalConflicts(conflict)[0].startsWith("Conflict"));
   assert.equal(combinedCapitalPlan(conflict, 2, metrics), null);
+});
+
+
+test("recorded receipts are reported separately from contractual amounts due and a blank payment amount is not zero", () => {
+  const backRent = { lease_id: "owner-lease", due_date: "2026-09-01", paid_date: "2026-10-04", paid_amount: 500, amount_due: 500 };
+  const ids = new Set(["owner-lease"]);
+  const latePayment = leaseReceipts([backRent], ids, "2026-11-06");
+  assert.equal(latePayment.receipts, 500);
+  assert.equal(latePayment.rentDue, null);
+  assert.equal(latePayment.economicOccupancy, null);
+  assert.equal(leaseReceipts([{ ...backRent, paid_amount: null }], ids, "2026-11-06").receipts, null);
+  assert.equal(leaseReceipts([{ ...backRent, due_date: "2026-10-01", paid_date: null, paid_amount: null }], ids, "2026-11-06").receipts, 0);
 });

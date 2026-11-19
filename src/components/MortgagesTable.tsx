@@ -113,7 +113,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   <>
                     {/* NEW: Property select */}
                     <TableCell className="px-4 py-3">
-                      <select
+                      <select aria-label="Property"
                         className="h-8 w-full rounded-md border border-input bg-background px-2"
                         value={editData.property_id ?? ""}
                         onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
@@ -125,7 +125,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                       </select>
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <Input
+                      <Input aria-label="Original principal"
                         type="number"
                         placeholder="Original Principal"
                         value={editData.principal_original ?? ""}
@@ -136,7 +136,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                       />
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <Input
+                      <Input aria-label="Current balance"
                         type="number"
                         placeholder="Current Balance"
                         value={editData.current_balance ?? ""}
@@ -147,7 +147,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                       />
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <Input
+                      <Input aria-label="Interest rate (%)"
                         type="number"
                         step="0.01"
                         value={editData.interest_rate ?? ""}
@@ -156,7 +156,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                       />
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <Input
+                      <Input aria-label="Loan term (months)"
                         type="number"
                         value={editData.term_months ?? ""}
                         onChange={(e) => setEditData({ ...editData, term_months: e.target.value })}
@@ -183,7 +183,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                       </label>
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <Input
+                      <Input aria-label="Monthly payment"
                         type="number"
                         value={editData.monthly_payment ?? ""}
                         onChange={(e) => setEditData({ ...editData, monthly_payment: e.target.value })}
@@ -223,7 +223,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">${mortgage.monthly_payment.toLocaleString()}</TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(mortgage)} disabled={saving} className="h-8 hover:scale-105 transition-transform">
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(mortgage)} aria-label={`Edit mortgage ${mortgage.loan_name ?? ""}`} disabled={saving} className="h-8 hover:scale-105 transition-transform">
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => onDelete(mortgage.id)} aria-label={`Delete mortgage ${mortgage.loan_name ?? ""}`} className="h-8 hover:scale-105 transition-transform text-destructive">
@@ -239,7 +239,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
             {isAdding && (
               <TableRow className="bg-muted/20 border-b border-border/50">
                 <TableCell className="px-4 py-3">
-                  <select
+                  <select aria-label="Property"
                     className="h-8 w-full rounded-md border border-input bg-background px-2"
                     value={editData.property_id ?? ""}
                     onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
@@ -252,7 +252,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                 </TableCell>
 
                 <TableCell className="px-4 py-3">
-                  <Input
+                  <Input aria-label="Original principal"
                     type="number"
                     placeholder="Original Principal"
                     value={editData.principal_original ?? ""}
@@ -264,7 +264,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   />
                 </TableCell>
                 <TableCell className="px-4 py-3">
-                  <Input
+                  <Input aria-label="Current balance"
                     type="number"
                     placeholder="Current Balance"
                     value={editData.current_balance ?? ""}
@@ -276,7 +276,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   />
                 </TableCell>
                 <TableCell className="px-4 py-3">
-                  <Input
+                  <Input aria-label="Interest rate (%)"
                     type="number"
                     step="0.01"
                     placeholder="Rate %"
@@ -286,7 +286,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   />
                 </TableCell>
                 <TableCell className="px-4 py-3">
-                  <Input
+                  <Input aria-label="Loan term (months)"
                     type="number"
                     placeholder="Term"
                     value={editData.term_months ?? ""}
@@ -314,7 +314,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   </label>
                 </TableCell>
                 <TableCell className="px-4 py-3">
-                  <Input
+                  <Input aria-label="Monthly payment"
                     type="number"
                     placeholder="Monthly payment"
                     value={editData.monthly_payment ?? ""}
