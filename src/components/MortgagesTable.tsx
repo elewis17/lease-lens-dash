@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,9 +37,9 @@ export type MortgageInput = {
 
 interface MortgagesTableProps {
   mortgages: Mortgage[];
-  onUpdate: (id: string, data: MortgageInput) => void;
+  onUpdate: (id: string, data: MortgageInput) => Promise<boolean>;
   onDelete: (id: string) => void;
-  onAdd: (data: MortgageInput) => void;
+  onAdd: (data: MortgageInput) => Promise<boolean>;
   propertyOptions: PropertyOption[]; // NEW
 }
 
@@ -47,73 +47,44 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editData, setEditData] = useState<MortgageInput>({});
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
 
   const handleEdit = (mortgage: Mortgage) => {
     setEditingId(mortgage.id);
+    setIsAdding(false);
     setEditData({
       property_id: mortgage.property_id ?? null,
       loan_name: mortgage.loan_name ?? "",
       principal: typeof mortgage.principal === "number" ? mortgage.principal : null,
-      principal_original: typeof mortgage.principal_original === "number" ? mortgage.principal_original : null,
+      principal_original: mortgage.principal_original ?? mortgage.principal,
       current_balance: typeof mortgage.current_balance === "number" ? mortgage.current_balance : null,
       interest_rate: typeof mortgage.interest_rate === "number" ? mortgage.interest_rate : null,
       term_months: typeof mortgage.term_months === "number" ? mortgage.term_months : null,
       start_date: mortgage.start_date ?? null,
-      monthly_payment: typeof mortgage.monthly_payment === "number" ? mortgage.monthly_payment : null,
+      monthly_payment: mortgage.monthly_payment,
+      includes_escrow: mortgage.includes_escrow ?? undefined,
     });
   };
 
 
-    // helpers
-    const numOrNull = (v?: NumericInput) => (v === "" || v === undefined || v === null ? null : Number(v));
-    const intOrNull = (v?: NumericInput) => (v === "" || v === undefined || v === null ? null : parseInt(String(v), 10));
-    const toApiDate = (d: string | Date | null | undefined): string | null => {
-      if (!d) return null;
-      if (d instanceof Date) return d.toISOString().slice(0, 10);  // YYYY-MM-DD
-      // if already a string, pass through (assume YYYY-MM-DD)
-      return d;
-    };
+  const toApiDate = (value: MortgageInput["start_date"]) => value instanceof Date
+    ? value.toISOString().slice(0, 10) : value ?? "";
 
-    const handleSave = () => {
-      if (!editingId) return;
-
-      const payload: MortgageInput = {
-        property_id: editData.property_id || null,
-        loan_name: (editData.loan_name ?? "").toString().trim() || null,
-
-        // balances
-        principal_original: numOrNull(editData.principal_original),
-        current_balance:   numOrNull(editData.current_balance),
-        principal:         numOrNull(editData.principal), // legacy
-
-        // terms
-        interest_rate:  numOrNull(editData.interest_rate),
-        term_months:    intOrNull(editData.term_months),
-        start_date:     toApiDate(editData.start_date),   // ✅ handles Date or string
-        monthly_payment: numOrNull(editData.monthly_payment),
-        includes_escrow: !!editData.includes_escrow,  
-      };
-
-      onUpdate(editingId, payload);
+  const save = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSaving(true);
+    try {
+      const saved = editingId ? await onUpdate(editingId, editData) : await onAdd(editData);
+      if (!saved) return;
       setEditingId(null);
-    };
-
-  const handleAddNew = () => {
-    onAdd({
-      property_id: editData.property_id,
-      loan_name: editData.loan_name || "Primary Mortgage",
-      // keep "principal" for legacy if your backend expects it; else set null
-      principal: editData.principal ? Number(editData.principal) : 0,
-      principal_original: editData.principal_original ?? null, // ✅ NEW
-      current_balance: editData.current_balance ?? null,       // ✅ NEW
-      interest_rate: parseFloat(String(editData.interest_rate)) || 0,
-      term_months: parseInt(String(editData.term_months), 10) || 360,
-      start_date: new Date(editData.start_date || new Date()),
-      monthly_payment: parseFloat(String(editData.monthly_payment)) || 0,
-      includes_escrow: !!editData.includes_escrow,
-    });
-    setIsAdding(false);
-    setEditData({});
+      setIsAdding(false);
+      setEditData({});
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
   };
 
   return (
@@ -134,7 +105,9 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mortgages.map((mortgage) => (
+            {mortgages.map((mortgage) => {
+              const originalPrincipal = mortgage.principal_original ?? mortgage.principal;
+              return (
               <TableRow key={mortgage.id} className="hover:bg-muted/30 transition-colors border-b border-border/50">
                 {editingId === mortgage.id ? (
                   <>
@@ -142,7 +115,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">
                       <select
                         className="h-8 w-full rounded-md border border-input bg-background px-2"
-                        value={editData.property_id ?? mortgage.property_id ?? ""}
+                        value={editData.property_id ?? ""}
                         onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
                       >
                         <option value="">Select property…</option>
@@ -192,7 +165,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <Input
-                        type="date"
+                        type="date" aria-label="Loan start date"
                         value={toApiDate(editData.start_date) ?? ""}
                         onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                         className="h-8"
@@ -219,10 +192,10 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="ghost" onClick={handleSave} className="h-8 hover:scale-105 transition-transform">
+                        <Button size="sm" variant="ghost" onClick={save} aria-label="Save mortgage" disabled={saving} className="h-8 hover:scale-105 transition-transform">
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 hover:scale-105 transition-transform">
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} aria-label="Cancel mortgage edit" disabled={saving} className="h-8 hover:scale-105 transition-transform">
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -232,7 +205,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   <>
                   {/* NEW: read-mode name */}
                     <TableCell className="px-4 py-3"> {propertyOptions.find(p => p.id === mortgage.property_id)?.name ?? "—"}</TableCell>
-                    <TableCell className="px-4 py-3">${ (mortgage.principal_original ?? mortgage.principal ?? 0).toLocaleString() }</TableCell>
+                    <TableCell className="px-4 py-3">{originalPrincipal == null ? "—" : `$${originalPrincipal.toLocaleString()}`}</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.current_balance == null ? "—" : `$${mortgage.current_balance.toLocaleString()}`}</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.interest_rate}%</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.term_months}</TableCell>
@@ -250,10 +223,10 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     <TableCell className="px-4 py-3">${mortgage.monthly_payment.toLocaleString()}</TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(mortgage)} className="h-8 hover:scale-105 transition-transform">
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(mortgage)} disabled={saving} className="h-8 hover:scale-105 transition-transform">
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => onDelete(mortgage.id)} className="h-8 hover:scale-105 transition-transform text-destructive">
+                        <Button size="sm" variant="ghost" onClick={() => onDelete(mortgage.id)} aria-label={`Delete mortgage ${mortgage.loan_name ?? ""}`} className="h-8 hover:scale-105 transition-transform text-destructive">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -261,7 +234,8 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   </>
                 )}
               </TableRow>
-            ))}
+              );
+            })}
             {isAdding && (
               <TableRow className="bg-muted/20 border-b border-border/50">
                 <TableCell className="px-4 py-3">
@@ -306,7 +280,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                     type="number"
                     step="0.01"
                     placeholder="Rate %"
-                    value={editData.interest_rate || ""}
+                    value={editData.interest_rate ?? ""}
                     onChange={(e) => setEditData({ ...editData, interest_rate: e.target.value })}
                     className="h-8"
                   />
@@ -315,14 +289,14 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   <Input
                     type="number"
                     placeholder="Term"
-                    value={editData.term_months || ""}
+                    value={editData.term_months ?? ""}
                     onChange={(e) => setEditData({ ...editData, term_months: e.target.value })}
                     className="h-8"
                   />
                 </TableCell>
                 <TableCell className="px-4 py-3">
                   <Input
-                    type="date"
+                    type="date" aria-label="Loan start date"
                     value={toApiDate(editData.start_date) ?? ""}
                     onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                     className="h-8"
@@ -343,17 +317,17 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   <Input
                     type="number"
                     placeholder="Monthly payment"
-                    value={editData.monthly_payment || ""}
+                    value={editData.monthly_payment ?? ""}
                     onChange={(e) => setEditData({ ...editData, monthly_payment: e.target.value })}
                     className="h-8"
                   />
                 </TableCell>
                 <TableCell className="px-4 py-3">
                   <div className="flex gap-2 justify-end">
-                    <Button size="sm" variant="ghost" onClick={handleAddNew} className="h-8 hover:scale-105 transition-transform">
+                    <Button size="sm" variant="ghost" onClick={save} aria-label="Save mortgage" disabled={saving} className="h-8 hover:scale-105 transition-transform">
                       <Check className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setIsAdding(false); setEditData({}); }} className="h-8 hover:scale-105 transition-transform">
+                    <Button size="sm" variant="ghost" onClick={() => { setIsAdding(false); setEditData({}); }} aria-label="Cancel new mortgage" disabled={saving} className="h-8 hover:scale-105 transition-transform">
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -366,7 +340,8 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
       {!isAdding && (
         <div className="p-4 border-t border-border">
           <Button
-            onClick={() => setIsAdding(true)}
+            disabled={saving}
+            onClick={() => { setEditingId(null); setEditData({ includes_escrow: false }); setIsAdding(true); }}
             variant="outline"
             className="w-full hover:bg-primary hover:text-primary-foreground transition-colors"
           >

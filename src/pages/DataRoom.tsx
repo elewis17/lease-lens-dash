@@ -3,7 +3,7 @@ import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { Button } from "@/components/ui/button";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
-import { LeaseTable, type LeaseData } from "@/features/leases/LeaseTable";
+import { LeaseTable, type LeaseData, type ManualLeaseInput } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
 
 type PropertyOption = { id: string; name: string };
@@ -19,14 +19,14 @@ type DataRoomProps = {
   properties: Property[];
   propertyOptions: PropertyOption[];
   escrowByProperty: Map<string, boolean>;
-  onAddProperty: (data: Omit<Property, "id">) => void;
-  onUpdateProperty: (id: string, data: Partial<Property>) => void;
+  onAddProperty: (data: Partial<Property>) => Promise<boolean>;
+  onUpdateProperty: (id: string, data: Partial<Property>) => Promise<boolean>;
   onDeleteProperty: (id: string) => void;
-  onAddLease: (data: Omit<LeaseData, "id">) => void;
-  onUpdateLease: (id: string, data: Partial<LeaseData>) => void;
+  onAddLease: (id: string, data: ManualLeaseInput) => Promise<boolean>;
+  onUpdateLease: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   onDeleteLease: (id: string) => void;
-  onAddMortgage: (data: MortgageInput) => void;
-  onUpdateMortgage: (id: string, data: MortgageInput) => void;
+  onAddMortgage: (data: MortgageInput) => Promise<boolean>;
+  onUpdateMortgage: (id: string, data: MortgageInput) => Promise<boolean>;
   onDeleteMortgage: (id: string) => void;
 };
 
@@ -89,52 +89,30 @@ export default function DataRoom({
     [escrowByProperty]
   );
 
-  const OpexOverTaxes = () => {
-    const wrapRef = useRef<HTMLDivElement | null>(null);
-    const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
-    useEffect(() => {
-      const el = wrapRef.current;
-      if (!el) return;
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
 
-      const compute = () => {
-        const th = el.querySelector<HTMLElement>('th.bg-rose-50\\/60, th.bg-rose-50\\/40');
-        if (!th) return;
+    const compute = () => {
+      const th = el.querySelector<HTMLElement>('th.bg-rose-50\\/60, th.bg-rose-50\\/40');
+      if (!th) return;
 
-        const thRect = th.getBoundingClientRect();
-        const containerRect = el.getBoundingClientRect();
-        setPos({
-          left: thRect.left - containerRect.left + 4,
-          top: thRect.top - containerRect.top - 6,
-        });
-      };
+      const thRect = th.getBoundingClientRect();
+      const containerRect = el.getBoundingClientRect();
+      setPos({
+        left: thRect.left - containerRect.left + 4,
+        top: thRect.top - containerRect.top - 6,
+      });
+    };
 
-      compute();
-      window.addEventListener("resize", compute);
-      return () => window.removeEventListener("resize", compute);
-    }, [filteredProperties.length]);
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [filteredProperties.length]);
 
-    return (
-      <div ref={wrapRef} className="relative">
-        {pos && (
-          <span
-            className="absolute z-20 inline-flex -translate-y-full items-center rounded-t-lg bg-rose-100 px-3 py-0.5 text-xs font-medium text-rose-700 shadow-sm pointer-events-none"
-            style={{ left: pos.left, top: pos.top }}
-          >
-            OPEX
-          </span>
-        )}
-
-        <PropertiesTable
-          properties={filteredProperties}
-          onAdd={onAddProperty}
-          onUpdate={onUpdateProperty}
-          onDelete={onDeleteProperty}
-          escrowByProperty={escrowObject}
-        />
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-8">
@@ -215,7 +193,24 @@ export default function DataRoom({
             Supports valuation, operating assumptions, and portfolio-level decision context.
           </p>
         </div>
-        <OpexOverTaxes />
+        <div ref={wrapRef} className="relative">
+          {pos && (
+            <span
+              className="absolute z-20 inline-flex -translate-y-full items-center rounded-t-lg bg-rose-100 px-3 py-0.5 text-xs font-medium text-rose-700 shadow-sm pointer-events-none"
+              style={{ left: pos.left, top: pos.top }}
+            >
+              OPEX
+            </span>
+          )}
+
+          <PropertiesTable
+            properties={filteredProperties}
+            onAdd={onAddProperty}
+            onUpdate={onUpdateProperty}
+            onDelete={onDeleteProperty}
+            escrowByProperty={escrowObject}
+          />
+        </div>
       </section>
 
       <section className="space-y-3">

@@ -79,7 +79,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     property_id: unitById.get(lease.unit_id)?.property_id,
     tenant: lease.tenant?.name ?? "Unknown",
     monthlyRent: lease.monthly_rent,
-    deposit: lease.deposit ?? 0,
+    deposit: lease.deposit ?? null,
     startDate: lease.start_date,
     leaseEnd: lease.end_date,
     status: lease.status,

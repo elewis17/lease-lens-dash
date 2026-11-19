@@ -575,6 +575,21 @@ export type Database = {
         }
         Returns: string
       }
+      save_manual_lease: {
+        Args: {
+          p_lease_id: string
+          p_edit: boolean
+          p_property_id: string
+          p_unit_label: string
+          p_tenant_name: string
+          p_start_date: string
+          p_end_date: string
+          p_monthly_rent: number
+          p_deposit: number | null
+          p_status: Database["public"]["Enums"]["lease_status"] | null
+        }
+        Returns: string
+      }
       update_property_unit_count: {
         Args: { target_property: string }
         Returns: number

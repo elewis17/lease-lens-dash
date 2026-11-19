@@ -1,14 +1,18 @@
 import { format } from "date-fns";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { usePortfolio } from "@/features/portfolio/usePortfolio";
 import { Home, TrendingUp, Calculator, Database, FileText } from "lucide-react";
 import { PropertyFilter } from "@/features/properties/PropertyFilter";
 import type { Property } from "@/features/properties/PropertiesTable";
 import type { MortgageInput } from "@/components/MortgagesTable";
-import type { LeaseData } from "@/features/leases/LeaseTable";
-import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import type { ManualLeaseInput } from "@/features/leases/LeaseTable";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { manualLeaseForm, mortgageEscrowChange, mortgageForm, propertyForm } from "@/features/portfolio/recordValidation";
 import { useToast } from "@/hooks/use-toast";
 import DealsScenarios from "@/pages/DealsScenarios";
 import Memo from "@/pages/Memo";
@@ -17,6 +21,9 @@ import PortfolioSnapshot from "@/pages/PortfolioSnapshot";
 import DataRoom from "@/pages/DataRoom";
 import { modelPortfolio } from "@/domain/finance/portfolio";
 import type { DealAssumptions } from "@/domain/finance/underwriting";
+
+type RecordKind = "property" | "lease" | "mortgage";
+const recordTable = { property: "properties", lease: "leases", mortgage: "mortgages" } as const;
 
 type View = "snapshot" | "portfolio" | "database" | "deals" | "memo";
 
@@ -42,432 +49,128 @@ const Index = ({ userId }: { userId: string }) => {
     leases: record.leases?.map(lease => ({ ...lease, monthly_rent: lease.monthly_rent * (1 + increase / 100) })) ?? null,
   }, asOf, marketRatePct);
 
-  const handleUpdateLease = async (leaseId: string, data: Partial<LeaseData>) => {
-    // 1. Load existing lease so we can update tenant/unit
-    const { data: lease, error: fetchErr } = await supabase
-      .from("leases")
-      .select("tenant_id, unit_id")
-      .eq("user_id", userId)
-      .eq("id", leaseId)
-      .single();
-
-    if (fetchErr || !lease) {
-      toast({ title: "Error", description: "Lease not found", variant: "destructive" });
-      return;
-    }
-
-    const { tenant_id, unit_id } = lease;
-
-    // 2. Update tenant name
-    if (data.tenant && tenant_id) {
-      const { error } = await supabase
-        .from("tenants")
-        .update({ name: data.tenant })
-        .eq("user_id", userId)
-        .eq("id", tenant_id).select("id").single();
-      if (error) {
-        toast({ title: "Tenant update failed", description: "Check the tenant details and try again.", variant: "destructive" });
-        return;
-      }
-    }
-
-    // 3. Update unit label
-    if (data.unit_label && unit_id) {
-      const { error } = await supabase
-        .from("units")
-        .update({ unit_label: data.unit_label })
-        .eq("user_id", userId)
-        .eq("id", unit_id).select("id").single();
-      if (error) {
-        toast({ title: "Unit update failed", description: "Check the unit and try again.", variant: "destructive" });
-        await refresh();
-        return;
-      }
-    }
-
-    // 4. Update lease fields
-    const leasePayload: TablesUpdate<"leases"> = {};
-
-    if (data.monthlyRent !== undefined) leasePayload.monthly_rent = data.monthlyRent;
-    if (data.deposit !== undefined) leasePayload.deposit = data.deposit;
-
-    if (data.startDate) leasePayload.start_date = data.startDate;
-    if (data.leaseEnd) leasePayload.end_date = data.leaseEnd;
-
-    if (data.status) leasePayload.status = data.status;
-
-    // Optional: if UI lets you change property/unit
-    if (data.unit_id) leasePayload.unit_id = data.unit_id;
-    if (data.property_id) leasePayload.property_id = data.property_id;
-
-    const { error: leaseError } = await supabase
-      .from("leases")
-      .update(leasePayload)
-      .eq("user_id", userId)
-      .eq("id", leaseId)
-      .select("id")
-      .single();
-
-    if (leaseError) {
-      toast({ title: "Lease update failed", description: "Review the lease details and try again.", variant: "destructive" });
-      await refresh();
-      return;
-    }
-
-    toast({ title: "Success", description: "Lease updated successfully" });
-    refresh();
+  const showWriteError = (title: string, description: string) => {
+    toast({ title, description, variant: "destructive" });
+    return false;
   };
 
-  const handleDeleteLease = async (id: string) => {
-    const { error } = await supabase.from('leases').delete().eq("user_id", userId).eq("id", id).select("id").single();
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to delete lease", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Lease deleted successfully" });
-      refresh();
-    }
-  };
-
-  const handleAddLease = async (data: Omit<LeaseData, "id">) => {
-    const { startDate, leaseEnd: endDate } = data;
-    if (!startDate || !endDate || endDate < startDate) return;
-
-    // 1) Resolve target property
-    const targetPropertyId = data.property_id ?? selectedProperty;
-    if (!properties.some((property) => property.id === targetPropertyId)) {
-      toast({
-        title: "Select a property",
-        description: "Pick a property before adding a lease.",
-        variant: "destructive",
-      });
-      return;
+  const saveManualLease = async (id: string, data: ManualLeaseInput, editing: boolean) => {
+    const result = manualLeaseForm.safeParse(data);
+    if (!result.success) return showWriteError("Check the lease", result.error.issues[0].message);
+    const lease = result.data;
+    if (!properties.some(property => property.id === lease.property_id)) {
+      return showWriteError("Select a property", "Choose a property from this portfolio.");
     }
 
-    // -------------------------------
-    // 2) TENANT: find or create by name
-    // -------------------------------
-    const tenantName = (data.tenant ?? "").trim();
-    const unitLabel = (data.unit_label ?? "").trim();
-    if (!tenantName || !unitLabel) {
-      toast({ title: "Tenant and unit required", description: "Enter a tenant and unit before saving the lease.", variant: "destructive" });
-      return;
-    }
-
-    let tenantId: string | null = null;
-
-    if (tenantName) {
-      // Try to reuse an existing tenant with the same name
-      const { data: existingTenant, error: tenantLookupError } = await supabase
-        .from("tenants")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("name", tenantName)
-        .maybeSingle();
-
-      if (tenantLookupError) {
-        toast({ title: "Tenant lookup failed", description: "Check the tenant record and try again.", variant: "destructive" });
-        return;
-      }
-
-      if (existingTenant) {
-        tenantId = existingTenant.id;
-      } else {
-        // Create a new tenant row
-        const { data: insertedTenant, error: tenantInsertError } = await supabase
-          .from("tenants")
-          .insert({ name: tenantName, user_id: userId })
-          .select("id")
-          .single();
-
-        if (tenantInsertError || !insertedTenant) {
-          toast({
-            title: "Error",
-            description: "Failed to create tenant",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        tenantId = insertedTenant.id;
-      }
-    }
-
-    // -------------------------------
-    // 3) UNIT: find or create by (property_id + unit_label)
-    // -------------------------------
-    let unitId: string | null = null;
-
-    if (unitLabel) {
-      // Try to reuse an existing unit with same label on this property
-      const { data: existingUnit, error: unitLookupError } = await supabase
-        .from("units")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("property_id", targetPropertyId)
-        .eq("unit_label", unitLabel)
-        .maybeSingle();
-
-      if (unitLookupError) {
-        toast({ title: "Unit lookup failed", description: "Check the unit label and try again.", variant: "destructive" });
-        return;
-      }
-
-      if (existingUnit) {
-        unitId = existingUnit.id;
-      } else {
-        // Create new unit row
-        const { data: insertedUnit, error: unitInsertError } = await supabase
-          .from("units")
-          .insert({
-            user_id: userId,
-            property_id: targetPropertyId,
-            unit_label: unitLabel,
-          })
-          .select("id")
-          .single();
-
-        if (unitInsertError || !insertedUnit) {
-          toast({
-            title: "Error",
-            description: "Failed to create unit",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        unitId = insertedUnit.id;
-      }
-    }
-
-    // -------------------------------
-    // 4) LEASE: write the foreign keys into leases
-    // -------------------------------
-    if (!tenantId || !unitId) return;
-
-    const payload: TablesInsert<"leases"> = {
-      user_id: userId,
-      tenant_id: tenantId,
-      property_id: targetPropertyId,
-      unit_id: unitId,
-      monthly_rent: Number(data.monthlyRent ?? 0),
-      deposit: Number(data.deposit ?? 0),
-      start_date: startDate,
-      end_date: endDate,
-      status: data.status ?? "active",
-    };
-
-    const { error: leaseError } = await supabase.from("leases").insert(payload);
-
-    if (leaseError) {
-      toast({
-        title: "Error",
-        description: "Failed to create lease",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const { error: unitCountError } = await supabase.rpc("update_property_unit_count", {
-      target_property: targetPropertyId,
+    const { data: saved, error } = await supabase.rpc("save_manual_lease", {
+      p_lease_id: id,
+      p_edit: editing,
+      p_property_id: lease.property_id,
+      p_unit_label: lease.unit_label,
+      p_tenant_name: lease.tenant,
+      p_start_date: lease.startDate,
+      p_end_date: lease.leaseEnd,
+      p_monthly_rent: lease.monthlyRent,
+      p_deposit: lease.deposit,
+      p_status: lease.status ?? null,
     });
-
-    toast(unitCountError
-      ? { title: "Lease saved", description: "The property’s unit count could not be updated." }
-      : { title: "Success", description: "Lease added successfully" });
+    if (error || saved !== id) return showWriteError("Lease save failed", "Check the lease details and try again.");
     await refresh();
+    toast({ title: editing ? "Lease updated" : "Lease added" });
+    return true;
   };
 
-  //MORTGAGE HANDLERS
-  const mortgageNumberMissing = (value: string | number | null | undefined) =>
-    value == null || value === "" || !Number.isFinite(Number(value));
-
-  const handleUpdateMortgage = async (id: string, data: MortgageInput) => {
-    const { property_id, loan_name, start_date, principal, interest_rate, term_months, monthly_payment } = data;
-    if ([property_id, loan_name, start_date].some((field) => field === null || field === "") ||
-        [principal, interest_rate, term_months, monthly_payment].some((value) =>
-          value !== undefined && mortgageNumberMissing(value))) {
-      toast({ title: "Required mortgage details missing", description: "Enter the property, loan name, principal, terms, start date and payment.", variant: "destructive" });
-      return;
-    }
-
-    const payload: TablesUpdate<"mortgages"> = {};
-
-    if (data.loan_name != null) payload.loan_name = data.loan_name;
-    if (data.principal !== undefined) payload.principal = Number(data.principal);
-    if (data.principal_original !== undefined) payload.principal_original = Number(data.principal_original);
-    if (data.current_balance !== undefined) payload.current_balance = Number(data.current_balance);
-    if (data.interest_rate !== undefined) payload.interest_rate = Number(data.interest_rate);
-    if (data.term_months !== undefined) payload.term_months = Number(data.term_months);
-
-    if (data.start_date != null)
-      payload.start_date = data.start_date instanceof Date 
-        ? data.start_date.toISOString() 
-        : data.start_date;
-
-    if (data.monthly_payment !== undefined) payload.monthly_payment = Number(data.monthly_payment);
-    if (data.includes_escrow !== undefined) payload.includes_escrow = Boolean(data.includes_escrow);
-    if (data.property_id != null) payload.property_id = data.property_id;
-
-    const { data: rows, error } = await supabase
-      .from("mortgages")
-      .update(payload)
-      .eq("user_id", userId)
-      .eq("id", id)
-      .select();
-
-    if (error || !rows?.length) {
-      toast({
-        title: "Error",
-        description: "Failed to update mortgage",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    await refresh();
-  };
-
-  const handleDeleteMortgage = async (id: string) => {
-    const { error } = await supabase.from('mortgages').delete().eq("user_id", userId).eq("id", id).select("id").single();
-    
-    if (error) {
-      toast({ title: "Error", description: "Failed to delete mortgage", variant: "destructive" });
+  const saveMortgage = async (input: MortgageInput, id?: string) => {
+    const escrowOnly = mortgageEscrowChange.safeParse(input);
+    let payload: TablesUpdate<"mortgages">;
+    if (id && escrowOnly.success) {
+      payload = escrowOnly.data;
     } else {
-      toast({ title: "Success", description: "Mortgage deleted successfully" });
-      refresh();
-    }
-  };
+      const result = mortgageForm.safeParse(input);
+      if (!result.success) return showWriteError("Check the mortgage", result.error.issues[0].message);
+      const mortgage = result.data;
+      if (!properties.some(property => property.id === mortgage.property_id)) {
+        return showWriteError("Select a property", "Choose a property from this portfolio.");
+      }
+      payload = {
+        ...mortgage,
+        loan_name: mortgage.loan_name || undefined,
+        principal: mortgage.principal_original,
+      };
 
-  const handleAddMortgage = async (data: MortgageInput) => {
-    const propertyId = data.property_id ?? selectedProperty;
-    const startDate = data.start_date instanceof Date
-      ? data.start_date.toISOString()
-      : data.start_date;
-    if (!propertyId || !startDate ||
-        [data.principal, data.interest_rate, data.term_months, data.monthly_payment].some(mortgageNumberMissing)) {
-      toast({ title: "Required mortgage details missing", description: "Enter the property, principal, terms, start date and payment.", variant: "destructive" });
-      return;
-    }
-
-    const payload: TablesInsert<"mortgages"> = {
-      user_id: userId,
-      property_id: propertyId,
-      loan_name: data.loan_name ?? undefined,
-      principal: Number(data.principal),
-      principal_original: data.principal_original !== "" ? Number(data.principal_original) : null,
-      current_balance: data.current_balance !== "" ? Number(data.current_balance) : null,
-      interest_rate: Number(data.interest_rate),
-      term_months: Number(data.term_months),
-      start_date: startDate,
-      monthly_payment: Number(data.monthly_payment),
-      includes_escrow: Boolean(data.includes_escrow),
-    };
-
-    const { error } = await supabase.from("mortgages").insert(payload);
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to add mortgage", variant: "destructive" });
-      return;
-    } 
-
-    toast({ title: "Success", description: "Mortgage added successfully" });
-    refresh();
-    
-  };
-
-  //PROPERTY HANDLERS
-  const handleAddProperty = async (data: Omit<Property, "id">) => {
-    if (!data.address?.trim()) {
-      toast({ title: "Address required", description: "Enter a property address before saving.", variant: "destructive" });
-      return;
+      if (!id) {
+        const { error } = await supabase.from("mortgages").insert({
+          ...mortgage,
+          loan_name: mortgage.loan_name || undefined,
+          principal: mortgage.principal_original,
+          user_id: userId,
+        });
+        if (error) return showWriteError("Mortgage save failed", "Check the mortgage details and try again.");
+        await refresh();
+        toast({ title: "Mortgage added" });
+        return true;
+      }
     }
 
-    const payload: TablesInsert<"properties"> = {
-      alias: data.alias,
-      address: data.address,
-      type: data.type ?? null,
-      purchase_price: data.sale_price ?? null,
-      property_value: data.property_value ?? null,
-      property_taxes: data.property_taxes ?? null,
-      mgmt_pct: data.mgmt_pct ?? null,
-      vacancy_pct: data.vacancy_pct ?? null,
-      maintenance_pct: data.maintenance_pct ?? null,
-      insurance: data.insurance ?? null,    
-    };
-
-    const { error } = await supabase
-      .from("properties")
-      .insert({
-        ...payload, 
-        user_id: userId,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to add property", variant: "destructive" });
-      return;
-    }
-
-    toast({ title: "Success", description: "Property added" });
+    const { error } = await supabase.from("mortgages").update(payload)
+      .eq("user_id", userId).eq("id", id!).select("id").single();
+    if (error) return showWriteError("Mortgage save failed", "Check the mortgage details and try again.");
     await refresh();
+    toast({ title: "Mortgage updated" });
+    return true;
   };
 
-  const handleUpdateProperty = async (id: string, patch: Partial<Property>) => {
-    // Build a payload your current DB actually accepts:
-    // - Always allow address
-    // - Map sale_price -> purchase_price (legacy column) if provided
-    // - Only include fields that are not undefined (avoid sending unknown keys)
-    const payload: TablesUpdate<"properties"> = {};
-    if (patch.address !== undefined) {
-      if (!patch.address?.trim()) {
-        toast({ title: "Address required", description: "Enter a property address before saving.", variant: "destructive" });
+  const saveProperty = async (input: Partial<Property>, id?: string) => {
+    const result = propertyForm.safeParse(input);
+    if (!result.success) return showWriteError("Check the property", result.error.issues[0].message);
+    const { sale_price, ...property } = result.data;
+    const payload = { ...property, purchase_price: sale_price };
+    const { error } = id
+      ? await supabase.from("properties").update(payload).eq("user_id", userId).eq("id", id).select("id").single()
+      : await supabase.from("properties").insert({ ...payload, user_id: userId }).select("id").single();
+    if (error) {
+      return showWriteError("Property save failed", error.code === "23505"
+        ? "Use a property name that is unique in this portfolio."
+        : "Check the property details and try again.");
+    }
+
+    await refresh();
+    toast({ title: id ? "Property updated" : "Property added" });
+    return true;
+  };
+
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: RecordKind; id: string; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteInFlight = useRef(false);
+  const requestDelete = (kind: RecordKind, id: string, name: string) => {
+    setDeleteError(false);
+    setDeleteTarget({ kind, id, name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setDeleting(true);
+    setDeleteError(false);
+    const { kind, id } = deleteTarget;
+    try {
+      const { error } = await supabase.from(recordTable[kind]).delete()
+        .eq("user_id", userId).eq("id", id).select("id").single();
+      if (error) {
+        setDeleteError(true);
         return;
       }
-      payload.address = patch.address;
+      if (kind === "property" && selectedProperty === id) setSelectedProperty("");
+      setDeleteTarget(null);
+      await refresh();
+      toast({ title: "Record deleted" });
+    } catch {
+      setDeleteError(true);
+    } finally {
+      deleteInFlight.current = false;
+      setDeleting(false);
     }
-    if (patch.sale_price !== undefined) payload.purchase_price = patch.sale_price;
-    if (patch.property_value !== undefined) payload.property_value = patch.property_value;
-
-    // If your migration with the new columns is applied, these will also succeed (harmless if ignored by types)
-    if (patch.alias !== undefined) payload.alias = patch.alias ?? null;
-    if (patch.type !== undefined) payload.type = patch.type ?? null;
-    if (patch.property_taxes !== undefined) payload.property_taxes = patch.property_taxes ?? null;
-    if (patch.mgmt_pct !== undefined) payload.mgmt_pct = patch.mgmt_pct ?? null;
-    if (patch.vacancy_pct !== undefined) payload.vacancy_pct = patch.vacancy_pct ?? null;
-    if (patch.maintenance_pct !== undefined) payload.maintenance_pct = patch.maintenance_pct ?? null;
-    if (patch.insurance !== undefined) payload.insurance = patch.insurance ?? null;  
-
-    const { data: updated, error } = await supabase
-      .from("properties")
-      .update(payload)
-      .eq("user_id", userId)
-      .eq("id", id)
-      .select("id, address, purchase_price, alias, name, type, sale_price, property_value, property_taxes, mgmt_pct, vacancy_pct, maintenance_pct, insurance")
-      .single();
-
-    if (error || !updated) {
-      toast({ title: "Update failed", description: "The property could not be updated. Try again.", variant: "destructive" });
-      return;
-    }
-
-    await refresh();
-    toast({ title: "Property updated" });
-  };
-
-  const handleDeleteProperty = async (id: string) => {
-    const { error } = await supabase.from("properties").delete()
-      .eq("user_id", userId).eq("id", id).select("id").single();
-
-    if (error) {
-      toast({ title: "Delete failed", description: "The property could not be deleted. Try again.", variant: "destructive" });
-      return;
-    }
-
-    if (selectedProperty === id) setSelectedProperty("");
-    await refresh();
-    toast({ title: "Deleted", description: "Property removed successfully." });
   };
 
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -579,15 +282,15 @@ const LeftNav = ({
             properties={properties}
             propertyOptions={propertyOptions}
             escrowByProperty={escrowByProperty}
-            onAddProperty={handleAddProperty}
-            onUpdateProperty={handleUpdateProperty}
-            onDeleteProperty={handleDeleteProperty}
-            onAddLease={handleAddLease}
-            onUpdateLease={handleUpdateLease}
-            onDeleteLease={handleDeleteLease}
-            onAddMortgage={handleAddMortgage}
-            onUpdateMortgage={handleUpdateMortgage}
-            onDeleteMortgage={handleDeleteMortgage}
+            onAddProperty={saveProperty}
+            onUpdateProperty={(id, input) => saveProperty(input, id)}
+            onDeleteProperty={(id) => requestDelete("property", id, properties.find(property => property.id === id)?.alias ?? "Property")}
+            onAddLease={(id, input) => saveManualLease(id, input, false)}
+            onUpdateLease={(id, input) => saveManualLease(id, input, true)}
+            onDeleteLease={(id) => requestDelete("lease", id, leases.find(lease => lease.id === id)?.tenant ?? "Lease")}
+            onAddMortgage={saveMortgage}
+            onUpdateMortgage={(id, input) => saveMortgage(input, id)}
+            onDeleteMortgage={(id) => requestDelete("mortgage", id, mortgages.find(mortgage => mortgage.id === id)?.loan_name ?? "Mortgage")}
           />
         )}
 
@@ -599,6 +302,27 @@ const LeftNav = ({
           <PortfolioDecisions metrics={metrics} onAddData={openDataRoom} marketRate={marketRate}
             onMarketRateChange={setMarketRate} rentScenario={rentScenario} />
         )}
+        <AlertDialog open={deleteTarget !== null} onOpenChange={open => {
+          if (!open && !deleteInFlight.current) setDeleteTarget(null);
+        }}>
+          {deleteTarget && <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {deleteTarget.kind}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteTarget.name} will be permanently deleted.
+                {deleteTarget.kind === "property" && " Its linked units, leases, mortgages, and other dependent records will also be deleted."}
+                {deleteTarget.kind === "lease" && " Its linked payment records will also be deleted."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {deleteError && <p role="alert" className="text-sm text-destructive">The record could not be deleted. Try again.</p>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <Button variant="destructive" disabled={deleting} onClick={confirmDelete}>
+                {deleting ? "Deleting…" : `Delete ${deleteTarget.kind}`}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>}
+        </AlertDialog>
       </main>
 
     </div>
