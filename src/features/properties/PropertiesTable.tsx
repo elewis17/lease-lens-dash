@@ -12,12 +12,15 @@ export type Property = {
   address: string | null;
   type: string | null;
   sale_price: number | null;
+  property_value?: number | null;
+  rent_growth_rate?: number | null;
+  opex_inflation_rate?: number | null;
 
   // OPEX inputs (some may be null/undefined)
-  property_taxes: number | null;   // monthly $
-  insurance?: number | null;       // monthly $
-  hoa?: number | null;             // monthly $
-  misc?: number | null;            // monthly $
+  property_taxes: number | null;   // annual $
+  insurance?: number | null;       // annual $
+  hoa?: number | null;             // annual $
+  misc?: number | null;            // annual $
   mgmt_pct: number | null;         // % of rent
   maintenance_pct: number | null;  // % of rent
   vacancy_pct: number | null;
@@ -43,7 +46,6 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editData, setEditData] = useState<Partial<Property>>({});
-  const [overrideTaxes, setOverrideTaxes] = useState(false); // per-row flag
 
   const aliasSet = useMemo(() => new Set(properties.map(p => p.alias.trim().toLowerCase())), [properties]);
 
@@ -53,25 +55,21 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
       alias: row.alias,
       address: row.address ?? "",
       type: row.type ?? "Single-Family",
-      sale_price: row.sale_price ?? undefined,
+      sale_price: row.sale_price ?? null,
+      property_value: row.property_value ?? null,
       property_taxes: row.property_taxes ?? undefined,
       insurance: row.insurance ?? undefined,   // ✅ add
-      mgmt_pct: row.mgmt_pct ?? 8,
-      vacancy_pct: row.vacancy_pct ?? 5,
-      maintenance_pct: row.maintenance_pct ?? 5,
+      mgmt_pct: row.mgmt_pct ?? null,
+      vacancy_pct: row.vacancy_pct ?? null,
+      maintenance_pct: row.maintenance_pct ?? null,
     });
-    setOverrideTaxes(row.property_taxes != null); // override ON if an explicit value already exists
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditData({});
     setIsAdding(false);
-    setOverrideTaxes(false);
   };
-
-  const autoTaxes = (sale: number | undefined) =>
-    sale && !overrideTaxes ? Math.round(sale * 0.013) : editData.property_taxes;
 
   const saveEdit = () => {
     if (!editingId) return;
@@ -85,7 +83,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
     onUpdate(editingId, {
       ...editData,
       insurance: editData.insurance ?? null,
-      property_taxes: overrideTaxes ? editData.property_taxes ?? null : (editData.sale_price ? Math.round(editData.sale_price * 0.013) : null),
+      property_taxes: editData.property_taxes ?? null,
     });
     cancelEdit();
   };
@@ -100,15 +98,12 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
       address: (editData.address as string) || null,
       type: (editData.type as PropertyType) || "Single-Family",
       sale_price: editData.sale_price ?? null,
+      property_value: editData.property_value ?? null,
       insurance: editData.insurance ?? null,
-      property_taxes: overrideTaxes
-        ? editData.property_taxes ?? null
-        : editData.sale_price
-          ? Math.round(editData.sale_price * 0.013)
-          : null,
-      mgmt_pct: editData.mgmt_pct ?? 8,
-      vacancy_pct: editData.vacancy_pct ?? 5,
-      maintenance_pct: editData.maintenance_pct ?? 5,
+      property_taxes: editData.property_taxes ?? null,
+      mgmt_pct: editData.mgmt_pct ?? null,
+      vacancy_pct: editData.vacancy_pct ?? null,
+      maintenance_pct: editData.maintenance_pct ?? null,
     });
     cancelEdit();
   };
@@ -123,6 +118,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
               <TableHead className="px-4 py-2">Address</TableHead>
               <TableHead className="px-4 py-2">Type</TableHead>
               <TableHead className="px-4 py-2">Purchase Price</TableHead>
+              <TableHead className="px-4 py-2">Current Value Estimate</TableHead>
 
               {/* Non-OPEX: Vacancy */}
               <TableHead className="px-4 py-2">Vacancy %</TableHead>
@@ -130,7 +126,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
               {/* OPEX #1: Taxes */}
               <TableHead className="px-4 py-2 bg-rose-50/60">
                 <div className="flex items-center">
-                  <span>Taxes</span>
+                  <span>Annual Taxes</span>
                   <span
                     className="inline-flex items-center ml-1 text-muted-foreground"
                     title="Defaults to 1.3% of Purchase Price unless overridden"
@@ -189,14 +185,18 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                         value={editData.sale_price ?? ""}
                         onChange={(e) => {
                           const v = e.target.value ? Number(e.target.value) : undefined;
-                          setEditData(ed => ({ ...ed, sale_price: v, property_taxes: autoTaxes(v) ?? ed.property_taxes }));
+                          setEditData(ed => ({ ...ed, sale_price: v ?? null }));
                         }}
                         className="h-8"
                         placeholder="e.g., 450000"
                       />
                     </TableCell>
                     <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.vacancy_pct ?? 5} onChange={(e)=>setEditData({ ...editData, vacancy_pct: Number(e.target.value) })} className="h-8" />
+                      <Input aria-label="Current value estimate" type="number" min="0" value={editData.property_value ?? ""}
+                        onChange={event => setEditData({ ...editData, property_value: event.target.value === "" ? null : Number(event.target.value) })} className="h-8" />
+                    </TableCell>
+                    <TableCell className="px-4 py-2">
+                      <Input type="number" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
                     </TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex items-center gap-2">
@@ -205,13 +205,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                           return (
                             <Input
                               type="number"
-                              value={
-                                escrowed
-                                  ? ""
-                                  : overrideTaxes
-                                    ? (editData.property_taxes ?? "")
-                                    : (editData.sale_price ? Math.round(editData.sale_price * 0.013) : "")
-                              }
+                              value={escrowed ? "" : (editData.property_taxes ?? "")}
                               onChange={(e) =>
                                 setEditData({
                                   ...editData,
@@ -219,20 +213,12 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                                 })
                               }
                               className="h-8"
-                              disabled={escrowed || !overrideTaxes}
-                              placeholder={escrowed ? "in mortgage" : "auto"}
+                              disabled={escrowed}
+                              placeholder={escrowed ? "in mortgage" : ""}
                             />
                           );
                         })()}
-                        <label className={`text-xs inline-flex items-center gap-1 ${isEscrowed(editingId) ? "opacity-40 cursor-not-allowed" : ""}`}>
-                        <input
-                          type="checkbox"
-                          disabled={isEscrowed(editingId)}
-                          checked={overrideTaxes}
-                          onChange={(e) => setOverrideTaxes(e.target.checked)}
-                        />
-                        Override
-                      </label>
+
                       </div>
                     </TableCell>
                     <TableCell className="px-4 py-2">
@@ -256,10 +242,10 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                       })()}
                     </TableCell>
                     <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.mgmt_pct ?? 8} onChange={(e)=>setEditData({ ...editData, mgmt_pct: Number(e.target.value) })} className="h-8" />
+                      <Input type="number" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
                     </TableCell>          
                     <TableCell className="px-4 py-2">
-                      <Input type="number" value={editData.maintenance_pct ?? 5} onChange={(e)=>setEditData({ ...editData, maintenance_pct: Number(e.target.value) })} className="h-8" />
+                      <Input type="number" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" />
                     </TableCell>
                     <TableCell className="px-4 py-2">
                       <div className="flex justify-end gap-2">
@@ -274,11 +260,12 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     <TableCell className="px-4 py-2">{p.address ?? "—"}</TableCell>
                     <TableCell className="px-4 py-2">{p.type ?? "—"}</TableCell>
                     <TableCell className="px-4 py-2">{fmtMoney(p.sale_price ?? undefined)}</TableCell>
+                    <TableCell className="px-4 py-2">{fmtMoney(p.property_value)}</TableCell>
                     <TableCell className="px-4 py-2">{pct(p.vacancy_pct ?? undefined)}</TableCell>
                     {(() => {
                       const escrowed = isEscrowed(p.id);
                       const value = fmtMoney(
-                        p.property_taxes ?? (p.sale_price ? Math.round(p.sale_price * 0.013) : undefined)
+                        p.property_taxes
                       );
                       return (
                         <TableCell className={`px-4 py-2 ${escrowed ? "text-muted-foreground" : ""}`}>
@@ -356,12 +343,16 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     value={editData.sale_price ?? ""}
                     onChange={(e) => {
                       const v = e.target.value ? Number(e.target.value) : undefined;
-                      setEditData(ed => ({ ...ed, sale_price: v, property_taxes: autoTaxes(v) ?? ed.property_taxes }));
+                      setEditData(ed => ({ ...ed, sale_price: v ?? null }));
                     }}
                     className="h-8"
                   />
                 </TableCell>
-                <TableCell className="px-4 py-2"><Input type="number" value={editData.vacancy_pct ?? 5} onChange={(e)=>setEditData({ ...editData, vacancy_pct: Number(e.target.value) })} className="h-8" /></TableCell>
+                <TableCell className="px-4 py-2">
+                      <Input aria-label="Current value estimate" type="number" min="0" value={editData.property_value ?? ""}
+                        onChange={event => setEditData({ ...editData, property_value: event.target.value === "" ? null : Number(event.target.value) })} className="h-8" />
+                    </TableCell>
+                    <TableCell className="px-4 py-2"><Input type="number" value={editData.vacancy_pct ?? ""} onChange={(e)=>setEditData({ ...editData, vacancy_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2">
                   <div className="flex items-center gap-2">
                     {(() => {
@@ -383,10 +374,7 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                         />
                       );
                     })()}
-                    <label className="text-xs inline-flex items-center gap-1">
-                      <input type="checkbox" checked={overrideTaxes} onChange={(e) => setOverrideTaxes(e.target.checked)} />
-                      Override
-                    </label>
+
                   </div>
                 </TableCell>
                 {/* ✅ NEW: Insurance (between Taxes and Mgmt %) */}
@@ -404,8 +392,8 @@ export default function PropertiesTable({ properties, onAdd, onUpdate, onDelete,
                     placeholder=""
                   />
                 </TableCell>
-                <TableCell className="px-4 py-2"><Input type="number" value={editData.mgmt_pct ?? 8} onChange={(e)=>setEditData({ ...editData, mgmt_pct: Number(e.target.value) })} className="h-8" /></TableCell>
-                <TableCell className="px-4 py-2"><Input type="number" value={editData.maintenance_pct ?? 5} onChange={(e)=>setEditData({ ...editData, maintenance_pct: Number(e.target.value) })} className="h-8" /></TableCell>
+                <TableCell className="px-4 py-2"><Input type="number" value={editData.mgmt_pct ?? ""} onChange={(e)=>setEditData({ ...editData, mgmt_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
+                <TableCell className="px-4 py-2"><Input type="number" value={editData.maintenance_pct ?? ""} onChange={(e)=>setEditData({ ...editData, maintenance_pct: e.target.value === "" ? null : Number(e.target.value) })} className="h-8" /></TableCell>
                 <TableCell className="px-4 py-2">
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={saveAdd}><Check className="h-4 w-4" /></Button>

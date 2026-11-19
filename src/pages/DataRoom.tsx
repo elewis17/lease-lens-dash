@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Database, FileText, Home, Landmark, ShieldCheck } from "lucide-react";
+import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
 import { LeaseTable, type LeaseData } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
@@ -184,21 +184,14 @@ export default function DataRoom({
             value={filteredLeases.length}
             title="leases"
             cue="supports rent quality"
-            description="Lease records feed contracted rent, occupancy, cash flow, and the confidence behind portfolio income."
+            description="Lease records feed contracted rent, occupancy, and estimated cash flow."
           />
           <DataSignal
             icon={Landmark}
             value={filteredMortgages.length}
             title="mortgages"
             cue="feeds debt stress"
-            description="Debt balances, payments, rates, and escrow flags drive DSCR, cash flow, refi capacity, and risk watch items."
-          />
-          <DataSignal
-            icon={ShieldCheck}
-            value={properties.length > 0 && filteredLeases.length > 0 && filteredMortgages.length > 0 ? "High" : "Medium"}
-            title="confidence"
-            cue="feeds memo"
-            description="Confidence improves as properties, leases, mortgages, and expenses are all populated for the selected scope."
+            description="Debt balances, payments, rates, and escrow flags drive DSCR, cash flow, and coverage."
           />
         </div>
       </section>

@@ -5,15 +5,7 @@ import { Label } from "@/components/ui/label";
 import { defaultThresholds } from "@/domain/finance/thresholds";
 import { kirkwoodExample, modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
 
-const money = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
-const currency = (value: number | null | undefined) => value == null ? "—" : money.format(value);
-const ratio = (value: number | null | undefined) => value == null ? "—" : `${value.toFixed(2)}×`;
-const percent = (value: number | null | undefined) => value == null ? "—" : `${(100 * value).toFixed(1)}%`;
+import { money as currency, ratio, percent } from "@/domain/finance/format";
 
 const fields: { key: keyof DealAssumptions; label: string; scale?: number }[] = [
   { key: "price", label: "Asking price ($)" },
@@ -35,15 +27,30 @@ type AssumptionInputs = Partial<Record<keyof DealAssumptions, string>>;
 
 const assumptionsFrom = (values: AssumptionInputs): DealAssumptions | null => {
   if (fields.some(({ key }) => !values[key]?.trim())) return null;
-  const assumptions: DealAssumptions = { ...kirkwoodExample, holdYears };
-  for (const { key, scale = 1 } of fields) assumptions[key] = Number(values[key]) / scale;
-  return assumptions;
+  return {
+    ...Object.fromEntries(fields.map(({ key, scale = 1 }) => [key, Number(values[key]) / scale])),
+    holdYears,
+  } as DealAssumptions;
 };
 
-export default function DealsScenarios({ illustrative = false }: { illustrative?: boolean }) {
-  const [values, setValues] = useState<AssumptionInputs>(() => illustrative
-    ? Object.fromEntries(fields.map(({ key, scale = 1 }) => [key, String(Number((kirkwoodExample[key] * scale).toPrecision(12)))]))
-    : {});
+export default function DealsScenarios({ illustrative = false, initialAssumptions, onAssumptionsChange }: {
+  illustrative?: boolean;
+  initialAssumptions?: DealAssumptions | null;
+  onAssumptionsChange?: (assumptions: DealAssumptions | null) => void;
+}) {
+  const [values, setValues] = useState<AssumptionInputs>(() => {
+    const initial = initialAssumptions ?? (illustrative ? kirkwoodExample : null);
+    return initial
+      ? Object.fromEntries(fields.map(({ key, scale = 1 }) => [key, String(Number((initial[key] * scale).toPrecision(12)))]))
+      : {};
+  });
+
+  const changeInput = (key: keyof DealAssumptions, value: string) => {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onAssumptionsChange?.(assumptionsFrom(next));
+  };
+
   const assumptions = assumptionsFrom(values);
   const model = assumptions && modelDeal(assumptions);
   const gates = assumptions && priceGates(assumptions);
@@ -75,7 +82,7 @@ export default function DealsScenarios({ illustrative = false }: { illustrative?
                   type="number"
                   step="any"
                   value={values[key] ?? ""}
-                  onChange={(event) => setValues({ ...values, [key]: event.target.value })}
+                  onChange={(event) => changeInput(key, event.target.value)}
                 />
               </div>
             ))}

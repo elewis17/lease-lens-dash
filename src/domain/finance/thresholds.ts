@@ -7,4 +7,5 @@ export const defaultThresholds = {
   lender: { minimumDscr: 1.15 },
 };
 
+export type ThresholdPolicy = typeof defaultThresholds;
 export type BuyThresholds = typeof defaultThresholds.buy;

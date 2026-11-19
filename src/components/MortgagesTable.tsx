@@ -233,7 +233,7 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   {/* NEW: read-mode name */}
                     <TableCell className="px-4 py-3"> {propertyOptions.find(p => p.id === mortgage.property_id)?.name ?? "—"}</TableCell>
                     <TableCell className="px-4 py-3">${ (mortgage.principal_original ?? mortgage.principal ?? 0).toLocaleString() }</TableCell>
-                    <TableCell className="px-4 py-3">${ (mortgage.current_balance ?? mortgage.principal ?? 0).toLocaleString() }</TableCell>
+                    <TableCell className="px-4 py-3">{mortgage.current_balance == null ? "—" : `$${mortgage.current_balance.toLocaleString()}`}</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.interest_rate}%</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.term_months}</TableCell>
                     <TableCell className="px-4 py-3">{mortgage.start_date ? new Date(mortgage.start_date).toLocaleDateString() : "—"}</TableCell>

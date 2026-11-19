@@ -1,137 +1,47 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card } from "@/components/ui/card";
+import { projectPortfolio } from "@/domain/finance/scenarios";
+import { money } from "@/domain/finance/format";
+import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 
-interface WealthBuildChartProps {
-  noi: number;
-  capRate: number;
-  mortgages: Array<{
-    principal: number;
-    interest_rate: number;
-    term_months: number;
-    start_date: Date;
-  }>;
-}
-
-export const WealthBuildChart = ({ noi, capRate, mortgages }: WealthBuildChartProps) => {
-  const calculateLoanBalance = (
-    principal: number,
-    interestRate: number,
-    termMonths: number,
-    monthsPaid: number
-  ) => {
-    if (monthsPaid >= termMonths) return 0;
-    
-    const monthlyRate = interestRate / 100 / 12;
-    const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
-    
-    let balance = principal;
-    for (let i = 0; i < monthsPaid; i++) {
-      const interest = balance * monthlyRate;
-      const principalPaid = monthlyPayment - interest;
-      balance -= principalPaid;
-    }
-    
-    return Math.max(0, balance);
-  };
-
-  const generateProjections = () => {
-    const data: { year: number; propertyValue: number; loanBalance: number; equity: number }[] = [];
-    const monthlyNOI = noi;
-    const annualNOI = monthlyNOI * 12;
-    
-    for (let year = 1; year <= 10; year++) {
-      // Project property value based on NOI and cap rate
-      const projectedNOI = annualNOI * Math.pow(1.03, year - 1); // Assume 3% NOI growth
-      const propertyValue = capRate > 0 ? projectedNOI / (capRate / 100) : 0;
-      
-      // Calculate total loan balance across all mortgages
-      let totalLoanBalance = 0;
-      const monthsPassed = year * 12;
-      mortgages.forEach(mortgage => {
-        totalLoanBalance += calculateLoanBalance(
-          mortgage.principal,
-          mortgage.interest_rate,
-          mortgage.term_months,
-          monthsPassed
-        );
-      });
-      
-      const equity = propertyValue - totalLoanBalance;
-      
-      data.push({
-        year,
-        propertyValue: Math.round(propertyValue / 1000), // Convert to thousands
-        loanBalance: Math.round(totalLoanBalance / 1000),
-        equity: Math.round(equity / 1000),
-      });
-    }
-    
-    return data;
-  };
-
-  const data = generateProjections();
-
+export function WealthBuildChart({ metrics }: { metrics: PortfolioMetrics }) {
+  const data = projectPortfolio(metrics);
+  const showIncome = data.some(point => point.cashFlow !== null);
+  const showEquity = data.some(point => point.equity !== null);
   return (
-    <Card className="p-6 rounded-xl shadow-sm border-border">
-      <div className="h-[400px] sm:h-[500px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-            <XAxis 
-              dataKey="year" 
-              stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              label={{ value: "Years", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))" }}
-            />
-            <YAxis 
-              stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-              tickFormatter={(value) => `$${value}k`}
-              label={{ value: "Thousands ($)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))" }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
-                color: "hsl(var(--foreground))",
-                fontSize: "14px",
-                padding: "8px 12px",
-              }}
-              formatter={(value: number) => [`$${value}k`, ""]}
-              labelFormatter={(label) => `Year ${label}`}
-            />
-            <Legend 
-              wrapperStyle={{ fontSize: "12px" }}
-              iconType="line"
-            />
-            <Line
-              type="monotone"
-              dataKey="propertyValue"
-              name="Projected Property Value"
-              stroke="hsl(var(--primary))"
-              strokeWidth={3}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="loanBalance"
-              name="Loan Balance"
-              stroke="hsl(var(--destructive))"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="equity"
-              name="Equity"
-              stroke="hsl(142, 76%, 36%)"
-              strokeWidth={3}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+    <Card className="space-y-3 p-5 shadow-none">
+      <h2 className="text-lg font-semibold">Wealth trajectory</h2>
+      <p className="text-sm text-muted-foreground">
+        Estimate · Ten years at each property’s recorded rent growth, expense growth, current vacancy assumption, and current cap rate.
+        Loan payments roll off at maturity. Loan balances use current balances and remaining terms.
+      </p>
+      {(!showEquity || !showIncome) && (
+        <p className="text-sm text-muted-foreground">
+          {showIncome ? "Equity requires positive NOI, valuation, and complete current loan terms and balances."
+            : "Cash flow projections need rent, operating costs, growth assumptions, and remaining loan schedules."}
+        </p>
+      )}
+      {metrics.assets.map(asset => (
+        <p className="text-xs text-muted-foreground" key={asset.property.id}>
+          {asset.property.alias} · Rent growth {asset.property.rent_growth_rate ?? "—"}% · Expense growth {asset.property.opex_inflation_rate ?? "—"}%
+          {" · "}Vacancy {asset.property.vacancy_pct ?? "—"}% · Starting cap rate {asset.capRate === null ? "—" : `${(asset.capRate * 100).toFixed(2)}%`}
+        </p>
+      ))}
+      {(showIncome || showEquity) && (
+        <div className="h-72" aria-label="Estimated cash flow and real estate equity by year">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data}>
+              <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+              <XAxis dataKey="year" />
+              <YAxis tickFormatter={value => money(value)} width={74} />
+              <Tooltip formatter={(value: number) => money(value)} labelFormatter={value => `Year ${value}`} />
+              <Legend />
+              {showIncome && <Line dataKey="cashFlow" name="Annual cash flow" stroke="hsl(var(--foreground))" dot={false} isAnimationActive={false} />}
+              {showEquity && <Line dataKey="equity" name="Real estate equity" stroke="hsl(var(--primary))" dot={false} isAnimationActive={false} />}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </Card>
   );
-};
+}

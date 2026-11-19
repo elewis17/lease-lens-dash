@@ -1,4 +1,5 @@
 import { defaultThresholds, type BuyThresholds } from "./thresholds.ts";
+import { acquisitionVerdict, passesBuyGates } from "./verdicts.ts";
 
 export type DealAssumptions = {
   price: number;
@@ -111,13 +112,13 @@ export function priceGates(input: DealAssumptions, buy: BuyThresholds = defaultT
   }
   const debtPerDollar = model.monthlyDebt / input.price * Math.min(12, input.termMonths);
   const walkAway = Math.floor(model.annualNoi / (defaultThresholds.lender.minimumDscr * debtPerDollar));
-  const dscrCap = Math.floor(model.annualNoi / (buy.minimumDscr * debtPerDollar));
+  const dscrCap = Math.floor(model.annualNoi / (Math.max(buy.minimumDscr, defaultThresholds.lender.minimumDscr) * debtPerDollar));
   if (!Number.isSafeInteger(walkAway) || !Number.isSafeInteger(dscrCap)) {
     return { maxOffer: null, walkAway: null, verdict: "Insufficient basis" } as const;
   }
   const passes = (price: number) => {
     const deal = modelDeal({ ...input, price });
-    return deal?.dscr != null && deal.dscr >= buy.minimumDscr && deal.irr != null && deal.irr >= buy.minimumIrr;
+    return deal !== null && passesBuyGates(deal, buy);
   };
   let low = 1;
   let high = dscrCap;
@@ -129,12 +130,6 @@ export function priceGates(input: DealAssumptions, buy: BuyThresholds = defaultT
       low = middle + 1;
     } else high = middle - 1;
   }
-  const verdict = passes(input.price)
-    ? "Buy"
-    : model.dscr < defaultThresholds.lender.minimumDscr
-      ? "Do not pursue"
-      : maxOffer === null
-        ? "Insufficient basis"
-        : "Verify mitigations";
+  const verdict = acquisitionVerdict({ dscr: model.dscr, irr: model.irr }, maxOffer, { ...defaultThresholds, buy });
   return { maxOffer, walkAway, verdict } as const;
 }
