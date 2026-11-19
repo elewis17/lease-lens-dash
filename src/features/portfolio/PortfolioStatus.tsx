@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { useWorkspace } from "./Workspace";
+import { useWorkspace } from "./useWorkspace";
 
 export function PortfolioStatus({ children }: { children: ReactNode }) {
   const { query } = useWorkspace();

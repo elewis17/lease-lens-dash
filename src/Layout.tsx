@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { rememberWorkspaceLocation } from "@/features/navigation/returnTo";
+import { useAuth } from "@/context/auth";
+import { rememberWorkspaceLocation } from "@/features/navigation/sessionState";
 import UserMenu from "@/components/ui/UserMenu";
 import { useLocation, useNavigate } from "react-router-dom";
 

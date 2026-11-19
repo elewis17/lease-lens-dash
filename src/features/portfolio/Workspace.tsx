@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PropertyFilter } from "@/features/properties/PropertyFilter";
 import { usePortfolio } from "./usePortfolio";
 import { PortfolioNav } from "@/features/navigation/PortfolioNav";
@@ -56,8 +56,7 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   };
 }
 
-type WorkspaceContext = ReturnType<typeof useWorkspaceState>;
-export const useWorkspace = () => useOutletContext<WorkspaceContext>();
+export type WorkspaceContext = ReturnType<typeof useWorkspaceState>;
 
 export function Workspace({ userId, prefix = "", illustrative = false }: {
   userId: string;

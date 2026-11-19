@@ -1,3 +1,5 @@
+import { acquisitionVerdictDetail } from "@/domain/finance/verdicts";
+import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { money, ratio, percent } from "@/domain/finance/format";
@@ -31,7 +33,7 @@ export default function Memo({ assumptions, onOpenUnderwriting }: { assumptions:
     <section className="space-y-4">
       <h1 className="text-3xl font-semibold">Investment Memo</h1>
       <Card className="space-y-4 p-5 shadow-none">
-        <p className="font-medium">Verdict · {gates.verdict}</p>
+        <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} />
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 tabular-nums">
           {summary.map(([label, value]) => <div key={label}>
             <dt className="text-sm text-muted-foreground">{label}</dt>

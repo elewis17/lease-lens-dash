@@ -1,3 +1,4 @@
+import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { coverage, money } from "@/domain/finance/format";
@@ -32,8 +33,7 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
     <section className="space-y-6">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold">Portfolio Decisions</h1>
-        <p>Verdict · {metrics.verdict.label}</p>
-        <p className="text-sm text-muted-foreground">{metrics.verdict.detail}</p>
+        <VerdictExplanation {...metrics.verdict} />
       </header>
       <dl className="grid gap-3 sm:grid-cols-3">
         {[

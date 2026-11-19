@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { buttonVariants } from "@/components/ui/button";
-import { useWorkspace } from "@/features/portfolio/Workspace";
+import { buttonVariants } from "@/components/ui/buttonVariants";
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { modelDeal } from "@/domain/finance/underwriting";
 
 export default function DecisionLog() {

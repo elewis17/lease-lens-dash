@@ -1,3 +1,5 @@
+import { acquisitionVerdictDetail } from "@/domain/finance/verdicts";
+import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,7 +57,9 @@ export default function DealsScenarios({ illustrative = false, values, onChange 
 
         <Card className="space-y-4 p-5 shadow-none">
           <h3 className="text-lg font-semibold">Price guidance</h3>
-          <p className="font-medium" role="status">{model ? gates?.verdict : "Enter valid assumptions to calculate price guidance."}</p>
+          {model && gates
+            ? <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} live />
+            : <p className="font-medium" role="status">Enter valid assumptions to calculate price guidance.</p>}
           <dl className="grid grid-cols-2 gap-4">
             <div><dt className="text-sm text-muted-foreground">Max offer</dt><dd className="text-xl font-semibold">{currency(gates?.maxOffer)}</dd></div>
             <div><dt className="text-sm text-muted-foreground">Walk-away</dt><dd className="text-xl font-semibold">{currency(gates?.walkAway)}</dd></div>

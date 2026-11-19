@@ -25,3 +25,12 @@ export function useSessionState<T>(key: string, fallback: T) {
   };
   return [value, update] as const;
 }
+
+export const destinationStorageKey = "dealstack:sign-in-destination";
+export const workspacePath = /^\/(?:briefing|capital|underwrite|holdings|decisions(?:\/[a-z0-9-]+\/memo)?)\/?$/i;
+export type WorkspaceDestination = { pathname: string; search: string; hash: string };
+
+export function rememberWorkspaceLocation(location: WorkspaceDestination) {
+  const { pathname, search, hash } = location;
+  storeSessionValue(destinationStorageKey, workspacePath.test(pathname) ? { pathname, search, hash } : null);
+}

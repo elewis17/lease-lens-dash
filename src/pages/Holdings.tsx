@@ -1,7 +1,7 @@
 import DataRoom from "./DataRoom";
 import { PortfolioStatus } from "@/features/portfolio/PortfolioStatus";
 import { useRecordActions } from "@/features/portfolio/useRecordActions";
-import { useWorkspace } from "@/features/portfolio/Workspace";
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
 
 export default function Holdings() {
   const {

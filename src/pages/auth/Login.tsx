@@ -3,7 +3,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useLocation } from "react-router-dom";
 import { ReturnToWorkspace } from "@/features/navigation/returnTo";
 import { callbackUrl } from "@/features/auth/authRedirect";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Login() {

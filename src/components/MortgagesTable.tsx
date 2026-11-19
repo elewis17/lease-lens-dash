@@ -93,13 +93,13 @@ export const MortgagesTable = ({ mortgages, onUpdate, onDelete, onAdd, propertyO
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 border-b border-border">
-              <TableHead className="px-4 py-3">Property</TableHead> {/* NEW */}
+              <TableHead className="px-4 py-3">Property</TableHead>
               <TableHead className="font-semibold px-4 py-3">Original Principal</TableHead> 
               <TableHead className="font-semibold px-4 py-3">Current Balance</TableHead>   
               <TableHead className="font-semibold px-4 py-3">Rate (%)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Term (months)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Start Date</TableHead>
-              <TableHead className="px-4 py-2">Escrow (T&amp;I)</TableHead> {/* NEW */}
+              <TableHead className="px-4 py-2">Escrow (T&amp;I)</TableHead>
               <TableHead className="font-semibold px-4 py-3">Monthly Payment</TableHead>
               <TableHead className="font-semibold px-4 py-3 text-center">Actions</TableHead>
             </TableRow>

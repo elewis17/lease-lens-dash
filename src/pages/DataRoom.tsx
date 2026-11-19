@@ -242,10 +242,7 @@ export default function DataRoom({
           onUpdate={onUpdateLease}
           onDelete={onDeleteLease}
           onAdd={onAddLease}
-          propertyOptions={properties.map((p: any) => ({
-            id: p.id,
-            name: p.alias || p.address || "Untitled Property",
-          }))}
+          propertyOptions={propertyOptions}
         />
       </section>
 
