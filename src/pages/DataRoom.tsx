@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Database, FileText, Home, Landmark } from "lucide-react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
+import { Button } from "@/components/ui/button";
+import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { LeaseTable, type LeaseData } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
 
 type PropertyOption = { id: string; name: string };
 
 type DataRoomProps = {
+  ownerId: string;
+  selectedProperty: string;
+  onLeaseCaptured: () => Promise<void>;
   filteredProperties: Property[];
   filteredLeases: LeaseData[];
   filteredMortgages: Mortgage[];
@@ -57,6 +62,9 @@ const DataSignal = ({
 );
 
 export default function DataRoom({
+  ownerId,
+  selectedProperty,
+  onLeaseCaptured,
   filteredProperties,
   filteredLeases,
   filteredMortgages,
@@ -74,6 +82,8 @@ export default function DataRoom({
   onUpdateMortgage,
   onDeleteMortgage,
 }: DataRoomProps) {
+  const [showLeaseUpload, setShowLeaseUpload] = useState(false);
+  const [leaseSaved, setLeaseSaved] = useState(false);
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]
@@ -217,6 +227,21 @@ export default function DataRoom({
             Feeds rent quality, occupancy, monthly cash flow, and investment memo support.
           </p>
         </div>
+        {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
+        {showLeaseUpload ? (
+          <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
+            onClose={() => setShowLeaseUpload(false)}
+            onUploadComplete={async () => {
+              setShowLeaseUpload(false);
+              setLeaseSaved(true);
+              await onLeaseCaptured();
+            }} />
+        ) : (
+          <Button variant="outline" disabled={!properties.length} onClick={() => {
+            setLeaseSaved(false);
+            setShowLeaseUpload(true);
+          }}>Upload lease</Button>
+        )}
         <LeaseTable
           leases={filteredLeases}
           onUpdate={onUpdateLease}

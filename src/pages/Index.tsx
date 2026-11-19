@@ -571,7 +571,7 @@ const LeftNav = ({
         {query.isSuccess && view === "snapshot" && <PortfolioSnapshot metrics={metrics} onAddData={openDataRoom} />}
 
         {query.isSuccess && view === "database" && (
-          <DataRoom
+          <DataRoom ownerId={userId} selectedProperty={selectedProperty} onLeaseCaptured={refresh}
             filteredProperties={filteredProperties}
             filteredLeases={filteredLeases}
             filteredMortgages={filteredMortgages}
