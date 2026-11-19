@@ -1,4 +1,4 @@
-import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import PortfolioSnapshot from "@/pages/PortfolioSnapshot";
 import PortfolioDecisions from "@/pages/PortfolioDecisions";
 import DealsScenarios from "@/pages/DealsScenarios";
@@ -13,8 +13,13 @@ export function Briefing() {
   const navigate = useNavigate();
   return (
     <PortfolioStatus>
-      {metrics.assets.length > 0 && <Link className="text-sm underline underline-offset-4" to={pathTo("/capital")}>Review capital opportunities</Link>}
       <PortfolioSnapshot metrics={metrics} onAddData={() => navigate(pathTo("/holdings"))}
+        onReviewProperty={propertyId => {
+          const destination = pathTo("/capital");
+          const search = new URLSearchParams(destination.search);
+          search.set("property", propertyId);
+          navigate({ ...destination, search: search.toString() });
+        }}
         initialAppreciation={illustrative ? "3" : ""} sessionKey={`dealstack:${userId}:appreciation`} />
     </PortfolioStatus>
   );

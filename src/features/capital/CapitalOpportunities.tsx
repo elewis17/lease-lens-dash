@@ -7,9 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
-  capitalHorizonYears, capitalObjectives, capitalOpportunities, capitalProjection, emptyRentPlan, emptySalePlan, netSaleProceeds, rankCapitalOpportunities,
-  type CapitalObjective, type CapitalOpportunity, type RefinanceQuote, type RentPlan, type SalePlan,
+  capitalHorizonYears, capitalObjectives, capitalOpportunities, capitalProjection, emptyPaydownPlan, emptyRentPlan, emptySalePlan, netSaleProceeds, rankCapitalOpportunities,
+  type CapitalObjective, type CapitalOpportunity, type RefinanceQuote, type RentPlan, type SalePlan, type PaydownPlan,
 } from "@/domain/finance/capital";
+import { balanceEvidenceText } from "@/domain/finance/debt";
 import { coverage, money, percent, ratio } from "@/domain/finance/format";
 import type { AssetMetrics } from "@/domain/finance/portfolio";
 import { CapitalLifecycle } from "@/features/decisions/CapitalLifecycle";
@@ -24,7 +25,7 @@ const objectiveBasis: Record<CapitalObjective, string> = {
   risk: "Change in debt-service coverage",
 };
 
-function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInputs, onSaleChange }: {
+function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInputs, onSaleChange, paydownInputs, onPaydownChange }: {
   row: CapitalOpportunity;
   objective: CapitalObjective;
   quote: RefinanceQuote;
@@ -32,6 +33,8 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
   onRentChange: (next: RentPlan) => void;
   saleInputs: SalePlan;
   onSaleChange: (next: SalePlan) => void;
+  paydownInputs: PaydownPlan;
+  onPaydownChange: (next: PaydownPlan) => void;
 }) {
   const { action, asset, refinance: model, rentPlan } = row;
   const projection = capitalProjection(row);
@@ -45,12 +48,17 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
     notes: "", actualAnnualCashChange: null,
     projection: {
       quote, rentInputs: rentPlan ? rentInputs : undefined,
+      paydownInputs: row.paydown ? {
+        ...paydownInputs, startingBalance: row.paydown.startingBalance, annualRate: row.paydown.annualRate,
+        monthsSaved: row.paydown.monthsSaved, lifetimeInterestSaved: row.paydown.lifetimeInterestSaved,
+      } : undefined,
       saleInputs: netProceeds === null ? undefined : { ...saleInputs, netProceeds },
       annualCashChange: projection?.annualRunRateImpact ?? null, initialCost: projection?.closingCosts ?? null,
       tenYearCashChange: projection?.cash ?? null, tenYearWealthChange: projection?.wealth ?? null, coverageChange: projection?.risk ?? null,
     },
   } as const;
   const current = stage === "identified" || stage === "investigating" ? captured : latest ?? captured;
+  const debtEvidence = balanceEvidenceText(asset.debtEvidence);
   const score = projection?.[objective] ?? null;
   const formatScore = objective === "risk" ? ratio : money;
 
@@ -87,6 +95,9 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
                   Estimate · Existing balance {money(asset.debt)}, balance-weighted loan rate {asset.loanRatePct === null ? "—" : percent(asset.loanRatePct / 100)}, and DSCR {coverage(asset)}.
                 </p>
               )}
+              {(action === "refinance" || action === "paydown" || action === "sale") && debtEvidence && (
+                <p className="text-sm text-muted-foreground">{debtEvidence}</p>
+              )}
               {action === "vacancy" && asset.occupancy && (
                 <p className="text-sm text-muted-foreground">
                   Contractual · Active leases cover {asset.occupancy.occupiedUnits} of {asset.occupancy.totalUnits} recorded units.
@@ -104,6 +115,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
               <p className="text-sm text-muted-foreground">{row.risk}</p>
               <p className="text-sm text-muted-foreground">{row.missing}</p>
             </section>
+            {action === "paydown" && <PaydownEditor row={row} value={paydownInputs} change={onPaydownChange} />}
             {action === "sale" && <SaleScenario value={saleInputs} change={onSaleChange} net={netProceeds} />}
             {(action === "rent" || action === "vacancy") && (
               <RentPlanEditor value={rentInputs} change={onRentChange} estimate={rentPlan} />
@@ -138,6 +150,46 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
         </SheetContent>
       </Sheet>
     </li>
+  );
+}
+
+function PaydownEditor({ row, value, change }: {
+  row: CapitalOpportunity; value: PaydownPlan; change: (next: PaydownPlan) => void;
+}) {
+  const estimate = row.paydown;
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-medium">Principal paydown</h3>
+      <label className="block space-y-1 text-sm">
+        <span>Loan to pay down</span>
+        <select value={value.loanId} onChange={event => change({ ...value, loanId: event.target.value })}
+          className="block min-h-11 w-full rounded-md border bg-background px-2">
+          <option value="">Select a loan</option>
+          {row.asset.loans?.filter(loan => loan.balance !== null && loan.balance > 0).map(loan => (
+            <option key={loan.id} value={loan.id}>{money(loan.balance)} recorded balance at {percent(loan.rate)}</option>
+          ))}
+        </select>
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block space-y-1 text-sm">
+          <span>Principal payment ($)</span>
+          <Input type="number" min="0" step=".01" value={value.amount} onChange={event => change({ ...value, amount: event.target.value })} />
+        </label>
+        <label className="block space-y-1 text-sm">
+          <span>Prepayment fee ($)</span>
+          <Input type="number" min="0" step=".01" value={value.fee} onChange={event => change({ ...value, fee: event.target.value })} />
+        </label>
+      </div>
+      {estimate ? (
+        <div className="space-y-2 text-sm italic tabular-nums">
+          <p>Hypothetical · If paid now, deploys {money(estimate.closingCosts)} including any fee.</p>
+          <p>Monthly cash flow change when applied {money(estimate.debtServiceReduction)}. Loan paid off {estimate.monthsSaved} months earlier.</p>
+          <p>{horizon} interest saved {money(estimate.tenYearInterestSaved)}. Lifetime interest saved {money(estimate.lifetimeInterestSaved)}.</p>
+          <p>First 12 months after costs {money(estimate.firstYearNet)}. First-year cash yield {percent(estimate.firstYearCashYield)}.</p>
+          <p>{horizon} cash change {money(estimate.cash)}. {horizon} incremental real estate net worth {money(estimate.wealth)}.</p>
+        </div>
+      ) : <p className="text-sm text-muted-foreground">Requires a loan with a current balance and a complete payoff schedule. Enter the payment and a verified fee, or zero if none applies.</p>}
+    </section>
   );
 }
 
@@ -210,9 +262,11 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
     navigate({ pathname, search: params.toString(), hash }, { replace: true, preventScrollReset: true });
   };
   const [rentPlans, setRentPlans] = useSessionState<Record<string, RentPlan>>(sessionKey + ":rent-plans", {});
+  const [paydownPlans, setPaydownPlans] = useSessionState<Record<string, PaydownPlan>>(sessionKey + ":paydowns", {});
   const [salePlans, setSalePlans] = useSessionState<Record<string, SalePlan>>(sessionKey + ":sale-plans", {});
   const changeRentPlan = (id: string, next: RentPlan) => setRentPlans({ ...rentPlans, [id]: next });
-  const ranked = rankCapitalOpportunities(capitalOpportunities(assets, quote, rentPlans), objective);
+  const ranked = rankCapitalOpportunities(capitalOpportunities(assets, quote, rentPlans, paydownPlans), objective);
+  const paydownOptions = assets.filter(asset => (asset.debt ?? 0) > 0 && !paydownPlans[asset.property.id + ":paydown"]);
   const rentResetOptions = assets.filter(asset => (asset.expectedRent ?? 0) > 0 && !rentPlans[asset.property.id + ":rent"]);
 
   return (
@@ -244,11 +298,24 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
           </select>
         </label>
       )}
+      {!!paydownOptions.length && (
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          <span>Model a debt paydown</span>
+          <select className="min-h-11 rounded-md border bg-background px-2" value=""
+            onChange={event => {
+              if (event.target.value) setPaydownPlans({ ...paydownPlans, [event.target.value + ":paydown"]: emptyPaydownPlan });
+            }}>
+            <option value="">Select a property</option>
+            {paydownOptions.map(asset => <option key={asset.property.id} value={asset.property.id}>{asset.property.alias}</option>)}
+          </select>
+        </label>
+      )}
       {ranked.length
         ? <ul aria-label="Capital opportunities">{ranked.map(row => (
             <Opportunity key={row.id} row={row} objective={objective} quote={quote}
               rentInputs={rentPlans[row.id] ?? emptyRentPlan} onRentChange={next => changeRentPlan(row.id, next)}
-              saleInputs={salePlans[row.id] ?? emptySalePlan} onSaleChange={next => setSalePlans({ ...salePlans, [row.id]: next })} />
+              saleInputs={salePlans[row.id] ?? emptySalePlan} onSaleChange={next => setSalePlans({ ...salePlans, [row.id]: next })}
+              paydownInputs={paydownPlans[row.id] ?? emptyPaydownPlan} onPaydownChange={next => setPaydownPlans({ ...paydownPlans, [row.id]: next })} />
           ))}</ul>
         : <p className="text-sm text-muted-foreground">The current record does not identify a refinance, vacancy, or sale review.</p>}
     </Card>

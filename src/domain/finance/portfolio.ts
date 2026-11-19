@@ -1,5 +1,5 @@
 import { isActiveLease } from "./activeLeases.ts";
-import { splitLoan, balanceAfter, type LoanInput } from "./debt.ts";
+import { splitLoan, balanceAfter, balanceEvidence, type BalanceStatement, type LoanInput } from "./debt.ts";
 import { MetricsCalculator } from "./MetricsCalculator.ts";
 import { operatingExpenses, type ExpenseInput } from "./OpexCalculator.ts";
 import { defaultThresholds, type ThresholdPolicy } from "./thresholds.ts";
@@ -26,6 +26,7 @@ export type PortfolioRecord = {
   loans: LoanInput[] | null;
   expenses: ExpenseInput[] | null;
   payments?: PaymentInput[] | null;
+  statements?: readonly BalanceStatement[];
 };
 
 export const sumKnown = (values: readonly (number | null)[]): number | null =>
@@ -52,7 +53,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
     const effectiveRent = expectedRent === null ? null : expectedRent === 0 ? 0
       : vacancy == null ? null : expectedRent * (1 - vacancy / 100);
     const loanRows = record.loans?.filter(loan => loan.property_id === property.id);
-    const loans = loanRows?.map(loan => splitLoan(loan, asOf)) ?? null;
+    const loans = loanRows?.map(loan => ({ ...splitLoan(loan, asOf), id: loan.id })) ?? null;
     const debt = loans ? sumKnown(loans.map(loan => loan.balance)) : null;
     const debtService = loans ? sumKnown(loans.map(loan => loan.principalInterest)) : null;
     const escrow = loans ? sumKnown(loans.map(loan => loan.escrow)) : null;
@@ -74,6 +75,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
     const verdict = portfolioVerdict({ ...metrics, debtService, loanRatePct, marketRatePct }, propertyPolicies.get(property.type ?? "") ?? policy);
     return {
       ...metrics, property, value, debt, debtService, escrow, loans, expectedRent, effectiveRent, occupancy,
+      debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
       loanRatePct, rateBasis, expenseLines, opex, equity: value === null || debt === null ? null : value - debt,
       verdict,
     };
@@ -97,6 +99,7 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
   const nextBalance = loans !== null ? sumKnown(loans.map(loan => balanceAfter(loan, 12))) : null;
   return {
     ...metrics, ...receipts, assets, value, debt, debtService, loans, loanRatePct,
+    debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
     annualizedCashFlow: metrics.cashFlow === null ? null : Math.round(metrics.cashFlow) * 12,
     equity: value === null || debt === null ? null : value - debt,
     ltv: value !== null && value > 0 && debt !== null ? debt / value : null,

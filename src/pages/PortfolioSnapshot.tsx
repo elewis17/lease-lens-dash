@@ -5,11 +5,12 @@ import { projectNextYearWealth } from "@/domain/finance/scenarios";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
+import { balanceEvidenceText } from "@/domain/finance/debt";
 import { coverage, money, percent } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 
-export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciation = "", sessionKey }: {
-  metrics: PortfolioMetrics; onAddData: () => void; initialAppreciation?: string; sessionKey: string;
+export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty, initialAppreciation = "", sessionKey }: {
+  metrics: PortfolioMetrics; onAddData: () => void; onReviewProperty: (propertyId: string) => void; initialAppreciation?: string; sessionKey: string;
 }) {
   const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
   const [equityGoal, setEquityGoal] = useSessionState(sessionKey + ":equityGoal", "");
@@ -28,13 +29,17 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
   const wealth = projectNextYearWealth(metrics, appreciation);
   const progress = (amount: number | null, target: string) =>
     amount !== null && Number(target) > 0 && Number.isFinite(Number(target)) ? percent(amount / Number(target)) : "—";
+  const debtEvidence = balanceEvidenceText(metrics.debtEvidence);
+  const priorities = metrics.assets.filter(asset =>
+    ["Distress", "Sell candidate", "Refinance candidate"].includes(asset.verdict.label))
+    .sort((left, right) => (left.cashFlow ?? Infinity) - (right.cashFlow ?? Infinity));
   const tiles = [
-    { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest" },
-    { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest" },
+    { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest", source: debtEvidence },
+    { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest", source: debtEvidence },
     { label: "Cap rate", value: percent(metrics.capRate), basis: "Estimate · Annualized NOI divided by property value" },
     { label: "Physical occupancy", value: percent(metrics.physicalOccupancy), basis: metrics.occupiedUnits === null || metrics.totalUnits === null
       ? "Unit or lease records missing" : `Contractual · ${metrics.occupiedUnits} of ${metrics.totalUnits} units on current leases` },
-    { label: "Real estate equity", value: money(metrics.equity), basis: "Estimate · Property value less recorded current loan balances" },
+    { label: "Real estate equity", value: money(metrics.equity), basis: "Estimate · Property value less recorded current loan balances", source: debtEvidence },
     { label: "Cash-on-cash", value: percent(metrics.cashOnCash), basis: "Invested cash basis is missing" },
   ];
 
@@ -51,9 +56,38 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
             <dt className="text-sm text-muted-foreground">{tile.label}</dt>
             <dd className="text-2xl font-semibold tabular-nums">{tile.value}</dd>
             <dd className="text-xs text-muted-foreground">{tile.basis}</dd>
+            {tile.source && <dd className="mt-1 text-xs text-muted-foreground">{tile.source}</dd>}
           </Card>
         ))}
       </dl>
+
+      {priorities.length > 0 && (
+        <Card className="space-y-3 p-5">
+          <h2 className="text-lg font-semibold">Needs you</h2>
+          <ul className="divide-y">
+            {priorities.map(asset => {
+              const refinance = asset.verdict.label === "Refinance candidate";
+              return (
+                <li key={asset.property.id} className="space-y-2 py-3">
+                  <p className="font-medium">{asset.property.alias} · {asset.verdict.label}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Estimate · {money(asset.cashFlow)}/mo cash flow and {coverage(asset)} debt-service coverage.
+                    {" "}{asset.verdict.detail}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {refinance
+                      ? "Confirm the quote and fees before estimating savings."
+                      : "Verify rent and expenses and obtain a payoff quote and selling costs before considering a sale."}
+                  </p>
+                  <Button variant="outline" onClick={() => onReviewProperty(asset.property.id)}>
+                    Review {asset.property.alias} in Capital
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-4 p-5">
@@ -75,7 +109,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
         <Card className="space-y-4 p-5">
           <h2 className="text-lg font-semibold">Equity position</h2>
           <dl className="space-y-2 tabular-nums">
-            <div className="flex justify-between gap-4"><dt>Property value · Estimate</dt><dd>{money(metrics.value)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Property value · Estimate, source date unverified</dt><dd>{money(metrics.value)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Debt · Recorded current balances</dt><dd>{money(metrics.debt)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Loan-to-value · Estimate</dt><dd>{percent(metrics.ltv)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Scheduled principal reduction · Next 12 months</dt><dd>{money(metrics.paydown)}</dd></div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { downloadCapturedDocument } from "@/features/leases/leaseCaptureApi";
 import type { usePortfolio } from "@/features/portfolio/usePortfolio";
+import { staleStatementDays } from "@/domain/finance/debt";
 import { money, percent } from "@/domain/finance/format";
 import type { Property } from "./PropertiesTable";
 
@@ -130,9 +131,9 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
                 <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
                 <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
                 {backedByStatement && source ? (
-                  <p className={age !== null && age > 45 ? "text-warning" : "text-muted-foreground"}>
+                  <p className={age !== null && age > staleStatementDays ? "text-warning" : "text-muted-foreground"}>
                     Source · Confirmed statement dated {shortDate(source.statement_date)}{age !== null ? " · " + age + " days old" : ""}
-                    {age !== null && age > 45 ? " · Check for a newer statement." : ""}
+                    {age !== null && age > staleStatementDays ? " · Check for a newer statement." : ""}
                   </p>
                 ) : loan.current_balance != null && <p className="text-muted-foreground">Balance source date unverified.</p>}
               </li>

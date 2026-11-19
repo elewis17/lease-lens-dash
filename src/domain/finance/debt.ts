@@ -46,3 +46,38 @@ export function balanceAfter(loan: Loan, months: number): number | null {
   return loan.balance * monthlyPayment(1, loan.rate, loan.remaining) /
     monthlyPayment(1, loan.rate, loan.remaining - months);
 }
+
+export type BalanceStatement = { mortgage_id: string; statement_date: string; principal_balance: number };
+export const staleStatementDays = 45;
+
+export function balanceEvidence(loans: readonly { id: string; balance: number | null }[] | null,
+  statements: readonly BalanceStatement[], asOf: string) {
+  const latest = new Map<string, BalanceStatement>();
+  for (const statement of statements) {
+    if (statement.statement_date > asOf) continue;
+    const prior = latest.get(statement.mortgage_id);
+    if (!prior || statement.statement_date > prior.statement_date) latest.set(statement.mortgage_id, statement);
+  }
+  return (loans ?? []).reduce((result, loan) => {
+    if (loan.balance === null) return { ...result, missing: result.missing + 1 };
+    if (loan.balance === 0) return result;
+    const current = latest.get(loan.id);
+    if (!current || current.principal_balance !== loan.balance) {
+      return { ...result, undated: result.undated + 1 };
+    }
+    const age = Math.floor((Date.parse(asOf) - Date.parse(current.statement_date)) / 86_400_000);
+    if (age > staleStatementDays) return { ...result, stale: result.stale + 1 };
+    return { ...result, confirmed: result.confirmed + 1 };
+  }, { confirmed: 0, stale: 0, undated: 0, missing: 0 });
+}
+
+export function balanceEvidenceText(evidence: ReturnType<typeof balanceEvidence>) {
+  const counts = [
+    [evidence.stale, "stale statement", "stale statements"],
+    [evidence.undated, "unverified source date", "unverified source dates"],
+    [evidence.missing, "missing balance", "missing balances"],
+  ] as const;
+  const issues = counts.flatMap(([count, single, plural]) => count ? [count + " " + (count === 1 ? single : plural)] : []);
+  if (issues.length) return "Debt evidence · " + issues.join(", ") + ".";
+  return evidence.confirmed ? "Current balances match confirmed statements." : null;
+}

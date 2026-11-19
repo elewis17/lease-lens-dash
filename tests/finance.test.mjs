@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { capitalBudget, capitalConflicts, capitalOpportunities, combinedCapitalPlan, netSaleProceeds, rankCapitalOpportunities, recommendCapital } from "../src/domain/finance/capital.ts";
+import { capitalBudget, capitalConflicts, capitalOpportunities, combinedCapitalPlan, netSaleProceeds, modelPaydown, rankCapitalOpportunities, recommendCapital } from "../src/domain/finance/capital.ts";
 import { leaseReceipts } from "../src/domain/finance/receipts.ts";
 import { isActiveLease } from "../src/domain/finance/activeLeases.ts";
 import { defaultThresholds } from "../src/domain/finance/thresholds.ts";
@@ -293,4 +293,43 @@ test("recorded receipts are reported separately from contractual amounts due and
   assert.equal(latePayment.economicOccupancy, null);
   assert.equal(leaseReceipts([{ ...backRent, paid_amount: null }], ids, "2026-11-06").receipts, null);
   assert.equal(leaseReceipts([{ ...backRent, due_date: "2026-10-01", paid_date: null, paid_amount: null }], ids, "2026-11-06").receipts, 0);
+});
+
+
+test("Glen Iris paydown keeps the scheduled payment, shortens the term, and charges the correct upfront capital", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const metrics = modelPortfolio(record.properties, record, reviewDate, 6.25);
+  const glen = metrics.assets.find(asset => asset.property.alias === "Glen Iris Triplex");
+  const inputs = { loanId: glen.loans[0].id, amount: "50000", fee: "0" };
+  const projection = modelPaydown(glen, inputs);
+  assert.equal(projection.annualRunRateImpact, 0);
+  assert.equal(projection.firstYearNet, -50000);
+  assert.equal(projection.firstYearCashYield, 0);
+  assert.equal(projection.monthsSaved, 93);
+  assert.equal(Math.round(projection.lifetimeInterestSaved), 145027);
+  assert.equal(Math.round(projection.tenYearInterestSaved), 45609);
+  assert.equal(modelPaydown(glen, { ...inputs, fee: "" }), null);
+  assert.equal(modelPaydown(glen, { ...inputs, amount: "310001" }), null);
+  const rows = capitalOpportunities(metrics.assets, { rate: "", years: "", cost: "" }, {}, {
+    [glen.property.id + ":paydown"]: inputs,
+  });
+  assert.equal(recommendCapital(rows, "wealth", 49999).length, 0);
+  const selected = recommendCapital(rows, "wealth", 50000);
+  assert.equal(selected.length, 1);
+  assert.equal(combinedCapitalPlan(selected, null, metrics).costs, 50000);
+  assert.equal(combinedCapitalPlan(selected, null, metrics).dscr, metrics.dscr);
+});
+
+test("portfolio debt evidence follows the latest matching balance instead of an older or superseded statement", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const [property] = record.properties;
+  const [loan] = record.loans;
+  const metrics = (statements) => modelPortfolio([property], { ...record, statements }, reviewDate, 6.25);
+  const older = { mortgage_id: loan.id, principal_balance: loan.current_balance, statement_date: "2026-09-01" };
+  const latest = { ...older, statement_date: "2026-11-15" };
+  assert.equal(metrics([older]).debtEvidence.stale, 1);
+  assert.equal(metrics([older]).assets[0].debtEvidence.stale, 1);
+  assert.equal(metrics([latest, older]).debtEvidence.confirmed, 1);
+  assert.equal(metrics([older, { ...latest, principal_balance: 1 }]).debtEvidence.undated, 1);
+  assert.equal(metrics([older, { ...latest, statement_date: "2026-12-01" }]).debtEvidence.stale, 1);
 });

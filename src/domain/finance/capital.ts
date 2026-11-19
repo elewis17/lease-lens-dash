@@ -1,5 +1,5 @@
 import { monthlyPayment } from "./underwriting.ts";
-import { balanceAfter } from "./debt.ts";
+import { balanceAfter, type Loan } from "./debt.ts";
 import { refinance } from "./scenarios.ts";
 import { sumKnown, type AssetMetrics } from "./portfolio.ts";
 
@@ -64,6 +64,64 @@ export function modelRentPlan(asset: AssetMetrics, inputs: RentPlan) {
   };
 }
 
+export type PaydownPlan = { loanId: string; amount: string; fee: string };
+export const emptyPaydownPlan: PaydownPlan = { loanId: "", amount: "", fee: "" };
+
+function scheduledDebt(loan: Loan, principal: number, limit: number) {
+  const { principalInterest, rate } = loan;
+  if (principalInterest === null || !Number.isFinite(principalInterest) || !Number.isFinite(rate) ||
+      rate < 0 || (principal > 0 && principalInterest <= principal * rate / 12)) return null;
+  let balance = principal;
+  let payments = 0;
+  let interest = 0;
+  let months = 0;
+  while (balance > 0.005 && months < limit) {
+    const charge = balance * rate / 12;
+    const payment = Math.min(principalInterest, balance + charge);
+    balance = Math.max(0, balance + charge - payment);
+    payments += payment;
+    interest += charge;
+    months++;
+  }
+  return { balance, months, payments, interest };
+}
+
+export function modelPaydown(asset: AssetMetrics, inputs: PaydownPlan) {
+  if (!inputs.amount.trim() || !inputs.fee.trim()) return null;
+  const amount = Number(inputs.amount);
+  const fee = Number(inputs.fee);
+  const loan = asset.loans?.find(item => item.id === inputs.loanId);
+  if (!loan || loan.balance === null || loan.remaining === null || !Number.isSafeInteger(loan.remaining) ||
+      loan.remaining < 1 || loan.remaining > 1200 || !Number.isFinite(amount) || amount <= 0 || amount > loan.balance ||
+      !Number.isFinite(fee) || fee < 0 || !Number.isFinite(amount + fee)) return null;
+  const remainingPrincipal = loan.balance - amount;
+  const lifeBefore = scheduledDebt(loan, loan.balance, loan.remaining);
+  const lifeAfter = scheduledDebt(loan, remainingPrincipal, loan.remaining);
+  if (!lifeBefore || !lifeAfter || lifeBefore.balance > 0.01 || lifeAfter.balance > 0.01) return null;
+
+  const firstBefore = scheduledDebt(loan, loan.balance, 12);
+  const firstAfter = scheduledDebt(loan, remainingPrincipal, 12);
+  const tenBefore = scheduledDebt(loan, loan.balance, capitalHorizonYears * 12);
+  const tenAfter = scheduledDebt(loan, remainingPrincipal, capitalHorizonYears * 12);
+  if (!firstBefore || !firstAfter || !tenBefore || !tenAfter) return null;
+  const closingCosts = amount + fee;
+  const debtServiceReduction = remainingPrincipal === 0 ? loan.principalInterest ?? 0 : 0;
+  const postPayment = asset.debtService === null ? null : asset.debtService - debtServiceReduction;
+  const cash = tenBefore.payments - tenAfter.payments - closingCosts;
+  return {
+    closingCosts, amount, fee, startingBalance: loan.balance, annualRate: loan.rate,
+    debtServiceReduction, annualRunRateImpact: debtServiceReduction * 12,
+    firstYearNet: firstBefore.payments - firstAfter.payments - closingCosts, cash,
+    wealth: cash + tenBefore.balance - tenAfter.balance,
+    risk: asset.noi !== null && asset.dscr !== null && postPayment !== null && postPayment > 0
+      ? asset.noi / postPayment - asset.dscr : null,
+    firstYearCashYield: (firstBefore.payments - firstAfter.payments) / closingCosts,
+    tenYearInterestSaved: tenBefore.interest - tenAfter.interest,
+    lifetimeInterestSaved: lifeBefore.interest - lifeAfter.interest,
+    monthsSaved: lifeBefore.months - lifeAfter.months,
+  };
+}
+
 const opportunityDetails = {
   refinance: {
     name: "Refinance",
@@ -79,6 +137,11 @@ const opportunityDetails = {
     name: "Fill vacancy at",
     risk: "Lease-up time and refresh costs can reduce or delay the cash benefit.",
     missing: "Confirm the vacant unit’s achievable rent, refresh cost, and expected move-in date.",
+  },
+  paydown: {
+    name: "Pay down debt at",
+    risk: "Cash used for paydown is no longer available. The model keeps the scheduled payment in place until payoff.",
+    missing: "Confirm the lender will apply the payment to principal and verify any prepayment charge.",
   },
   sale: {
     name: "Review sale of",
@@ -97,17 +160,20 @@ export type CapitalOpportunity = {
   missing: string;
   refinance: ReturnType<typeof modelRefinance>;
   rentPlan?: ReturnType<typeof modelRentPlan>;
+  paydown?: ReturnType<typeof modelPaydown>;
 };
 
-export function capitalOpportunities(assets: AssetMetrics[], quote: RefinanceQuote, rentPlans: Readonly<Record<string, RentPlan>> = {}): CapitalOpportunity[] {
+export function capitalOpportunities(assets: AssetMetrics[], quote: RefinanceQuote, rentPlans: Readonly<Record<string, RentPlan>> = {}, paydowns: Readonly<Record<string, PaydownPlan>> = {}): CapitalOpportunity[] {
   const result: CapitalOpportunity[] = [];
   for (const asset of assets) {
     const add = (action: Action) => {
       const { name, risk, missing } = opportunityDetails[action];
       const id = `${asset.property.id}:${action}`;
       const inputs = rentPlans[id];
+      const paydown = paydowns[id];
       result.push({
         id,
+        paydown: paydown && action === "paydown" ? modelPaydown(asset, paydown) : null,
         rentPlan: inputs && (action === "vacancy" || action === "rent") ? modelRentPlan(asset, inputs) : null,
         action, title: `${name} ${asset.property.alias}`,
         asset, risk, missing, refinance: action === "refinance" ? modelRefinance(asset, quote) : null,
@@ -116,12 +182,13 @@ export function capitalOpportunities(assets: AssetMetrics[], quote: RefinanceQuo
     if (asset.verdict.label === "Refinance candidate") add("refinance");
     if (asset.occupancy && asset.occupancy.occupiedUnits < asset.occupancy.totalUnits) add("vacancy");
     if (rentPlans[asset.property.id + ":rent"] && (asset.expectedRent ?? 0) > 0) add("rent");
+    if (paydowns[asset.property.id + ":paydown"]) add("paydown");
     if (asset.verdict.label === "Distress" || asset.verdict.label === "Sell candidate") add("sale");
   }
   return result;
 }
 
-export const capitalProjection = (action: CapitalOpportunity) => action.refinance ?? action.rentPlan ?? null;
+export const capitalProjection = (action: CapitalOpportunity) => action.refinance ?? action.rentPlan ?? action.paydown ?? null;
 
 export function rankCapitalOpportunities(opportunities: CapitalOpportunity[], objective: CapitalObjective) {
   return [...opportunities].sort((a, b) => {
@@ -175,6 +242,13 @@ export function combinedCapitalPlan(actions: CapitalOpportunity[], monthsToStart
   let debtService = metrics.debtService;
   let noi = metrics.noi;
   for (const action of actions) {
+    if (action.paydown) {
+      costs += action.paydown.closingCosts;
+      runRate += action.paydown.annualRunRateImpact;
+      firstYear += action.paydown.firstYearNet;
+      if (debtService !== null) debtService -= action.paydown.debtServiceReduction;
+      continue;
+    }
     if (action.rentPlan) {
       const { closingCosts, annualRunRateImpact, firstYearNet, monthlyNoi } = action.rentPlan;
       costs += closingCosts;

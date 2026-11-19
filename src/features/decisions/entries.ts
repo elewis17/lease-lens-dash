@@ -24,6 +24,10 @@ const acquisition = z.object({
   projection,
 });
 const capitalProjection = z.object({
+  paydownInputs: z.object({
+    loanId: z.string(), amount: z.string(), fee: z.string(), startingBalance: amount, annualRate: amount,
+    monthsSaved: amount, lifetimeInterestSaved: amount,
+  }).optional(),
   saleInputs: z.object({ price: z.string(), costs: z.string(), payoff: z.string(), date: z.string(), netProceeds: amount }).optional(),
   rentInputs: z.object({ rent: z.string(), expenses: z.string(), cost: z.string(), start: z.string() }).optional(),
   quote: z.object({ rate: z.string(), years: z.string(), cost: z.string() }),

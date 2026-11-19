@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { money, ratio } from "@/domain/finance/format";
+import { money, percent, ratio } from "@/domain/finance/format";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { CapitalLifecycle } from "./CapitalLifecycle";
 import { capitalHistory, lifecycle, type CapitalEntry, type Entry } from "./entries";
@@ -33,7 +33,11 @@ export function CapitalMemo({ entry }: { entry: Entry & { payload: CapitalEntry 
       </Card>
       <Card className="space-y-3 p-4">
         <h2 className="text-lg font-semibold">Frozen assumptions</h2>
-        {projection.saleInputs ? (
+        {projection.paydownInputs ? (
+          <p className="text-sm italic">
+            Hypothetical · If {money(Number(projection.paydownInputs.amount))} goes to principal on the {money(projection.paydownInputs.startingBalance)} balance at {percent(projection.paydownInputs.annualRate)}, with a {money(Number(projection.paydownInputs.fee))} fee, the loan pays off {projection.paydownInputs.monthsSaved} months sooner. Estimated interest saved over the loan’s life is {money(projection.paydownInputs.lifetimeInterestSaved)}.
+          </p>
+        ) : projection.saleInputs ? (
           <p className="text-sm italic">
             Hypothetical · If sold for {money(Number(projection.saleInputs.price))}, less {money(Number(projection.saleInputs.costs))} in selling costs and a {money(Number(projection.saleInputs.payoff))} payoff,
             net proceeds would be {money(projection.saleInputs.netProceeds)}{projection.saleInputs.date ? " at the " + projection.saleInputs.date + " closing." : " at closing."}

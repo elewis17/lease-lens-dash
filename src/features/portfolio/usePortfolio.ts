@@ -96,7 +96,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     start_date: loan.start_date ? new Date(loan.start_date) : null,
   }));
 
-  return { properties, leases, mortgages, statements, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments } };
+  return { properties, leases, mortgages, statements, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments, statements } };
 }
 
 export function usePortfolio(userId: string) {
