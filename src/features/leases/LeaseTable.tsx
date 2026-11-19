@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Save, X, Plus, Edit, Pencil } from "lucide-react";
+import { Trash2, Save, X, Plus, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 import { Constants, type Enums } from "@/integrations/supabase/types";
@@ -87,7 +87,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold text-sm sticky left-0 bg-muted/50 backdrop-blur-sm">Tenant</TableHead>
-              <TableHead className="font-semibold text-sm">Property</TableHead> {/* ✅ NEW */}
+              <TableHead className="font-semibold text-sm">Property</TableHead>
               <TableHead className="font-semibold text-sm">Unit</TableHead>
               <TableHead className="font-semibold text-sm">Status</TableHead>
               <TableHead className="font-semibold text-sm">Monthly Rent</TableHead>

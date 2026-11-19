@@ -1,55 +1,21 @@
-import { useState } from "react";
+import { acquisitionVerdictDetail } from "@/domain/finance/verdicts";
+import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { defaultThresholds } from "@/domain/finance/thresholds";
-import { kirkwoodExample, modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
+import { modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
 
 import { money as currency, ratio, percent } from "@/domain/finance/format";
 
-const fields: { key: keyof DealAssumptions; label: string; scale?: number }[] = [
-  { key: "price", label: "Asking price ($)" },
-  { key: "rentMonthly", label: "Monthly rent ($)" },
-  { key: "opexMonthly", label: "Monthly operating expenses ($)" },
-  { key: "vacancyRate", label: "Vacancy (%)", scale: 100 },
-  { key: "downPayment", label: "Down payment (%)", scale: 100 },
-  { key: "annualRate", label: "Annual loan rate (%)", scale: 100 },
-  { key: "termMonths", label: "Loan term (years)", scale: 1 / 12 },
-  { key: "closingCost", label: "Closing costs (%)", scale: 100 },
-  { key: "annualRentGrowth", label: "Annual rent growth (%)", scale: 100 },
-  { key: "annualExpenseGrowth", label: "Annual expense growth (%)", scale: 100 },
-  { key: "exitCap", label: "Exit cap rate (%)", scale: 100 },
-  { key: "saleCost", label: "Selling costs (%)", scale: 100 },
-];
+import { assumptionsFrom, fields, holdYears, type AssumptionInputs } from "@/features/underwriting/draft";
 
-const holdYears = 10;
-type AssumptionInputs = Partial<Record<keyof DealAssumptions, string>>;
-
-const assumptionsFrom = (values: AssumptionInputs): DealAssumptions | null => {
-  if (fields.some(({ key }) => !values[key]?.trim())) return null;
-  return {
-    ...Object.fromEntries(fields.map(({ key, scale = 1 }) => [key, Number(values[key]) / scale])),
-    holdYears,
-  } as DealAssumptions;
-};
-
-export default function DealsScenarios({ illustrative = false, initialAssumptions, onAssumptionsChange }: {
+export default function DealsScenarios({ illustrative = false, values, onChange }: {
   illustrative?: boolean;
-  initialAssumptions?: DealAssumptions | null;
-  onAssumptionsChange?: (assumptions: DealAssumptions | null) => void;
+  values: AssumptionInputs;
+  onChange: (values: AssumptionInputs) => void;
 }) {
-  const [values, setValues] = useState<AssumptionInputs>(() => {
-    const initial = initialAssumptions ?? (illustrative ? kirkwoodExample : null);
-    return initial
-      ? Object.fromEntries(fields.map(({ key, scale = 1 }) => [key, String(Number((initial[key] * scale).toPrecision(12)))]))
-      : {};
-  });
-
-  const changeInput = (key: keyof DealAssumptions, value: string) => {
-    const next = { ...values, [key]: value };
-    setValues(next);
-    onAssumptionsChange?.(assumptionsFrom(next));
-  };
+  const changeInput = (key: keyof DealAssumptions, value: string) => onChange({ ...values, [key]: value });
 
   const assumptions = assumptionsFrom(values);
   const model = assumptions && modelDeal(assumptions);
@@ -91,7 +57,9 @@ export default function DealsScenarios({ illustrative = false, initialAssumption
 
         <Card className="space-y-4 p-5 shadow-none">
           <h3 className="text-lg font-semibold">Price guidance</h3>
-          <p className="font-medium" role="status">{model ? gates?.verdict : "Enter valid assumptions to calculate price guidance."}</p>
+          {model && gates
+            ? <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} live />
+            : <p className="font-medium" role="status">Enter valid assumptions to calculate price guidance.</p>}
           <dl className="grid grid-cols-2 gap-4">
             <div><dt className="text-sm text-muted-foreground">Max offer</dt><dd className="text-xl font-semibold">{currency(gates?.maxOffer)}</dd></div>
             <div><dt className="text-sm text-muted-foreground">Walk-away</dt><dd className="text-xl font-semibold">{currency(gates?.walkAway)}</dd></div>

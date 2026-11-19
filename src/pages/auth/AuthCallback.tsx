@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { ReturnToWorkspace } from "@/features/navigation/returnTo";
 import { callbackHasError } from "@/features/auth/authRedirect";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -32,7 +33,7 @@ export default function AuthCallback() {
     return () => { mounted = false; };
   }, [providerError]);
 
-  if (!providerError && result === "success") return <Navigate to="/" replace />;
+  if (!providerError && result === "success") return <ReturnToWorkspace />;
   if (!providerError && result === "checking") return <p className="p-6" role="status">Completing sign-in…</p>;
 
   return (

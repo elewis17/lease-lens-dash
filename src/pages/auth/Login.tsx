@@ -1,8 +1,9 @@
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { Navigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { ReturnToWorkspace } from "@/features/navigation/returnTo";
 import { callbackUrl } from "@/features/auth/authRedirect";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Login() {
@@ -10,7 +11,7 @@ export default function Login() {
   const { search } = useLocation();
   const retry = new URLSearchParams(search).get("retry") === "1";
   if (loading) return <p className="p-6" role="status">Loading sign-in…</p>;
-  if (user && !retry) return <Navigate to="/" replace />;
+  if (user && !retry) return <ReturnToWorkspace />;
 
   const redirectUrl = callbackUrl(window.location.origin, import.meta.env.BASE_URL);
   return (

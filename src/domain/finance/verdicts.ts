@@ -39,3 +39,12 @@ export function acquisitionVerdict(model: { dscr: number; irr: number | null }, 
   if (passesBuyGates(model, policy.buy)) return "Buy";
   return maxOffer === null ? "Insufficient basis" : "Verify mitigations";
 }
+
+export function acquisitionVerdictDetail(verdict: ReturnType<typeof acquisitionVerdict>) {
+  switch (verdict) {
+    case "Buy": return "The asking price meets both approved buy gates.";
+    case "Do not pursue": return "Debt service coverage falls below the lender floor.";
+    case "Verify mitigations": return "Verify rent, a rate buydown, or a larger down payment, then rerun the buy gates.";
+    case "Insufficient basis": return "Review the inputs and establish a price that clears both buy gates.";
+  }
+}

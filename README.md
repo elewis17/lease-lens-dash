@@ -110,3 +110,18 @@ npm run typecheck
 Review the generated diff before committing. The preview contract comes from
 the checked-in migrations. A schema-only inspection of the live project is
 needed separately before approving a production rollout.
+
+### Verify changes
+
+Use Node 24 and run `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, and
+`npm run build:gh`. The DealStack app checks workflow runs the same commands on
+pull requests. The tests use the built-in Node runner and need no production
+credentials.
+
+The following files under `src/components/ui` are reusable shadcn templates
+available for the design work. They have no current route or product entry
+point: accordion, alert, aspect ratio, breadcrumb, calendar, carousel, chart,
+checkbox, collapsible, context menu, drawer, dropdown menu, hover card, input
+OTP, menubar, pagination, progress, radio group, resizable, scroll area,
+select, separator, sheet, skeleton, slider, switch, tabs, textarea, and the toast
+compatibility re-export. `src/vite-env.d.ts` declares build-time types for Vite.

@@ -4,7 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { Workspace } from "@/features/portfolio/Workspace";
+import { workspaceRoutes } from "@/features/portfolio/workspaceRoutes";
 import DemoPortfolio from "./pages/DemoPortfolio";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -21,14 +22,11 @@ const App = () => (
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Layout>
           <Routes>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute signedOut={<DemoPortfolio />}>
-                  {(userId) => <Index key={userId} userId={userId} />}
-                </ProtectedRoute>
-              }
-            />
+            {workspaceRoutes(
+              <ProtectedRoute signedOut={<DemoPortfolio />}>
+                {(userId) => <Workspace key={userId} userId={userId} />}
+              </ProtectedRoute>,
+            )}
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="*" element={<NotFound />} />

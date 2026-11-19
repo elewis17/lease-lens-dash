@@ -1,24 +1,25 @@
-import { useState } from "react";
+import { useSessionState } from "@/features/navigation/sessionState";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { money, coverage } from "@/domain/finance/format";
 import { refinance } from "@/domain/finance/scenarios";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 
-export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentScenario }: {
+export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentScenario, sessionKey }: {
   metrics: PortfolioMetrics;
   marketRate: string;
   onMarketRateChange: (rate: string) => void;
+  sessionKey: string;
   rentScenario: (increase: number) => PortfolioMetrics;
 }) {
-  const [termYears, setTermYears] = useState("");
-  const [costPct, setCostPct] = useState("");
-  const [rentPct, setRentPct] = useState("");
-  const [buildingBasis, setBuildingBasis] = useState("");
-  const [eligibleShare, setEligibleShare] = useState("");
-  const [bonusPct, setBonusPct] = useState("");
-  const [taxRate, setTaxRate] = useState("");
-  const [serviceYear, setServiceYear] = useState("");
+  const [termYears, setTermYears] = useSessionState(`${sessionKey}:termYears`, "");
+  const [costPct, setCostPct] = useSessionState(`${sessionKey}:costPct`, "");
+  const [rentPct, setRentPct] = useSessionState(`${sessionKey}:rentPct`, "");
+  const [buildingBasis, setBuildingBasis] = useSessionState(`${sessionKey}:buildingBasis`, "");
+  const [eligibleShare, setEligibleShare] = useSessionState(`${sessionKey}:eligibleShare`, "");
+  const [bonusPct, setBonusPct] = useSessionState(`${sessionKey}:bonusPct`, "");
+  const [taxRate, setTaxRate] = useSessionState(`${sessionKey}:taxRate`, "");
+  const [serviceYear, setServiceYear] = useSessionState(`${sessionKey}:serviceYear`, "");
   const refi = [marketRate, termYears, costPct].every(value => value !== "")
     ? refinance(metrics, Number(marketRate), Number(termYears) * 12, Number(costPct)) : null;
   const rent = rentPct !== "" && Number.isFinite(Number(rentPct)) && Number(rentPct) >= -100 ? rentScenario(Number(rentPct)) : null;

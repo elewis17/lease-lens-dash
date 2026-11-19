@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { VerdictExplanation } from "@/components/VerdictExplanation";
+import { useSessionState } from "@/features/navigation/sessionState";
 import { Input } from "@/components/ui/input";
 import { projectNextYearWealth } from "@/domain/finance/scenarios";
 import { Button } from "@/components/ui/button";
@@ -7,10 +8,10 @@ import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { coverage, money, percent } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 
-export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciation = "" }: {
-  metrics: PortfolioMetrics; onAddData: () => void; initialAppreciation?: string;
+export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciation = "", sessionKey }: {
+  metrics: PortfolioMetrics; onAddData: () => void; initialAppreciation?: string; sessionKey: string;
 }) {
-  const [appreciationRate, setAppreciationRate] = useState(initialAppreciation);
+  const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
@@ -36,8 +37,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, initialAppreciat
     <section className="space-y-6">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold">Portfolio Snapshot</h1>
-        <p className="font-medium">Verdict · {metrics.verdict.label}</p>
-        <p className="text-sm text-muted-foreground">{metrics.verdict.detail}</p>
+        <VerdictExplanation {...metrics.verdict} />
       </header>
 
       <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
