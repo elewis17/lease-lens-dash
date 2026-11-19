@@ -119,6 +119,14 @@ export type PortfolioMetrics = ReturnType<typeof modelPortfolio>;
 // The property metrics are inferred from the shared calculation.
 export type AssetMetrics = PortfolioMetrics["assets"][number];
 
+export function vacancyOpportunity(asset: Pick<AssetMetrics, "expectedRent" | "property">, targetPercent: number | null) {
+  const vacancyPercent = asset.property.vacancy_pct;
+  if (asset.expectedRent === null || targetPercent === null || vacancyPercent == null ||
+    !Number.isFinite(targetPercent) || targetPercent < 0 || targetPercent > 100 ||
+    !Number.isFinite(vacancyPercent) || vacancyPercent < 0 || vacancyPercent > 100) return null;
+  return asset.expectedRent * Math.max(0, vacancyPercent - targetPercent) / 100 * 12;
+}
+
 export function operatingConfidence(assets: readonly AssetMetrics[]) {
   if (assets.some(asset => asset.cashFlow === null)) return "Confidence limited · Rent, expenses, or debt service is missing.";
   const estimates = [

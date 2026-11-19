@@ -71,7 +71,7 @@ test("active and expiring lease dates are inclusive and stale status cannot add 
   assert.equal(isActiveLease({ ...lease, start_date: null }, "2026-11-18"), false);
 });
 
-import { modelPortfolio, operatingConfidence } from "../src/domain/finance/portfolio.ts";
+import { modelPortfolio, operatingConfidence, vacancyOpportunity } from "../src/domain/finance/portfolio.ts";
 import { MetricsCalculator } from "../src/domain/finance/MetricsCalculator.ts";
 import { splitLoan } from "../src/domain/finance/debt.ts";
 import { projectNextYearWealth, projectPortfolio, refinance } from "../src/domain/finance/scenarios.ts";
@@ -91,6 +91,9 @@ test("portfolio matches the deck's illustrative waterfall, coverage, occupancy, 
   assert.equal(metrics.dscr.toFixed(2), "1.49");
   assert.deepEqual(metrics.assets.map(asset => asset.dscr.toFixed(2)), ["1.65", "1.81", "1.60", "1.32", "0.82"]);
   assert.equal(metrics.assets[4].verdict.label, "Distress");
+  assert.equal(vacancyOpportunity(metrics.assets[3], 5), 3906);
+  assert.equal(vacancyOpportunity(metrics.assets[0], 5), 0);
+  assert.equal(vacancyOpportunity(metrics.assets[3], null), null);
   assert.equal(metrics.equity, 711000);
   assert.equal(metrics.debt, 1400000);
   assert.equal((metrics.ltv * 100).toFixed(1), "66.3");

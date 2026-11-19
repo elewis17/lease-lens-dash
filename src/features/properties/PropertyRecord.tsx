@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { downloadCapturedDocument } from "@/features/leases/leaseCaptureApi";
 import type { usePortfolio } from "@/features/portfolio/usePortfolio";
-import { staleStatementDays } from "@/domain/finance/debt";
-import { money, percent } from "@/domain/finance/format";
+import { balanceEvidenceText, staleStatementDays } from "@/domain/finance/debt";
+import { coverage, money, percent } from "@/domain/finance/format";
+import { operatingConfidence } from "@/domain/finance/portfolio";
 import type { Property } from "./PropertiesTable";
 
 type Portfolio = ReturnType<typeof usePortfolio>["portfolio"];
@@ -55,7 +56,10 @@ function RecordedDocument({ ownerId, path, title }: { ownerId: string; path: str
 }
 
 function RecordSections({ ownerId, property, portfolio }: { ownerId: string; property: Property; portfolio: Portfolio }) {
-  const { entries, pathTo } = useWorkspace();
+  const { entries, metrics, pathTo } = useWorkspace();
+  const asset = metrics.assets.find(item => item.property.id === property.id);
+  const cashEvidence = asset && operatingConfidence([asset]);
+  const balanceEvidence = asset && balanceEvidenceText(asset.debtEvidence);
   const propertyDecisions = entries.entries.flatMap(entry =>
     entry.payload.kind === "capital" && entry.payload.status === "decided" && entry.payload.propertyId === property.id
       ? [{ ...entry, title: entry.payload.title }] : []);
@@ -102,90 +106,110 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
 
   return (
     <div className="space-y-4">
-      <section className="space-y-2">
-        <h3 className="font-medium">Timeline</h3>
-        {timeline.length ? (
-          <ol className="space-y-3 border-l pl-3 text-sm">
-            {timeline.map((event, index) => (
-              <li key={index}>
-                <p>{event.title}</p>
-                <p className="text-xs text-muted-foreground">{shortDate(event.date)} · {event.basis}</p>
+      {asset && <section aria-label="Property financial summary" className="space-y-2 border-b pb-4">
+        <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground">Real estate equity · Estimate</dt>
+            <dd className="text-xl font-semibold tabular-nums">{money(asset.equity)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Cash flow / mo · Estimate</dt>
+            <dd className="text-xl font-semibold tabular-nums">{money(asset.cashFlow)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">DSCR · Estimate</dt>
+            <dd className="text-xl font-semibold tabular-nums">{coverage(asset)}</dd>
+          </div>
+        </dl>
+        {balanceEvidence && <p className="text-xs text-muted-foreground">{balanceEvidence}</p>}
+        {cashEvidence && <p className="text-xs text-muted-foreground">{cashEvidence}</p>}
+      </section>}
+      <div className="grid gap-4 lg:grid-cols-[2fr_3fr] lg:gap-8">
+        <section className="space-y-2">
+          <h3 className="font-medium">Timeline</h3>
+          {timeline.length ? (
+            <ol className="space-y-3 border-l pl-3 text-sm">
+              {timeline.map((event, index) => (
+                <li key={index}>
+                  <p>{event.title}</p>
+                  <p className="text-xs text-muted-foreground">{shortDate(event.date)} · {event.basis}</p>
+                </li>
+              ))}
+            </ol>
+          ) : <p className="text-sm text-muted-foreground">No dated events in the current record.</p>}
+        </section>
+        <div>
+          <Section title="Acquisition">
+            <p>{property.purchase_price == null ? "Acquisition price is unavailable." : `Recorded purchase price · ${money(property.purchase_price)}`}</p>
+            <p className="text-muted-foreground">The acquisition date is unavailable.</p>
+          </Section>
+          <Section title="Financing">
+            {loans.length ? <ul className="space-y-2">{loans.map(loan => {
+              const source = statements.find(statement => statement.mortgage_id === loan.id);
+              const backedByStatement = source?.principal_balance === loan.current_balance && !!source;
+              const age = source ? Math.max(0, Math.floor((Date.now() - Date.parse(source.statement_date)) / 86_400_000)) : null;
+              return (
+                <li key={loan.id}>
+                  <p className="font-medium">{loan.loan_name || "Mortgage"}</p>
+                  <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
+                  <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
+                  {backedByStatement && source ? (
+                    <p className={age !== null && age > staleStatementDays ? "text-warning" : "text-muted-foreground"}>
+                      Source · Confirmed statement dated {shortDate(source.statement_date)}{age !== null ? " · " + age + " days old" : ""}
+                      {age !== null && age > staleStatementDays ? " · Check for a newer statement." : ""}
+                    </p>
+                  ) : loan.current_balance != null && <p className="text-muted-foreground">Balance source date unverified.</p>}
+                </li>
+              );
+            })}</ul> : <p className="text-muted-foreground">No financing records.</p>}
+          </Section>
+          <Section title="Leases">
+            {leases.length ? <ul className="space-y-2">{leases.map(lease => (
+              <li key={lease.id}>
+                <p className="font-medium">{lease.unit_label ?? "Unit unavailable"} · {lease.tenant}</p>
+                <p className="text-muted-foreground">Contractual · {money(lease.monthlyRent)}/mo · {shortDate(lease.startDate)} to {shortDate(lease.leaseEnd)}</p>
               </li>
-            ))}
-          </ol>
-        ) : <p className="text-sm text-muted-foreground">No dated events in the current record.</p>}
-      </section>
-      <div>
-        <Section title="Acquisition">
-          <p>{property.purchase_price == null ? "Acquisition price is unavailable." : `Recorded purchase price · ${money(property.purchase_price)}`}</p>
-          <p className="text-muted-foreground">The acquisition date is unavailable.</p>
-        </Section>
-        <Section title="Financing">
-          {loans.length ? <ul className="space-y-2">{loans.map(loan => {
-            const source = statements.find(statement => statement.mortgage_id === loan.id);
-            const backedByStatement = source?.principal_balance === loan.current_balance && !!source;
-            const age = source ? Math.max(0, Math.floor((Date.now() - Date.parse(source.statement_date)) / 86_400_000)) : null;
-            return (
-              <li key={loan.id}>
-                <p className="font-medium">{loan.loan_name || "Mortgage"}</p>
-                <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
-                <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
-                {backedByStatement && source ? (
-                  <p className={age !== null && age > staleStatementDays ? "text-warning" : "text-muted-foreground"}>
-                    Source · Confirmed statement dated {shortDate(source.statement_date)}{age !== null ? " · " + age + " days old" : ""}
-                    {age !== null && age > staleStatementDays ? " · Check for a newer statement." : ""}
-                  </p>
-                ) : loan.current_balance != null && <p className="text-muted-foreground">Balance source date unverified.</p>}
-              </li>
-            );
-          })}</ul> : <p className="text-muted-foreground">No financing records.</p>}
-        </Section>
-        <Section title="Leases">
-          {leases.length ? <ul className="space-y-2">{leases.map(lease => (
-            <li key={lease.id}>
-              <p className="font-medium">{lease.unit_label ?? "Unit unavailable"} · {lease.tenant}</p>
-              <p className="text-muted-foreground">Contractual · {money(lease.monthlyRent)}/mo · {shortDate(lease.startDate)} to {shortDate(lease.leaseEnd)}</p>
-            </li>
-          ))}</ul> : <p className="text-muted-foreground">No lease records.</p>}
-        </Section>
-        <Section title="Expenses">
-          {operating.length ? <><p className="text-muted-foreground">Recorded operating expenses</p>{history(operating)}</>
-            : <p className="text-muted-foreground">No operating expense records.</p>}
-        </Section>
-        <Section title="Improvements">
-          {improvements.length ? <><p className="text-muted-foreground">Recorded capital expenses</p>{history(improvements)}</>
-            : <p className="text-muted-foreground">No capital improvement expenses recorded.</p>}
-        </Section>
-        <Section title="Valuation">
-          <p>{property.property_value == null ? "No valuation estimate on record." : `Estimate · Current recorded value ${money(property.property_value)}`}</p>
-          <p className="text-muted-foreground">Appraisal date and valuation history are unavailable.</p>
-        </Section>
-        <Section title="Documents">
-          {documents.length || statements.length ? <ul className="space-y-2">
-            {documents.map(lease => lease.documentPath && <RecordedDocument key={lease.id} ownerId={ownerId} path={lease.documentPath}
-              title={"Download lease · " + (lease.unit_label ?? "Unit unavailable")} />)}
-            {statements.map(statement => <RecordedDocument key={statement.id} ownerId={ownerId} path={statement.document_path}
-              title={"Download statement · " + shortDate(statement.statement_date)} />)}
-          </ul> : <p className="text-muted-foreground">No lease documents or mortgage statements linked.</p>}
-        </Section>
-        <Section title="Decisions">
-          {entries.isError ? <p className="text-muted-foreground">Could not load property-linked decisions.</p>
-            : propertyDecisions.length ? <ul className="space-y-2">{propertyDecisions.map(entry => (
-              <li key={entry.id}><Link className="underline" to={pathTo("/decisions/" + entry.id + "/memo")}>{entry.title}</Link></li>
-            ))}</ul>
-            : <p className="text-muted-foreground">No property-linked decisions recorded.</p>}
-        </Section>
-        <Section title="Performance">
-          {receipts.size ? (
-            <>
-              <p className="text-muted-foreground">Recorded rent receipts by calendar year. Coverage reflects months with a recorded receipt.</p>
-              <ul className="space-y-2">{[...receipts].sort(([a], [b]) => b.localeCompare(a)).map(([year, value]) => (
-                <li key={year}>{year} · {money(value.amount)} · {value.months.size} of 12 months</li>
+            ))}</ul> : <p className="text-muted-foreground">No lease records.</p>}
+          </Section>
+          <Section title="Expenses">
+            {operating.length ? <><p className="text-muted-foreground">Recorded operating expenses</p>{history(operating)}</>
+              : <p className="text-muted-foreground">No operating expense records.</p>}
+          </Section>
+          <Section title="Improvements">
+            {improvements.length ? <><p className="text-muted-foreground">Recorded capital expenses</p>{history(improvements)}</>
+              : <p className="text-muted-foreground">No capital improvement expenses recorded.</p>}
+          </Section>
+          <Section title="Valuation">
+            <p>{property.property_value == null ? "No valuation estimate on record." : `Estimate · Current recorded value ${money(property.property_value)}`}</p>
+            <p className="text-muted-foreground">Appraisal date and valuation history are unavailable.</p>
+          </Section>
+          <Section title="Documents">
+            {documents.length || statements.length ? <ul className="space-y-2">
+              {documents.map(lease => lease.documentPath && <RecordedDocument key={lease.id} ownerId={ownerId} path={lease.documentPath}
+                title={"Download lease · " + (lease.unit_label ?? "Unit unavailable")} />)}
+              {statements.map(statement => <RecordedDocument key={statement.id} ownerId={ownerId} path={statement.document_path}
+                title={"Download statement · " + shortDate(statement.statement_date)} />)}
+            </ul> : <p className="text-muted-foreground">No lease documents or mortgage statements linked.</p>}
+          </Section>
+          <Section title="Decisions">
+            {entries.isError ? <p className="text-muted-foreground">Could not load property-linked decisions.</p>
+              : propertyDecisions.length ? <ul className="space-y-2">{propertyDecisions.map(entry => (
+                <li key={entry.id}><Link className="underline" to={pathTo("/decisions/" + entry.id + "/memo")}>{entry.title}</Link></li>
               ))}</ul>
-            </>
-          ) : <p className="text-muted-foreground">No rent receipts on record.</p>}
-          <p className="text-muted-foreground">Historical net cash flow needs a complete operating and debt-payment history.</p>
-        </Section>
+              : <p className="text-muted-foreground">No property-linked decisions recorded.</p>}
+          </Section>
+          <Section title="Performance">
+            {receipts.size ? (
+              <>
+                <p className="text-muted-foreground">Recorded rent receipts by calendar year. Coverage reflects months with a recorded receipt.</p>
+                <ul className="space-y-2">{[...receipts].sort(([a], [b]) => b.localeCompare(a)).map(([year, value]) => (
+                  <li key={year}>{year} · {money(value.amount)} · {value.months.size} of 12 months</li>
+                ))}</ul>
+              </>
+            ) : <p className="text-muted-foreground">No rent receipts on record.</p>}
+            <p className="text-muted-foreground">Historical net cash flow needs a complete operating and debt-payment history.</p>
+          </Section>
+        </div>
       </div>
     </div>
   );
@@ -201,7 +225,7 @@ export function PropertyRecord({ ownerId, property, portfolio }: { ownerId: stri
         </button>
       </SheetTrigger>
       <SheetContent side="bottom" hideClose
-        className="mx-auto flex max-h-[min(90dvh,48rem)] max-w-2xl flex-col gap-0 border p-0">
+        className="mx-auto flex max-h-[min(90dvh,48rem)] max-w-2xl flex-col gap-0 border p-0 lg:max-w-5xl">
         <header className="space-y-1 border-b px-4 py-4 sm:px-6">
           <SheetTitle>{property.alias}</SheetTitle>
           <SheetDescription>Property record</SheetDescription>

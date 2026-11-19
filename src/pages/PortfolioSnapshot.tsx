@@ -7,12 +7,13 @@ import { Card } from "@/components/ui/card";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { balanceEvidenceText } from "@/domain/finance/debt";
 import { coverage, money, percent } from "@/domain/finance/format";
-import { operatingConfidence, type PortfolioMetrics } from "@/domain/finance/portfolio";
+import { operatingConfidence, vacancyOpportunity, type PortfolioMetrics } from "@/domain/finance/portfolio";
 
 const signedPoints = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, signDisplay: "exceptZero" });
 
-export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty, initialAppreciation = "", sessionKey }: {
-  metrics: PortfolioMetrics; onAddData: () => void; onReviewProperty: (propertyId: string) => void; initialAppreciation?: string; sessionKey: string;
+export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty, initialAppreciation = "", vacancyTarget, sessionKey }: {
+  metrics: PortfolioMetrics; onAddData: () => void; onReviewProperty: (propertyId: string) => void;
+  initialAppreciation?: string; vacancyTarget: number | null; sessionKey: string;
 }) {
   const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
   const [equityGoal, setEquityGoal] = useSessionState(sessionKey + ":equityGoal", "");
@@ -48,6 +49,13 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   const receiptChange = metrics.receipts === null || previous.receipts === null ? null : metrics.receipts - previous.receipts;
   const occupancyChange = metrics.economicOccupancy === null || previous.economicOccupancy === null
     ? null : (metrics.economicOccupancy - previous.economicOccupancy) * 100;
+  const cashShortfalls = metrics.assets.flatMap(asset =>
+    asset.cashFlow !== null && asset.cashFlow < 0 ? [{ asset, annual: Math.round(asset.cashFlow) * 12 }] : [],
+  ).sort((a, b) => a.annual - b.annual);
+  const vacancyGaps = metrics.assets.flatMap(asset => {
+    const annual = vacancyOpportunity(asset, vacancyTarget);
+    return annual !== null && annual > 0 ? [{ asset, annual }] : [];
+  }).sort((a, b) => b.annual - a.annual);
   const tiles = [
     { label: "Monthly cash flow", value: money(metrics.cashFlow), basis: "Estimate · Monthly NOI less principal and interest", source: operatingEvidence },
     { label: "DSCR", value: coverage(metrics), basis: "Estimate · Monthly NOI divided by principal and interest", source: operatingEvidence },
@@ -79,15 +87,44 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
         ))}
       </dl>
 
-      <Card className="space-y-3 p-5">
-        <h2 className="text-lg font-semibold">What changed</h2>
-        <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
-        <dl className="space-y-2 tabular-nums">
-          <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange !== null && receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>
-          <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{occupancyChange === null ? "—" : signedPoints.format(occupancyChange) + " pp"}</dd></div>
-        </dl>
-        {(receiptChange === null || occupancyChange === null) && <p className="text-xs text-muted-foreground">A comparison requires a recorded basis for both months.</p>}
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <Card className="space-y-3 p-5">
+          <h2 className="text-lg font-semibold">What changed</h2>
+          <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
+          <dl className="space-y-2 tabular-nums">
+            <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange !== null && receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{occupancyChange === null ? "—" : signedPoints.format(occupancyChange) + " pp"}</dd></div>
+          </dl>
+          {(receiptChange === null || occupancyChange === null) && <p className="text-xs text-muted-foreground">A comparison requires a recorded basis for both months.</p>}
+        </Card>
+
+        <Card className="space-y-4 p-5">
+          <h2 className="text-lg font-semibold">Where money is leaking</h2>
+          <section aria-label="Actual losses" className="space-y-2">
+            <h3 className="font-medium">Actual losses</h3>
+            <p className="text-sm text-muted-foreground">— · Verified losses require a complete record of cash paid, including debt payments.</p>
+          </section>
+          {cashShortfalls.length > 0 && <section aria-label="Estimated cash flow shortfalls" className="space-y-2 border-t pt-3">
+            <h3 className="font-medium">Estimated cash flow shortfalls</h3>
+            <ul className="space-y-2">
+              {cashShortfalls.map(({ asset, annual }) => <li key={asset.property.id} className="text-sm">
+                {asset.property.alias} · <span className="tabular-nums">{money(annual)}/yr annualized</span>
+              </li>)}
+            </ul>
+          </section>}
+          <section aria-label="Missed income" className="space-y-2 border-t pt-3">
+            <h3 className="font-medium">Missed income</h3>
+            {vacancyGaps.length > 0 ? <ul className="space-y-2">
+              {vacancyGaps.map(({ asset, annual }) => <li key={asset.property.id} className="text-sm italic">
+                <p>{asset.property.alias} · {money(annual)}/yr potential rent</p>
+                <p className="text-xs text-muted-foreground">Hypothetical · If vacancy fell from {asset.property.vacancy_pct}% to {vacancyTarget}%</p>
+              </li>)}
+            </ul> : <p className="text-sm text-muted-foreground">{vacancyTarget === null
+              ? "— · Vacancy opportunity requires a supported vacancy target." : "No modeled vacancy above the illustrative target."}</p>}
+            <p className="text-sm text-muted-foreground">— · Below-market rent requires verified comparable rents.</p>
+          </section>
+        </Card>
+      </div>
 
       {priorities.length > 0 && (
         <Card className="space-y-3 p-5">

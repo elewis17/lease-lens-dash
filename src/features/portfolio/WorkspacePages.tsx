@@ -20,7 +20,8 @@ export function Briefing() {
           search.set("property", propertyId);
           navigate({ ...destination, search: search.toString() });
         }}
-        initialAppreciation={illustrative ? "3" : ""} sessionKey={`dealstack:${userId}:appreciation`} />
+        initialAppreciation={illustrative ? "3" : ""} vacancyTarget={illustrative ? 5 : null}
+        sessionKey={`dealstack:${userId}:appreciation`} />
     </PortfolioStatus>
   );
 }
