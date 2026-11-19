@@ -68,7 +68,7 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <PortfolioNav prefix={prefix} />
-      <div className="container min-w-0 flex-1 space-y-6 px-4 py-8 sm:px-8">
+      <div className="container min-w-0 flex-1 space-y-6 px-4 pt-8 pb-[calc(9rem+env(safe-area-inset-bottom))] sm:px-8 lg:pb-8">
         {query.isSuccess && properties.length > 0 && (
           <PropertyFilter properties={properties.map(property => ({
             id: property.id, alias: property.alias, address: property.address ?? "",

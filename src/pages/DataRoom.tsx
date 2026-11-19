@@ -232,7 +232,9 @@ export default function DataRoom({
               await onLeaseCaptured();
             }} />
         ) : (
-          <Button variant="outline" disabled={!properties.length} onClick={() => {
+          <Button variant="outline" disabled={!properties.length}
+            className="fixed inset-x-4 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 min-h-11 lg:static"
+            onClick={() => {
             setLeaseSaved(false);
             setShowLeaseUpload(true);
           }}>Upload lease</Button>
