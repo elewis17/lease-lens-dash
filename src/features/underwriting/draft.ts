@@ -16,7 +16,7 @@ export const fields: { key: keyof DealAssumptions; label: string; scale?: number
 ];
 
 export const holdYears = 10;
-export type AssumptionInputs = Partial<Record<keyof DealAssumptions, string>>;
+export type AssumptionInputs = Partial<Record<keyof DealAssumptions | "testPrice", string>>;
 
 export const assumptionsFrom = (values: AssumptionInputs): DealAssumptions | null => {
   if (fields.some(({ key }) => !values[key]?.trim())) return null;
@@ -34,15 +34,22 @@ export function initialValues(assumptions: DealAssumptions | null | undefined): 
 }
 
 export function readDraft(fragment: string): AssumptionInputs | null {
-  const draft = new URLSearchParams(fragment.replace(/^#/, "")).get("draft");
+  const params = new URLSearchParams(fragment.replace(/^#/, ""));
+  const draft = params.get("draft");
   if (draft === null || draft.length > 600) return null;
   const parts = draft.split(",");
   if (parts.length !== fields.length ||
     parts.some(part => part.length > 40 || (part !== "" && !/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(part)))) return null;
-  return Object.fromEntries(fields.map(({ key }, index) => [key, parts[index]]));
+  const values: AssumptionInputs = Object.fromEntries(fields.map(({ key }, index) => [key, parts[index]]));
+  const testPrice = params.get("testPrice");
+  if (testPrice && testPrice.length <= 40 && /^\d+(?:\.\d+)?$/.test(testPrice) &&
+    Number.isFinite(Number(testPrice)) && Number(testPrice) > 0) values.testPrice = testPrice;
+  return values;
 }
 
 export function draftFragment(values: AssumptionInputs): string {
   const encoded = fields.map(({ key }) => values[key] ?? "").join(",");
-  return "#" + new URLSearchParams({ draft: encoded }).toString();
+  const params = new URLSearchParams({ draft: encoded });
+  if (values.testPrice) params.set("testPrice", values.testPrice);
+  return "#" + params.toString();
 }
