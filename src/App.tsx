@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/auth/Login.tsx";
 import AuthCallback from "./pages/auth/AuthCallback";
+import { connectedReview, connectedReviewCallback } from "@/features/portfolio/releaseProfile";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
             )}
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            {connectedReview && <Route path={connectedReviewCallback} element={<AuthCallback />} />}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

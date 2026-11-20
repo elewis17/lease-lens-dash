@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { entrySchema, type Entry, type EntryPayload } from "./entries";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 export function useWorkspaceEntries(userId: string, illustrative: boolean) {
   const client = useQueryClient();
@@ -10,6 +11,7 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
     queryKey: key,
     retry: false,
     queryFn: async ({ signal }): Promise<Entry[]> => {
+      if (connectedReview) return [];
       if (illustrative) return JSON.parse(localStorage.getItem(local) ?? "[]") as Entry[];
       const rows: Entry[] = [];
       for (let start = 0; ; start += 500) {
@@ -28,6 +30,7 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
   });
 
   const append = async (payload: EntryPayload) => {
+    if (connectedReview) throw new Error("Saving decisions is unavailable in the connected review.");
     const validated = entrySchema.parse(payload);
     const id = crypto.randomUUID();
     if (illustrative) {

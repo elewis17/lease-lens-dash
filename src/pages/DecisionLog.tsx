@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { modelDeal } from "@/domain/finance/underwriting";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 export default function DecisionLog() {
   const { pathTo, dealAssumptions, entries } = useWorkspace();
@@ -12,7 +13,8 @@ export default function DecisionLog() {
   return (
     <section className="space-y-4">
       <h1 className="text-3xl font-semibold">Decision Log</h1>
-      {entries.isError ? <p role="alert">Could not load the Decision Log.</p>
+      {connectedReview ? <p className="text-muted-foreground">Saved decisions are unavailable in the connected review.</p>
+        : entries.isError ? <p role="alert">Could not load the Decision Log.</p>
         : decisions.length === 0 ? <p className="text-muted-foreground">No recorded decisions yet.</p>
         : <ul className="divide-y border-y">{decisions.map(entry => (
             <li key={entry.id} className="py-3">

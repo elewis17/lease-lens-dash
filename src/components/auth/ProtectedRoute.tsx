@@ -17,7 +17,7 @@ export function ProtectedRoute({ children, signedOut }: ProtectedRouteProps) {
     );
   }
 
-  if (!user) {
+  if (!user || user.is_anonymous) {
     return signedOut ?? <Navigate to="/auth/login" replace />;
   }
 

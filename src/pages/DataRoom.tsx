@@ -6,6 +6,7 @@ import { StatementCapture } from "@/features/leases/StatementCapture";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { LeaseTable, type LeaseData, type ManualLeaseInput } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 type PropertyOption = { id: string; name: string };
 
@@ -86,6 +87,7 @@ export default function DataRoom({
         <PropertiesTable
           properties={filteredProperties}
           metrics={metrics.assets}
+          readOnly={connectedReview}
           renderName={renderPropertyName}
           onAdd={onAddProperty}
           onUpdate={onUpdateProperty}
@@ -104,12 +106,13 @@ export default function DataRoom({
           </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
+        {!connectedReview && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
           onOpen={() => setLeaseSaved(false)}
           onUploadComplete={async () => {
             setLeaseSaved(true);
             await onLeaseCaptured();
-          }} />
+          }} />}
+        <fieldset className="min-w-0" disabled={connectedReview}>
         <LeaseTable
           leases={filteredLeases}
           onUpdate={onUpdateLease}
@@ -117,6 +120,7 @@ export default function DataRoom({
           onAdd={onAddLease}
           propertyOptions={propertyOptions}
         />
+        </fieldset>
       </section>
 
       <section className="space-y-3">
@@ -128,7 +132,8 @@ export default function DataRoom({
             Drives DSCR, debt stress, refinance capacity, equity visibility, and cash-flow pressure.
           </p>
         </div>
-        <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />
+        {!connectedReview && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
+        <fieldset className="min-w-0" disabled={connectedReview}>
         <MortgagesTable
           mortgages={filteredMortgages}
           onUpdate={onUpdateMortgage}
@@ -136,6 +141,7 @@ export default function DataRoom({
           onAdd={onAddMortgage}
           propertyOptions={propertyOptions}
         />
+        </fieldset>
       </section>
     </div>
   );

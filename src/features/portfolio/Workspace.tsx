@@ -12,6 +12,7 @@ import { useSessionState } from "@/features/navigation/sessionState";
 import { assumptionsFrom, draftFragment, initialValues, readDraft, type AssumptionInputs } from "@/features/underwriting/draft";
 import { kirkwoodExample } from "@/domain/finance/underwriting";
 import { modelPortfolio } from "@/domain/finance/portfolio";
+import { connectedReview } from "./releaseProfile";
 
 function useWorkspaceState(userId: string, prefix: string, illustrative: boolean) {
   const location = useLocation();
@@ -84,12 +85,13 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <PortfolioNav prefix={prefix} />
       <div className="container min-w-0 flex-1 space-y-6 px-4 pt-8 pb-[calc(9rem+env(safe-area-inset-bottom))] sm:px-8 lg:pb-8">
+        {connectedReview && <p className="text-sm text-muted-foreground">Connected portfolio · Read-only review</p>}
         {query.isSuccess && properties.length > 0 && (
           <PropertyFilter properties={properties.map(property => ({
             id: property.id, alias: property.alias, address: property.address ?? "",
           }))} selectedProperty={selectedProperty} onPropertyChange={setSelectedProperty} />
         )}
-        <PolicySettings store={context.entries} />
+        {!connectedReview && <PolicySettings store={context.entries} />}
         <ScrollRestoration ownerId={userId} />
         <div key={pathnameForView} className={/\/(holdings|underwrite)\/?$/.test(pathnameForView) ? undefined : "animate-fade-in"}><Outlet context={context} /></div>
       </div>

@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/auth";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 export default function UserMenu() {
   const { user } = useAuth();
@@ -13,7 +14,7 @@ export default function UserMenu() {
 
   const signOut = async () => {
     setSigningOut(true);
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut(connectedReview ? { scope: "local" } : undefined);
     setSigningOut(false);
     if (error) toast({ variant: "destructive", title: "Could not sign out", description: "Try again." });
   };

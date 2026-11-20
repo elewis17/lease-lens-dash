@@ -17,6 +17,7 @@ import { CapitalLifecycle } from "@/features/decisions/CapitalLifecycle";
 import { capitalHistory } from "@/features/decisions/entries";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { useSessionState } from "@/features/navigation/sessionState";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 const horizon = `${capitalHorizonYears}-year`;
 const objectiveBasis: Record<CapitalObjective, string> = {
@@ -156,7 +157,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
             )}
           </div>
           <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-            <CapitalLifecycle current={current} />
+            {!connectedReview && <CapitalLifecycle current={current} />}
             <SheetClose asChild><Button variant="outline" className="min-h-11">Close</Button></SheetClose>
           </footer>
         </SheetContent>

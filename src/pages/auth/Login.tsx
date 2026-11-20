@@ -6,14 +6,44 @@ import { ReturnToWorkspace } from "@/features/navigation/returnTo";
 import { callbackUrl } from "@/features/auth/authRedirect";
 import { useAuth } from "@/context/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { connectedReview, connectedReviewCallback } from "@/features/portfolio/releaseProfile";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 export default function Login() {
   const { resolvedTheme } = useTheme();
   const { user, loading } = useAuth();
   const { search } = useLocation();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
   const retry = new URLSearchParams(search).get("retry") === "1";
   if (loading) return <p className="p-6" role="status">Loading sign-in…</p>;
   if (user && !retry) return <ReturnToWorkspace />;
+
+  if (connectedReview) {
+    return (
+      <section className="mx-auto max-w-md space-y-4 p-6">
+        <h1 className="text-2xl font-semibold">Sign in to DealStack</h1>
+        {error && <p role="alert">Google sign-in could not start. Try again.</p>}
+        {window.top !== window.self
+          ? <Button asChild><a href="/auth/login" target="_blank" rel="noopener noreferrer">Open sign-in in a browser tab</a></Button>
+          : <Button disabled={pending} onClick={async () => {
+              setPending(true);
+              setError(false);
+              try {
+                const result = await supabase.auth.signInWithOAuth({ provider: "google", options: {
+                  redirectTo: new URL(connectedReviewCallback, window.location.origin).href,
+                } });
+                if (result.error) throw result.error;
+              } catch {
+                setError(true);
+              } finally {
+                setPending(false);
+              }
+            }}>Continue with Google</Button>}
+      </section>
+    );
+  }
 
   const redirectUrl = callbackUrl(window.location.origin, import.meta.env.BASE_URL);
   return (

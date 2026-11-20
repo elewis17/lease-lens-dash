@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "build:gh": "vite build --mode gh && node scripts/prepare-pages.mjs",
+    "build:review": "vite build --mode review && node scripts/prepare-pages.mjs dist --connected-review",
+    "build:company": "vite build --mode company && node scripts/prepare-pages.mjs",
     "predeploy": "npm run build:gh",
     "deploy": "gh-pages -d dist -b gh-pages",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
