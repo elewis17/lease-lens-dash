@@ -1,3 +1,4 @@
+import { RentWaterfall } from "@/features/portfolio/RentWaterfall";
 import { useRef } from "react";
 import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { useSessionState } from "@/features/navigation/sessionState";
@@ -104,13 +105,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
 
           <Card className="space-y-4 p-5">
             <h2 className="text-lg font-semibold">Where the month’s rent goes</h2>
-            <dl className="space-y-2 tabular-nums">
-              <div className="flex justify-between gap-4"><dt>Contractual rent / mo</dt><dd>{money(metrics.expectedRent)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Vacancy adjustment / mo · Estimate</dt><dd>{money(metrics.expectedRent === null || metrics.effectiveRent === null ? null : metrics.effectiveRent - metrics.expectedRent)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Operating expenses / mo · Estimate</dt><dd>{money(metrics.opex)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Principal and interest / mo</dt><dd>{money(metrics.debtService)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Cash flow · Annualized from rounded monthly run-rate</dt><dd>{money(metrics.annualizedCashFlow)}</dd></div>
-            </dl>
+            <RentWaterfall metrics={metrics} />
             <dl className="space-y-2 border-t pt-3 tabular-nums">
               <div className="flex justify-between gap-4"><dt>Recorded cash receipts · {metrics.month}</dt><dd>{money(metrics.receipts)}</dd></div>
               <div className="flex justify-between gap-4"><dt>Economic occupancy · {metrics.month}</dt><dd>{percent(metrics.economicOccupancy)}</dd></div>

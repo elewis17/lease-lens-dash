@@ -19,7 +19,7 @@ The production candidate and the connected review use the same Briefing, Capital
 - [ ] Publish the production candidate to the approved owner-only review URL. Confirm the Google return reaches the full workspace and the property filter remains consistent across routes.
 - [ ] Validate the connected history against the owner’s records, including existing document availability and absence of cross-property records.
 - [ ] Verify real lease and statement extraction, explicit confirmation, saved documents and decision persistence using an authorized Supabase environment with Gemini.
-- [ ] Complete the design-deck acceptance review at 390px and 1440px, both themes. The rent waterfall and the Holdings ranking by dollars at stake remain open.
+- [ ] Complete the design-deck acceptance review at 390px and 1440px, both themes. The rent waterfall and renewal ranking are implemented. Other Holdings evidence gaps still need a reliable dollar basis.
 - [ ] Complete Capital optimization and personalized insights after the core gate passes.
 - [ ] Validate the production callback and direct links at `/dealstack/`, then verify the legacy `/lease-lens/` redirect at cutover.
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { money, ratio } from "@/domain/finance/format";
@@ -5,8 +6,8 @@ import { capitalBudget, capitalConflicts, capitalProjection, combinedCapitalPlan
 import { useSessionState } from "@/features/navigation/sessionState";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 
-export function CapitalAllocation({ actions, objective, sessionKey, salePlans }: {
-  actions: CapitalOpportunity[]; objective: CapitalObjective; sessionKey: string; salePlans: Readonly<Record<string, SalePlan>>;
+export function CapitalAllocation({ actions, objective, sessionKey, salePlans, children }: {
+  actions: CapitalOpportunity[]; objective: CapitalObjective; sessionKey: string; salePlans: Readonly<Record<string, SalePlan>>; children: ReactNode;
 }) {
   const { metrics } = useWorkspace();
   const [available, setAvailable] = useSessionState(sessionKey + ":available", "");
@@ -38,7 +39,7 @@ export function CapitalAllocation({ actions, objective, sessionKey, salePlans }:
 
   return (
     <Card className="min-w-0 space-y-4 p-4">
-      <h3 className="text-lg font-semibold">Capital allocation</h3>
+      <h3 className="text-lg font-semibold">Capital budget</h3>
       <div className="grid gap-3 sm:grid-cols-3">
         {budgetField("Available capital ($)", available, setAvailable)}
         {budgetField("Liquidity reserve floor ($)", reserve, setReserve)}
@@ -61,33 +62,38 @@ export function CapitalAllocation({ actions, objective, sessionKey, salePlans }:
           {sale.date ? " Expected " + sale.date + "." : " Closing date is unconfirmed."} The current budget excludes this amount.
         </p>];
       })}
-      <div className="space-y-2 border-t pt-3">
-        <h4 className="font-medium">Recommended allocation</h4>
-        {suggested.length ? <>
-          <p className="text-sm text-muted-foreground">Confidence · Each amount depends on the terms and timing shown in its opportunity.</p>
-          <ul className="space-y-1 text-sm">{suggested.map(action => (
-            <li key={action.id}>{action.title} · {money(capitalProjection(action)?.closingCosts)} estimated cost</li>
-          ))}</ul>
-          {suggested.some(action => action.refinance) && <label className="block max-w-xs space-y-1 text-sm">
-            <span>Months until modeled refinance closes</span>
-            <Input type="number" min="0" max="12" step="1" value={delay} onChange={event => setDelay(event.target.value)} />
-          </label>}
-          <PlanResult model={plan} missing="Enter timing from zero to twelve months to calculate first-year net cash." />
-        </> : <p className="text-sm text-muted-foreground">No modeled opportunity with a positive result for this objective fits the current budget.</p>}
+      <div className="grid items-start gap-5 border-t pt-4 lg:grid-cols-[3fr_2fr]">
+        <section aria-label="Ranked opportunities" className="min-w-0 space-y-3">{children}</section>
+        <aside aria-label="Allocation plan" className="min-w-0 space-y-4 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            <div className="space-y-2">
+              <h4 className="font-medium">Recommended allocation</h4>
+              {suggested.length ? <>
+                <p className="text-sm text-muted-foreground">Confidence · Each amount depends on the terms and timing shown in its opportunity.</p>
+                <ul className="space-y-1 text-sm">{suggested.map(action => (
+                  <li key={action.id}>{action.title} · {money(capitalProjection(action)?.closingCosts)} estimated cost</li>
+                ))}</ul>
+                {suggested.some(action => action.refinance) && <label className="block max-w-xs space-y-1 text-sm">
+                  <span>Months until modeled refinance closes</span>
+                  <Input type="number" min="0" max="12" step="1" value={delay} onChange={event => setDelay(event.target.value)} />
+                </label>}
+                <PlanResult model={plan} missing="Enter timing from zero to twelve months to calculate first-year net cash." />
+              </> : <p className="text-sm text-muted-foreground">No modeled opportunity with a positive result for this objective fits the current budget.</p>}
+            </div>
+            {combinationChoices.length > 1 && <div className="space-y-2 border-t pt-3">
+              <h4 className="font-medium">Check a combination</h4>
+              {combinationChoices.map(action => (
+                <label key={action.id} className="flex min-h-11 items-center gap-2 text-sm">
+                  <input type="checkbox" checked={chosen.includes(action.id)} onChange={event => setChosen(event.target.checked
+                    ? [...chosen, action.id] : chosen.filter(id => id !== action.id))} />
+                  {action.title}
+                </label>
+              ))}
+              {conflicts.map(conflict => <p key={conflict} role="status" className="text-sm text-warning">{conflict}</p>)}
+              {selectionPlan && deployable !== null && selectionPlan.costs > deployable && <p role="status" className="text-sm text-warning">This combination would breach the reserve floor.</p>}
+              {selected.length > 0 && conflicts.length === 0 && <PlanResult model={selectionPlan} missing="Model each action’s impact and confirm timing before calculating the combination." />}
+            </div>}
+        </aside>
       </div>
-      {combinationChoices.length > 1 && <div className="space-y-2 border-t pt-3">
-        <h4 className="font-medium">Check a combination</h4>
-        {combinationChoices.map(action => (
-          <label key={action.id} className="flex min-h-11 items-center gap-2 text-sm">
-            <input type="checkbox" checked={chosen.includes(action.id)} onChange={event => setChosen(event.target.checked
-              ? [...chosen, action.id] : chosen.filter(id => id !== action.id))} />
-            {action.title}
-          </label>
-        ))}
-        {conflicts.map(conflict => <p key={conflict} role="status" className="text-sm text-warning">{conflict}</p>)}
-        {selectionPlan && deployable !== null && selectionPlan.costs > deployable && <p role="status" className="text-sm text-warning">This combination would breach the reserve floor.</p>}
-        {selected.length > 0 && conflicts.length === 0 && <PlanResult model={selectionPlan} missing="Model each action’s impact and confirm timing before calculating the combination." />}
-      </div>}
     </Card>
   );
 }

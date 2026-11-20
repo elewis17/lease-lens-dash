@@ -1,3 +1,4 @@
+import { RenewalExposure } from "@/features/properties/RenewalExposure";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { money, percent } from "@/domain/finance/format";
 import { useMemo, useState, type ReactNode } from "react";
@@ -75,26 +76,29 @@ export default function DataRoom({
         </dl>}
       </header>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-xl font-semibold leading-snug">
-            Properties <span className="text-base text-muted-foreground">({filteredProperties.length})</span>
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Supports valuation, operating assumptions, and portfolio-level decision context.
-          </p>
-        </div>
-        <PropertiesTable
-          properties={filteredProperties}
-          metrics={metrics.assets}
-          readOnly={connectedReview}
-          renderName={renderPropertyName}
-          onAdd={onAddProperty}
-          onUpdate={onUpdateProperty}
-          onDelete={onDeleteProperty}
-          escrowByProperty={escrowObject}
-        />
-      </section>
+      <div className="grid items-start gap-5 lg:grid-cols-[3fr_2fr]">
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-xl font-semibold leading-snug">
+              Properties <span className="text-base text-muted-foreground">({filteredProperties.length})</span>
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Supports valuation, operating assumptions, and portfolio-level decision context.
+            </p>
+          </div>
+          <PropertiesTable
+            properties={filteredProperties}
+            metrics={metrics.assets}
+            readOnly={connectedReview}
+            renderName={renderPropertyName}
+            onAdd={onAddProperty}
+            onUpdate={onUpdateProperty}
+            onDelete={onDeleteProperty}
+            escrowByProperty={escrowObject}
+          />
+        </section>
+        <RenewalExposure />
+      </div>
 
       <section className="space-y-3">
         <div>

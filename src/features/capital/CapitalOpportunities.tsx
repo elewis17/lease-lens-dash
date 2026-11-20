@@ -299,38 +299,39 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
           ))}
         </div>
       </fieldset>
-      <CapitalAllocation actions={ranked} objective={objective} sessionKey={sessionKey} salePlans={salePlans} />
-      <p className="text-sm text-muted-foreground">{objectiveBasis[objective]}</p>
-      {!!rentResetOptions.length && (
-        <label className="flex flex-wrap items-center gap-2 text-sm">
-          <span>Model a rent reset</span>
-          <select className="min-h-11 rounded-md border bg-background px-2" value=""
-            onChange={event => { if (event.target.value) changeRentPlan(event.target.value + ":rent", emptyRentPlan); }}>
-            <option value="">Select a property</option>
-            {rentResetOptions.map(asset => <option key={asset.property.id} value={asset.property.id}>{asset.property.alias}</option>)}
-          </select>
-        </label>
-      )}
-      {!!paydownOptions.length && (
-        <label className="flex flex-wrap items-center gap-2 text-sm">
-          <span>Model a debt paydown</span>
-          <select className="min-h-11 rounded-md border bg-background px-2" value=""
-            onChange={event => {
-              if (event.target.value) setPaydownPlans({ ...paydownPlans, [event.target.value + ":paydown"]: emptyPaydownPlan });
-            }}>
-            <option value="">Select a property</option>
-            {paydownOptions.map(asset => <option key={asset.property.id} value={asset.property.id}>{asset.property.alias}</option>)}
-          </select>
-        </label>
-      )}
-      {ranked.length
-        ? <ul aria-label="Capital opportunities">{ranked.map(row => (
-            <Opportunity key={row.id} row={row} objective={objective} quote={quote}
-              rentInputs={rentPlans[row.id] ?? emptyRentPlan} onRentChange={next => changeRentPlan(row.id, next)}
-              saleInputs={salePlans[row.id] ?? emptySalePlan} onSaleChange={next => setSalePlans({ ...salePlans, [row.id]: next })}
-              paydownInputs={paydownPlans[row.id] ?? emptyPaydownPlan} onPaydownChange={next => setPaydownPlans({ ...paydownPlans, [row.id]: next })} />
-          ))}</ul>
-        : <p className="text-sm text-muted-foreground">The current record does not identify a refinance, vacancy, or sale review.</p>}
+      <CapitalAllocation actions={ranked} objective={objective} sessionKey={sessionKey} salePlans={salePlans}>
+        <p className="text-sm text-muted-foreground">{objectiveBasis[objective]}</p>
+        {!!rentResetOptions.length && (
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            <span>Model a rent reset</span>
+            <select className="min-h-11 rounded-md border bg-background px-2" value=""
+              onChange={event => { if (event.target.value) changeRentPlan(event.target.value + ":rent", emptyRentPlan); }}>
+              <option value="">Select a property</option>
+              {rentResetOptions.map(asset => <option key={asset.property.id} value={asset.property.id}>{asset.property.alias}</option>)}
+            </select>
+          </label>
+        )}
+        {!!paydownOptions.length && (
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            <span>Model a debt paydown</span>
+            <select className="min-h-11 rounded-md border bg-background px-2" value=""
+              onChange={event => {
+                if (event.target.value) setPaydownPlans({ ...paydownPlans, [event.target.value + ":paydown"]: emptyPaydownPlan });
+              }}>
+              <option value="">Select a property</option>
+              {paydownOptions.map(asset => <option key={asset.property.id} value={asset.property.id}>{asset.property.alias}</option>)}
+            </select>
+          </label>
+        )}
+        {ranked.length
+          ? <ul aria-label="Capital opportunities">{ranked.map(row => (
+              <Opportunity key={row.id} row={row} objective={objective} quote={quote}
+                rentInputs={rentPlans[row.id] ?? emptyRentPlan} onRentChange={next => changeRentPlan(row.id, next)}
+                saleInputs={salePlans[row.id] ?? emptySalePlan} onSaleChange={next => setSalePlans({ ...salePlans, [row.id]: next })}
+                paydownInputs={paydownPlans[row.id] ?? emptyPaydownPlan} onPaydownChange={next => setPaydownPlans({ ...paydownPlans, [row.id]: next })} />
+            ))}</ul>
+          : <p className="text-sm text-muted-foreground">The current record does not identify a refinance, vacancy, or sale review.</p>}
+      </CapitalAllocation>
     </Card>
   );
 }

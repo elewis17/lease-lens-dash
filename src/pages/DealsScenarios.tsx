@@ -14,6 +14,13 @@ import { assumptionsFrom, fields, holdYears, type AssumptionInputs } from "@/fea
 import { SensitivityTable } from "@/features/underwriting/SensitivityTable";
 import { RentSensitivity } from "@/features/underwriting/RentSensitivity";
 
+const assumptionSliders: Partial<Record<keyof DealAssumptions, { max: number; step: number; unit: "money" | "percent" }>> = {
+  rentMonthly: { max: 10000, step: 25, unit: "money" },
+  opexMonthly: { max: 5000, step: 25, unit: "money" },
+  downPayment: { max: 100, step: 0.5, unit: "percent" },
+  annualRate: { max: 20, step: 0.05, unit: "percent" },
+};
+
 function priceRange(asking: number, test: number, walkAway: number, maxOffer: number | null) {
   const high = Math.max(asking, test, walkAway);
   const low = Math.min(asking, test, maxOffer ?? walkAway);
@@ -141,18 +148,27 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
             </select>
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
-            {fields.map(({ key, label }) => (
-              <div className="space-y-2" key={key}>
-                <Label htmlFor={`deal-${key}`}>{label}</Label>
-                <Input
-                  id={`deal-${key}`}
-                  type="number"
-                  step="any"
-                  value={values[key] ?? ""}
-                  onChange={(event) => changeInput(key, event.target.value)}
-                />
-              </div>
-            ))}
+            {fields.map(({ key, label }) => {
+              const slider = assumptionSliders[key];
+              const current = values[key]?.trim() ? Number(values[key]) : null;
+              return (
+                <div className="space-y-2" key={key}>
+                  <Label htmlFor={`deal-${key}`}>{label}</Label>
+                  <Input
+                    id={`deal-${key}`}
+                    type="number"
+                    step="any"
+                    value={values[key] ?? ""}
+                    onChange={(event) => changeInput(key, event.target.value)}
+                  />
+                  {slider && current !== null && Number.isFinite(current) && current >= 0 && (
+                    <Slider className="min-h-11" min={0} max={Math.max(slider.max, current)} step={slider.step}
+                      thumbLabel={`Adjust ${label}`} thumbValueText={slider.unit === "money" ? currency(current) : current + "%"}
+                      value={[current]} onValueChange={([value]) => changeInput(key, String(value))} />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>
