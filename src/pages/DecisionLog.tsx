@@ -5,7 +5,7 @@ import { modelDeal } from "@/domain/finance/underwriting";
 import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 export default function DecisionLog() {
-  const { pathTo, dealAssumptions, entries } = useWorkspace();
+  const { pathTo, dealAssumptions, entries, illustrative } = useWorkspace();
   const hasDraft = !!dealAssumptions && modelDeal(dealAssumptions) !== null;
 
   const decisions = entries.entries.filter(entry => entry.payload.kind === "acquisition" || entry.payload.kind === "policy" || (entry.payload.kind === "capital" && entry.payload.status === "decided"));
@@ -13,7 +13,7 @@ export default function DecisionLog() {
   return (
     <section className="space-y-4">
       <h1 className="text-3xl font-semibold">Decision Log</h1>
-      {connectedReview ? <p className="text-muted-foreground">Saved decisions are unavailable in the connected review.</p>
+      {connectedReview && !illustrative ? <p className="text-muted-foreground">Saved decisions are unavailable in the connected review.</p>
         : entries.isError ? <p role="alert">Could not load the Decision Log.</p>
         : decisions.length === 0 ? <p className="text-muted-foreground">No recorded decisions yet.</p>
         : <ul className="divide-y border-y">{decisions.map(entry => (

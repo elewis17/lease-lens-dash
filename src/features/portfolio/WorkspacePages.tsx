@@ -42,7 +42,7 @@ export function Underwrite() {
   const { draft, setDraft, illustrative, policyFor } = useWorkspace();
   return <div className="space-y-8">
     <DealsScenarios values={draft} onChange={setDraft} illustrative={illustrative} policy={policyFor(draft.propertyType)} />
-    {connectedReview ? <p className="text-sm text-muted-foreground">Model a deal here. Saving to the pipeline is unavailable in this review.</p> : <InvestmentPipeline />}
+    {connectedReview && !illustrative ? <p className="text-sm text-muted-foreground">Model a deal here. Saving to the pipeline is unavailable in this review.</p> : <InvestmentPipeline />}
   </div>;
 }
 

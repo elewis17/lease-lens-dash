@@ -40,7 +40,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
   const { action, asset, refinance: model, rentPlan } = row;
   const projection = capitalProjection(row);
   const netProceeds = action === "sale" ? netSaleProceeds(saleInputs.price, saleInputs.costs, saleInputs.payoff) : null;
-  const { entries } = useWorkspace();
+  const { entries, illustrative } = useWorkspace();
   const history = capitalHistory(entries.entries, row.id);
   const latest = history.at(0)?.payload;
   const stage = latest?.status ?? "identified";
@@ -157,7 +157,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
             )}
           </div>
           <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-            {!connectedReview && <CapitalLifecycle current={current} />}
+            {(!connectedReview || illustrative) && <CapitalLifecycle current={current} />}
             <SheetClose asChild><Button variant="outline" className="min-h-11">Close</Button></SheetClose>
           </footer>
         </SheetContent>

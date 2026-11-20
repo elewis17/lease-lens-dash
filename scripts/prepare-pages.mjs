@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const output = resolve(process.argv[2] ?? "dist");
 const index = resolve(output, "index.html");
 const routes = ["briefing", "capital", "underwrite", "holdings", "decisions", "decisions/draft/memo", "auth/login", "auth/callback"];
+routes.push("demo", ...routes.filter(route => !route.startsWith("auth/")).map(route => "demo/" + route));
 if (process.argv.includes("--connected-review")) routes.push("preview/live-portfolio");
 
 await Promise.all([

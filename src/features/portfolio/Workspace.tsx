@@ -18,7 +18,7 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   const location = useLocation();
   const navigate = useNavigate();
   const { pathname, search, hash } = location;
-  const query = usePortfolio(userId);
+  const query = usePortfolio(userId, illustrative);
   const entries = useWorkspaceEntries(userId, illustrative);
   const { properties, leases, mortgages, record } = query.portfolio;
   const selection = new URLSearchParams(search).get("property") ?? "";
@@ -85,13 +85,15 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <PortfolioNav prefix={prefix} />
       <div className="container min-w-0 flex-1 space-y-6 px-4 pt-8 pb-[calc(9rem+env(safe-area-inset-bottom))] sm:px-8 lg:pb-8">
-        {connectedReview && <p className="text-sm text-muted-foreground">Connected portfolio · Read-only review</p>}
+        {(illustrative || connectedReview) && <p className="text-sm text-muted-foreground">
+          {illustrative ? "Illustrative data · Demo portfolio" : "Connected portfolio · Read-only review"}
+        </p>}
         {query.isSuccess && properties.length > 0 && (
           <PropertyFilter properties={properties.map(property => ({
             id: property.id, alias: property.alias, address: property.address ?? "",
           }))} selectedProperty={selectedProperty} onPropertyChange={setSelectedProperty} />
         )}
-        {!connectedReview && <PolicySettings store={context.entries} />}
+        {(!connectedReview || illustrative) && <PolicySettings store={context.entries} />}
         <ScrollRestoration ownerId={userId} />
         <div key={pathnameForView} className={/\/(holdings|underwrite)\/?$/.test(pathnameForView) ? undefined : "animate-fade-in"}><Outlet context={context} /></div>
       </div>

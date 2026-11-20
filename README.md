@@ -2,7 +2,7 @@
 
 DealStack is a rental portfolio decision tool. Briefing explains what changed, Capital compares opportunities, Underwrite models one acquisition, and Holdings contains the property records. Decision Log preserves decisions and their memos.
 
-The app uses Vite, React, TypeScript, and Supabase. The signed-out demo uses illustrative data. Private portfolio records require sign-in and stay scoped to the owner.
+The app uses Vite, React, TypeScript, and Supabase. The signed-out workspace opens on Briefing and uses the same illustrative portfolio across all four tabs and the Decision Log. Signed-in users can open the demo at `/demo/`. Demo decisions and assumptions are stored in the current browser tab. Private portfolio records require sign-in and stay scoped to the owner.
 
 ## Development
 

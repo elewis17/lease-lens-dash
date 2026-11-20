@@ -6,6 +6,8 @@ import type { LeaseData } from "@/features/leases/LeaseTable";
 import type { Property } from "@/features/properties/PropertiesTable";
 import type { Tables } from "@/integrations/supabase/types";
 import { connectedReview } from "./releaseProfile";
+import { format } from "date-fns";
+import { illustrativePortfolio } from "@/domain/finance/illustrativePortfolio";
 
 const portfolioKey = (userId: string) => ["portfolio", userId] as const;
 
@@ -148,12 +150,26 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
   return { properties, leases, mortgages, statements, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments, statements } };
 }
 
-export function usePortfolio(userId: string) {
+export function usePortfolio(userId: string, illustrative = false) {
   const client = useQueryClient();
   const key = portfolioKey(userId);
   const query = useQuery({
     queryKey: key,
-    queryFn: ({ signal }) => readPortfolio(userId, signal),
+    queryFn: ({ signal }) => {
+      if (!illustrative) return readPortfolio(userId, signal);
+      const sample = illustrativePortfolio(format(new Date(), "yyyy-MM-dd"));
+      const labels = new Map(sample.units.map(unit => [unit.id, unit.unit_label]));
+      const properties = sample.properties.map(property => ({
+        ...property, sale_price: null, purchase_price: null,
+      }));
+      const leases: LeaseData[] = sample.leases.map(lease => ({
+        id: lease.id, property_id: lease.property_id, unit_id: lease.unit_id, unit_label: labels.get(lease.unit_id),
+        tenant: lease.tenant.name, monthlyRent: lease.monthly_rent, status: lease.status,
+        startDate: lease.start_date, leaseEnd: lease.end_date, deposit: null,
+      }));
+      const mortgages = sample.mortgages.map(loan => ({ ...loan, start_date: new Date(loan.start_date) }));
+      return { properties, leases, mortgages, statements: [], record: sample };
+    },
     retry: false,
     gcTime: 0,
   });

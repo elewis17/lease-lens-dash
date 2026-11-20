@@ -55,7 +55,8 @@ export default function DataRoom({
   onDeleteMortgage,
 }: DataRoomProps) {
   const [leaseSaved, setLeaseSaved] = useState(false);
-  const { metrics } = useWorkspace();
+  const { metrics, illustrative } = useWorkspace();
+  const readOnly = connectedReview || illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]
@@ -89,7 +90,7 @@ export default function DataRoom({
           <PropertiesTable
             properties={filteredProperties}
             metrics={metrics.assets}
-            readOnly={connectedReview}
+            readOnly={readOnly}
             renderName={renderPropertyName}
             onAdd={onAddProperty}
             onUpdate={onUpdateProperty}
@@ -110,13 +111,13 @@ export default function DataRoom({
           </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        {!connectedReview && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
+        {!readOnly && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
           onOpen={() => setLeaseSaved(false)}
           onUploadComplete={async () => {
             setLeaseSaved(true);
             await onLeaseCaptured();
           }} />}
-        <fieldset className="min-w-0" disabled={connectedReview}>
+        <fieldset className="min-w-0" disabled={readOnly}>
         <LeaseTable
           leases={filteredLeases}
           onUpdate={onUpdateLease}
@@ -136,8 +137,8 @@ export default function DataRoom({
             Drives DSCR, debt stress, refinance capacity, equity visibility, and cash-flow pressure.
           </p>
         </div>
-        {!connectedReview && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
-        <fieldset className="min-w-0" disabled={connectedReview}>
+        {!readOnly && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
+        <fieldset className="min-w-0" disabled={readOnly}>
         <MortgagesTable
           mortgages={filteredMortgages}
           onUpdate={onUpdateMortgage}
