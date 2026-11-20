@@ -56,7 +56,8 @@ export default function DataRoom({
 }: DataRoomProps) {
   const [leaseSaved, setLeaseSaved] = useState(false);
   const { metrics, illustrative } = useWorkspace();
-  const readOnly = connectedReview || illustrative;
+  const termsOnly = connectedReview && !illustrative;
+  const allowCapture = !connectedReview && !illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]
@@ -67,6 +68,7 @@ export default function DataRoom({
       <header className="space-y-2">
         <h1 id="holdings-title" tabIndex={-1} className="text-3xl font-semibold">Holdings</h1>
         <p className="text-sm text-muted-foreground">Open a property to review its records and sources.</p>
+        {illustrative && <p className="text-sm text-muted-foreground">Demo record changes reset when you reload.</p>}
         {filteredProperties.length > 0 && <dl aria-label="Holdings at a glance" className="grid grid-cols-2 gap-4 border-y py-3 text-sm sm:grid-cols-3">
           <div><dt className="text-xs text-muted-foreground">Real estate equity · Estimate</dt>
             <dd className="font-semibold tabular-nums">{money(metrics.equity)}</dd></div>
@@ -90,7 +92,7 @@ export default function DataRoom({
           <PropertiesTable
             properties={filteredProperties}
             metrics={metrics.assets}
-            readOnly={readOnly}
+            readOnly={termsOnly}
             renderName={renderPropertyName}
             onAdd={onAddProperty}
             onUpdate={onUpdateProperty}
@@ -111,21 +113,21 @@ export default function DataRoom({
           </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        {!readOnly && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
+        {termsOnly && <p className="text-sm text-muted-foreground">Edit the terms of an existing lease or confirm its deletion. Adding leases and changing tenants or units are unavailable in this preview.</p>}
+        {allowCapture && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
           onOpen={() => setLeaseSaved(false)}
           onUploadComplete={async () => {
             setLeaseSaved(true);
             await onLeaseCaptured();
           }} />}
-        <fieldset className="min-w-0" disabled={readOnly}>
         <LeaseTable
           leases={filteredLeases}
+          termsOnly={termsOnly}
           onUpdate={onUpdateLease}
           onDelete={onDeleteLease}
           onAdd={onAddLease}
           propertyOptions={propertyOptions}
         />
-        </fieldset>
       </section>
 
       <section className="space-y-3">
@@ -137,8 +139,8 @@ export default function DataRoom({
             Drives DSCR, debt stress, refinance capacity, equity visibility, and cash-flow pressure.
           </p>
         </div>
-        {!readOnly && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
-        <fieldset className="min-w-0" disabled={readOnly}>
+        {allowCapture && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
+        <fieldset className="min-w-0" disabled={termsOnly}>
         <MortgagesTable
           mortgages={filteredMortgages}
           onUpdate={onUpdateMortgage}

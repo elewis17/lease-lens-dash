@@ -10,7 +10,8 @@ export default function Holdings() {
     filteredProperties, filteredLeases, filteredMortgages, propertyOptions, escrowByProperty,
   } = useWorkspace();
   const { saveProperty, saveManualLease, saveMortgage, requestDelete, deleteDialog } = useRecordActions({
-    userId, properties, refresh: query.refresh, selectedProperty, clearProperty: () => setSelectedProperty(""),
+    userId, properties, leases, refresh: query.refresh, updateDemo: query.updateDemo, selectedProperty,
+    clearProperty: () => setSelectedProperty(""),
   });
 
   return (

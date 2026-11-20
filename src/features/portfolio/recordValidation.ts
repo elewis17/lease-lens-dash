@@ -44,13 +44,18 @@ export const mortgageForm = z.object({
 
 export const mortgageEscrowChange = z.object({ includes_escrow: z.boolean() }).strict();
 
-export const manualLeaseForm = z.object({
-  property_id: propertyId,
-  tenant: requiredText("a tenant name", 200),
-  unit_label: requiredText("a unit label", 100),
+const leaseTerms = z.object({
   startDate: date("the lease start date"),
   leaseEnd: date("the lease end date"),
   monthlyRent: requiredNumber(amount("monthly rent", 99_999_999.99)),
   deposit: optionalNumber(amount("Deposit", 99_999_999.99)),
   status: z.enum(["active", "expiring", "expired", "vacant"]).nullable().optional(),
-}).refine(value => value.leaseEnd >= value.startDate, { path: ["leaseEnd"], message: "Lease end must be on or after lease start." });
+});
+const dateOrder = { path: ["leaseEnd"], message: "Lease end must be on or after lease start." };
+const validDates = (value: { startDate: string; leaseEnd: string }) => value.leaseEnd >= value.startDate;
+export const leaseTermForm = leaseTerms.refine(validDates, dateOrder);
+export const manualLeaseForm = leaseTerms.extend({
+  property_id: propertyId,
+  tenant: requiredText("a tenant name", 200),
+  unit_label: requiredText("a unit label", 100),
+}).refine(validDates, dateOrder);

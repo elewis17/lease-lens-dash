@@ -15,7 +15,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     const auth = (method === "POST" && ["/auth/v1/token", "/auth/v1/logout"].includes(url.pathname))
       || (method === "GET" && url.pathname === "/auth/v1/user");
     const dataRead = method === "GET" && (url.pathname.startsWith("/rest/v1/") || url.pathname.startsWith("/storage/v1/"));
-    if (url.origin !== new URL(SUPABASE_URL).origin || (!auth && !dataRead)) {
+    const scopedLeaseChange = (method === "PATCH" || method === "DELETE") && url.pathname === "/rest/v1/leases"
+      && ["id", "unit_id"].every(column => /^eq\.[0-9a-f-]{36}$/i.test(url.searchParams.get(column) ?? ""));
+    if (url.origin !== new URL(SUPABASE_URL).origin || (!auth && !dataRead && !scopedLeaseChange)) {
       return Promise.resolve(new Response(JSON.stringify({ message: "The connected review is read-only." }), {
         status: 403, headers: { "Content-Type": "application/json" },
       }));

@@ -35,13 +35,14 @@ type PropertyOption = { id: string; name: string }; // NEW
 
 interface LeaseTableProps {
   leases: LeaseData[];
+  termsOnly?: boolean;
   onUpdate: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   onDelete: (id: string) => void;
   onAdd: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   propertyOptions: PropertyOption[]; 
 }
 
-export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}: LeaseTableProps) => {
+export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions, termsOnly = false }: LeaseTableProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<ManualLeaseInput>({});
   const [isAdding, setIsAdding] = useState(false);
@@ -104,14 +105,14 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
               {editingId === lease.id ? (
                 <>
                   <TableCell className="sticky left-0 bg-card backdrop-blur-sm">
-                    <Input aria-label="Tenant name"
+                    <Input aria-label="Tenant name" disabled={termsOnly}
                       value={editData.tenant || ""}
                       onChange={(e) => setEditData({ ...editData, tenant: e.target.value })}
                       className="h-8 text-sm"
                     />
                   </TableCell>
                   <TableCell>
-                    <select aria-label="Property"
+                    <select aria-label="Property" disabled={termsOnly}
                       className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
                       value={editData.property_id ?? ""}
                       onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
@@ -124,7 +125,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   </TableCell>
                   {/* Unit */}
                   <TableCell>
-                    <Input aria-label="Unit label"
+                    <Input aria-label="Unit label" disabled={termsOnly}
                       placeholder="Unit"
                       value={editData.unit_label || ""}
                       onChange={(e) =>
@@ -204,10 +205,10 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
                   <TableCell className="text-sm">{lease.deposit == null ? "—" : `$${lease.deposit.toLocaleString()}`}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} aria-label={`Edit lease for ${lease.tenant}`} disabled={saving} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} aria-label={termsOnly ? `Edit lease · ${lease.unit_label}` : `Edit lease for ${lease.tenant}`} disabled={saving} className="hover:scale-105 transition-transform">
                         <Pencil className="h-3 w-3 mr-1" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} aria-label={`Delete lease for ${lease.tenant}`} className="hover:scale-105 transition-transform">
+                      <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} aria-label={termsOnly ? `Delete lease · ${lease.unit_label}` : `Delete lease for ${lease.tenant}`} disabled={saving} className="hover:scale-105 transition-transform">
                         <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
                     </div>
@@ -314,7 +315,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions}
         </TableBody>
       </Table>
       </div>
-      {!isAdding && (
+      {!termsOnly && !isAdding && (
         <div className="p-3 border-t border-border">
           <Button variant="outline" size="sm" disabled={saving} onClick={() => {
             draftId.current = crypto.randomUUID();

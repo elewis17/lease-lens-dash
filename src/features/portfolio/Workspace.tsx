@@ -86,7 +86,7 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
       <PortfolioNav prefix={prefix} />
       <div className="container min-w-0 flex-1 space-y-6 px-4 pt-8 pb-[calc(9rem+env(safe-area-inset-bottom))] sm:px-8 lg:pb-8">
         {(illustrative || connectedReview) && <p className="text-sm text-muted-foreground">
-          {illustrative ? "Illustrative data · Demo portfolio" : "Connected portfolio · Read-only review"}
+          {illustrative ? "Illustrative data · Demo portfolio" : "Connected portfolio · Existing lease terms can be edited in Holdings"}
         </p>}
         {query.isSuccess && properties.length > 0 && (
           <PropertyFilter properties={properties.map(property => ({

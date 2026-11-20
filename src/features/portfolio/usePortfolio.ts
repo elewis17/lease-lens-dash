@@ -90,7 +90,9 @@ function toProperty(property: Tables<"properties">): Property {
   };
 }
 
-const emptyPortfolio: { properties: Property[]; leases: LeaseData[]; mortgages: Mortgage[]; statements: Tables<"dealstack_mortgage_statements">[]; record: PortfolioRecord } = {
+export type WorkspacePortfolio = { properties: Property[]; leases: LeaseData[]; mortgages: Mortgage[];
+  statements: Tables<"dealstack_mortgage_statements">[]; record: PortfolioRecord };
+const emptyPortfolio: WorkspacePortfolio = {
   properties: [],
   leases: [],
   mortgages: [],
@@ -171,7 +173,8 @@ export function usePortfolio(userId: string, illustrative = false) {
       return { properties, leases, mortgages, statements: [], record: sample };
     },
     retry: false,
-    gcTime: 0,
+    gcTime: illustrative ? 30 * 60 * 1000 : 0,
+    staleTime: illustrative ? Infinity : 0,
   });
 
   const refresh = async () => {
@@ -179,5 +182,7 @@ export function usePortfolio(userId: string, illustrative = false) {
     await client.invalidateQueries({ queryKey: key, exact: true });
   };
 
-  return { ...query, portfolio: query.data ?? emptyPortfolio, refresh };
+  const updateDemo = illustrative ? (update: (portfolio: WorkspacePortfolio) => WorkspacePortfolio) =>
+    client.setQueryData<WorkspacePortfolio>(key, current => current && update(current)) : undefined;
+  return { ...query, portfolio: query.data ?? emptyPortfolio, refresh, updateDemo };
 }

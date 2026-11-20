@@ -5,19 +5,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Property } from "@/features/properties/PropertiesTable";
 import type { MortgageInput } from "@/components/MortgagesTable";
-import type { ManualLeaseInput } from "@/features/leases/LeaseTable";
+import type { LeaseData, ManualLeaseInput } from "@/features/leases/LeaseTable";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
-import { manualLeaseForm, mortgageEscrowChange, mortgageForm, propertyForm } from "@/features/portfolio/recordValidation";
+import { leaseTermForm, manualLeaseForm, mortgageEscrowChange, mortgageForm, propertyForm } from "@/features/portfolio/recordValidation";
 import { useToast } from "@/hooks/use-toast";
+import { connectedReview } from "./releaseProfile";
+import type { WorkspacePortfolio } from "./usePortfolio";
+import { deleteDemoRecord, writeDemoLease, writeDemoMortgage, writeDemoProperty } from "./demoRecords";
 
 type RecordKind = "property" | "lease" | "mortgage";
 const recordTable = { property: "properties", lease: "leases", mortgage: "mortgages" } as const;
 
-export function useRecordActions({ userId, properties, refresh, selectedProperty, clearProperty }: {
+export function useRecordActions({ userId, properties, leases, refresh, updateDemo, selectedProperty, clearProperty }: {
   userId: string;
   properties: Property[];
+  leases: LeaseData[];
   refresh: () => Promise<void>;
+  updateDemo?: (update: (portfolio: WorkspacePortfolio) => WorkspacePortfolio) => void;
   selectedProperty: string;
   clearProperty: () => void;
 }) {
@@ -26,13 +31,44 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
     toast({ title, description, variant: "destructive" });
     return false;
   };
+  const scopedLease = async (id: string) => {
+    const lease = leases.find(row => row.id === id);
+    if (!lease?.unit_id || !lease.property_id || !properties.some(property => property.id === lease.property_id)) return null;
+    const { data, error } = await supabase.auth.getUser();
+    if (error || data.user?.id !== userId) return null;
+    const [property, unit] = await Promise.all([
+      supabase.from("properties").select("id").eq("id", lease.property_id).eq("user_id", userId).maybeSingle(),
+      supabase.from("units").select("id").eq("id", lease.unit_id).eq("property_id", lease.property_id).maybeSingle(),
+    ]);
+    return !property.error && property.data && !unit.error && unit.data ? { leaseId: id, unitId: lease.unit_id } : null;
+  };
 
   const saveManualLease = async (id: string, data: ManualLeaseInput, editing: boolean) => {
+    if (connectedReview && !updateDemo) {
+      const result = leaseTermForm.safeParse(data);
+      if (!result.success) return showWriteError("Check the lease", result.error.issues[0].message);
+      const scope = editing ? await scopedLease(id) : null;
+      if (!scope) return showWriteError("Lease unavailable", "Open an existing lease from your signed-in portfolio.");
+      const lease = result.data;
+      const { error } = await supabase.from("leases").update({
+        start_date: lease.startDate, end_date: lease.leaseEnd, monthly_rent: lease.monthlyRent,
+        deposit: lease.deposit, status: lease.status ?? null, updated_at: new Date().toISOString(),
+      }).eq("id", scope.leaseId).eq("unit_id", scope.unitId).select("id").single();
+      if (error) return showWriteError("Lease save failed", "The database did not accept this change. Your input is still in the row.");
+      await refresh();
+      toast({ title: "Lease updated" });
+      return true;
+    }
     const result = manualLeaseForm.safeParse(data);
     if (!result.success) return showWriteError("Check the lease", result.error.issues[0].message);
     const lease = result.data;
     if (!properties.some(property => property.id === lease.property_id)) {
       return showWriteError("Select a property", "Choose a property from this portfolio.");
+    }
+    if (updateDemo) {
+      updateDemo(portfolio => writeDemoLease(portfolio, id, lease));
+      toast({ title: editing ? "Demo lease updated" : "Demo lease added" });
+      return true;
     }
 
     const { data: saved, error } = await supabase.rpc("save_manual_lease", {
@@ -57,6 +93,10 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
     const escrowOnly = mortgageEscrowChange.safeParse(input);
     let payload: TablesUpdate<"mortgages">;
     if (id && escrowOnly.success) {
+      if (updateDemo) {
+        updateDemo(portfolio => writeDemoMortgage(portfolio, id, escrowOnly.data));
+        return true;
+      }
       payload = escrowOnly.data;
     } else {
       const result = mortgageForm.safeParse(input);
@@ -64,6 +104,10 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
       const mortgage = result.data;
       if (!properties.some(property => property.id === mortgage.property_id)) {
         return showWriteError("Select a property", "Choose a property from this portfolio.");
+      }
+      if (updateDemo) {
+        updateDemo(portfolio => writeDemoMortgage(portfolio, id ?? crypto.randomUUID(), mortgage));
+        return true;
       }
       payload = {
         ...mortgage,
@@ -98,6 +142,13 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
     if (!result.success) return showWriteError("Check the property", result.error.issues[0].message);
     const { sale_price, ...property } = result.data;
     const payload = { ...property, purchase_price: sale_price };
+    if (updateDemo) {
+      const propertyId = id ?? crypto.randomUUID();
+      updateDemo(portfolio => writeDemoProperty(portfolio, {
+        ...portfolio.properties.find(row => row.id === propertyId), ...payload, id: propertyId, sale_price, type: property.type ?? null,
+      }));
+      return true;
+    }
     const { error } = id
       ? await supabase.from("properties").update(payload).eq("user_id", userId).eq("id", id).select("id").single()
       : await supabase.from("properties").insert({ ...payload, user_id: userId }).select("id").single();
@@ -130,16 +181,26 @@ export function useRecordActions({ userId, properties, refresh, selectedProperty
     setDeleteError(false);
     const { kind, id } = deleteTarget;
     try {
-      const { error } = await supabase.from(recordTable[kind]).delete()
-        .eq("user_id", userId).eq("id", id).select("id").single();
-      if (error) {
-        setDeleteError(true);
-        return;
+      if (updateDemo) {
+        updateDemo(portfolio => deleteDemoRecord(portfolio, kind, id));
+      } else {
+        const scope = connectedReview && kind === "lease" ? await scopedLease(id) : null;
+        if (connectedReview && !scope) {
+          setDeleteError(true);
+          return;
+        }
+        const { error } = scope
+          ? await supabase.from("leases").delete().eq("id", scope.leaseId).eq("unit_id", scope.unitId).select("id").single()
+          : await supabase.from(recordTable[kind]).delete().eq("user_id", userId).eq("id", id).select("id").single();
+        if (error) {
+          setDeleteError(true);
+          return;
+        }
       }
       if (kind === "property" && selectedProperty === id) clearProperty();
       deleteTrigger.current = null;
       setDeleteTarget(null);
-      await refresh();
+      if (!updateDemo) await refresh();
       toast({ title: "Record deleted" });
     } catch {
       setDeleteError(true);

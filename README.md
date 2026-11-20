@@ -14,7 +14,7 @@ GitHub's label-triggered worker workflow is documented in [the worker operations
 
 ## Release readiness
 
-The production candidate and the connected review use the same Briefing, Capital, Underwrite and Holdings routes. The review build reads the signed-in owner’s existing Lease Lens records through their property relationships and uses a read-only browser client. Underwrite starts with empty inputs for signed-in users. It models the entered deal without inserting it into the pipeline. The company build targets `/dealstack/` and uses the DealStack schema.
+The production candidate and the connected review use the same Briefing, Capital, Underwrite and Holdings routes. The review build reads the signed-in owner’s existing Lease Lens records through their property relationships and allows owner-scoped edits or confirmed deletion of existing leases. Legacy lease edits cover rent, deposit, dates and status. Creating records and changing tenant/unit links remain part of the DealStack schema rollout. Underwrite starts with empty inputs for signed-in users. It models the entered deal without inserting it into the pipeline. The company build targets `/dealstack/` and uses the DealStack schema.
 
 - [ ] Publish the production candidate to the approved owner-only review URL. Confirm the Google return reaches the full workspace and the property filter remains consistent across routes.
 - [ ] Validate the connected history against the owner’s records, including existing document availability and absence of cross-property records.
@@ -23,4 +23,4 @@ The production candidate and the connected review use the same Briefing, Capital
 - [ ] Complete Capital optimization and personalized insights after the core gate passes.
 - [ ] Validate the production callback and direct links at `/dealstack/`, then verify the legacy `/lease-lens/` redirect at cutover.
 
-Run `npm run build:review` for the connected read-only candidate and `npm run build:company` for the company path. The review uses the already registered `/preview/live-portfolio` callback on the approved preview host. Both builds need the public Supabase configuration described above.
+Run `npm run build:review` for the connected review candidate and `npm run build:company` for the company path. The review uses the already registered `/preview/live-portfolio` callback on the approved preview host. Both builds need the public Supabase configuration described above.
