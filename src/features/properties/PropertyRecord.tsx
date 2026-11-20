@@ -10,6 +10,7 @@ import { balanceEvidenceText, staleStatementDays } from "@/domain/finance/debt";
 import { coverage, money, percent } from "@/domain/finance/format";
 import { operatingConfidence } from "@/domain/finance/portfolio";
 import type { Property } from "./PropertiesTable";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 type Portfolio = ReturnType<typeof usePortfolio>["portfolio"];
 const shortDate = (value: string | null) => value
@@ -56,7 +57,7 @@ function RecordedDocument({ ownerId, path, title }: { ownerId: string; path: str
 }
 
 function RecordSections({ ownerId, property, portfolio }: { ownerId: string; property: Property; portfolio: Portfolio }) {
-  const { entries, metrics, pathTo } = useWorkspace();
+  const { entries, metrics, pathTo, illustrative } = useWorkspace();
   const asset = metrics.assets.find(item => item.property.id === property.id);
   const cashEvidence = asset && operatingConfidence([asset]);
   const balanceEvidence = asset && balanceEvidenceText(asset.debtEvidence);
@@ -95,6 +96,15 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
     current.months.add(payment.paid_date.slice(0, 7));
     receipts.set(year, current);
   }
+  const costsByYear = new Map<string, { operating: number | null; improvements: number | null }>();
+  for (const expense of expenses) {
+    const year = expense.date.slice(0, 4);
+    const current = costsByYear.get(year) ?? { operating: null, improvements: null };
+    const category = expense.category === "capex" ? "improvements" : "operating";
+    current[category] = (current[category] ?? 0) + expense.amount;
+    costsByYear.set(year, current);
+  }
+  const historyYears = [...new Set([...receipts.keys(), ...costsByYear.keys()])].sort((a, b) => b.localeCompare(a));
   const documents = leases.filter(lease => lease.documentPath);
   const history = (entries: typeof expenses) => (
     <ul className="space-y-2">
@@ -192,21 +202,31 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
             </ul> : <p className="text-muted-foreground">No lease documents or mortgage statements linked.</p>}
           </Section>
           <Section title="Decisions">
-            {entries.isError ? <p className="text-muted-foreground">Could not load property-linked decisions.</p>
+            {connectedReview && !illustrative ? <p className="text-muted-foreground">Saved decisions are unavailable in the connected review.</p>
+              : entries.isError ? <p className="text-muted-foreground">Could not load property-linked decisions.</p>
               : propertyDecisions.length ? <ul className="space-y-2">{propertyDecisions.map(entry => (
                 <li key={entry.id}><Link className="underline" to={pathTo("/decisions/" + entry.id + "/memo")}>{entry.title}</Link></li>
               ))}</ul>
               : <p className="text-muted-foreground">No property-linked decisions recorded.</p>}
           </Section>
           <Section title="Performance">
-            {receipts.size ? (
+            {historyYears.length ? (
               <>
-                <p className="text-muted-foreground">Recorded rent receipts by calendar year. Coverage reflects months with a recorded receipt.</p>
-                <ul className="space-y-2">{[...receipts].sort(([a], [b]) => b.localeCompare(a)).map(([year, value]) => (
-                  <li key={year}>{year} · {money(value.amount)} · {value.months.size} of 12 months</li>
-                ))}</ul>
+                <p className="text-muted-foreground">Recorded amounts by calendar year. Coverage shows months with a rent receipt.</p>
+                <ul className="divide-y border-y">{historyYears.map(year => {
+                  const rent = receipts.get(year);
+                  const costs = costsByYear.get(year);
+                  return <li key={year} className="space-y-1 py-2">
+                    <p className="font-medium">{year}</p>
+                    <dl className="grid gap-2 tabular-nums sm:grid-cols-3">
+                      <div><dt>Rent received</dt><dd>{money(rent?.amount)}{rent && ` · ${rent.months.size} of 12 months`}</dd></div>
+                      <div><dt>Operating costs recorded</dt><dd>{money(costs?.operating)}</dd></div>
+                      <div><dt>Improvements recorded</dt><dd>{money(costs?.improvements)}</dd></div>
+                    </dl>
+                  </li>;
+                })}</ul>
               </>
-            ) : <p className="text-muted-foreground">No rent receipts on record.</p>}
+            ) : <p className="text-muted-foreground">No rent receipts or expenses on record.</p>}
             <p className="text-muted-foreground">Historical net cash flow needs a complete operating and debt-payment history.</p>
           </Section>
         </div>

@@ -65,17 +65,17 @@ export function CapitalAllocation({ actions, objective, sessionKey, salePlans, c
       <div className="grid items-start gap-5 border-t pt-4 lg:grid-cols-[3fr_2fr]">
         <section aria-label="Ranked opportunities" className="min-w-0 space-y-3">{children}</section>
         <aside aria-label="Allocation plan" className="min-w-0 space-y-4 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            {[...suggested, ...selected].some(action => action.refinance) && <label className="block max-w-xs space-y-1 text-sm">
+              <span>Months until modeled refinance closes</span>
+              <Input type="number" min="0" max="12" step="1" value={delay} onChange={event => setDelay(event.target.value)} />
+            </label>}
             <div className="space-y-2">
               <h4 className="font-medium">Recommended allocation</h4>
               {suggested.length ? <>
                 <p className="text-sm text-muted-foreground">Confidence · Each amount depends on the terms and timing shown in its opportunity.</p>
-                <ul className="space-y-1 text-sm">{suggested.map(action => (
+                {!plan && <ul className="space-y-1 text-sm">{suggested.map(action => (
                   <li key={action.id}>{action.title} · {money(capitalProjection(action)?.closingCosts)} estimated cost</li>
-                ))}</ul>
-                {suggested.some(action => action.refinance) && <label className="block max-w-xs space-y-1 text-sm">
-                  <span>Months until modeled refinance closes</span>
-                  <Input type="number" min="0" max="12" step="1" value={delay} onChange={event => setDelay(event.target.value)} />
-                </label>}
+                ))}</ul>}
                 <PlanResult model={plan} missing="Enter timing from zero to twelve months to calculate first-year net cash." />
               </> : <p className="text-sm text-muted-foreground">No modeled opportunity with a positive result for this objective fits the current budget.</p>}
             </div>
@@ -100,9 +100,22 @@ export function CapitalAllocation({ actions, objective, sessionKey, salePlans, c
 
 function PlanResult({ model, missing }: { model: ReturnType<typeof combinedCapitalPlan>; missing: string }) {
   return model ? (
-    <p className="text-sm italic">
-      Hypothetical · On the modeled schedule: {money(model.costs)} upfront costs, {money(model.runRate)}/yr once live,
-      {money(model.firstYear)} net in the first 12 months, and {ratio(model.dscr)} blended DSCR once live. Verify amounts, costs, and timing first.
-    </p>
+    <div className="space-y-3 text-sm italic">
+      <p>Hypothetical · If the modeled actions go ahead on this schedule, verify terms and costs first.</p>
+      <ol aria-label="Modeled capital schedule" className="divide-y border-y">
+        {model.steps.map(step => <li key={step.id} className="space-y-1 py-2">
+          <p className="font-medium">{step.title}</p>
+          <p className="text-xs text-muted-foreground">
+            {money(step.costs)} in month {step.costMonth} · {step.runRate === 0 ? "No immediate change to cash run-rate" :
+              `${money(step.runRate / 12)}/mo from month ${step.startMonth}`}
+          </p>
+          <p className="text-xs text-muted-foreground">{money(step.firstYear)} net in the first 12 months</p>
+        </li>)}
+      </ol>
+      <p className="tabular-nums">
+        {money(model.costs)} total capital required, {money(model.runRate)}/yr once live,
+        {" "}{money(model.firstYear)} net in the first 12 months, and {ratio(model.dscr)} blended DSCR once live.
+      </p>
+    </div>
   ) : <p className="text-sm text-muted-foreground">{missing}</p>;
 }

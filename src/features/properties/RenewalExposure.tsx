@@ -2,11 +2,12 @@ import { addDays, format, parseISO } from "date-fns";
 import { money } from "@/domain/finance/format";
 import { isActiveLease } from "@/domain/finance/activeLeases";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
+import { balanceEvidence } from "@/domain/finance/debt";
 
 const renewalWindowDays = 90;
 
 export function RenewalExposure() {
-  const { filteredProperties, query, setSelectedProperty } = useWorkspace();
+  const { filteredProperties, metrics, query, setSelectedProperty } = useWorkspace();
   const { leases, units } = query.portfolio.record;
   const today = format(new Date(), "yyyy-MM-dd");
   const windowEnd = format(addDays(parseISO(today), renewalWindowDays), "yyyy-MM-dd");
@@ -27,6 +28,13 @@ export function RenewalExposure() {
     if (nextLeasesByUnit.get(lease.unit_id)?.some(next => next.id !== lease.id && isActiveLease(next, nextDay))) return [];
     return [{ leaseId: lease.id, endDate, property, annualRent: lease.monthly_rent * 12 }];
   }).sort((a, b) => b.annualRent - a.annualRent || a.endDate.localeCompare(b.endDate));
+  const balances = metrics.assets.flatMap(asset => {
+    const unverified = (asset.loans ?? []).reduce((sum, loan) => {
+      const evidence = balanceEvidence([loan], query.portfolio.statements, today);
+      return sum + (evidence.stale || evidence.undated ? loan.balance ?? 0 : 0);
+    }, 0);
+    return unverified > 0 ? [{ property: asset.property, balance: unverified }] : [];
+  }).sort((a, b) => b.balance - a.balance || a.property.alias.localeCompare(b.property.alias));
 
   return (
     <aside aria-label="Renewals to verify" className="space-y-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
@@ -42,6 +50,18 @@ export function RenewalExposure() {
             <p className="text-xs text-muted-foreground">Current lease ends {endDate}.</p>
           </li>)}
         </ul> : <p className="text-sm text-muted-foreground">No upcoming renewals need review in the current records.</p>}
+      {balances.length > 0 && <section aria-label="Mortgage balances to verify" className="space-y-3 border-t pt-3">
+        <h2 className="text-lg font-semibold">Mortgage balances to verify</h2>
+        <p className="text-sm text-muted-foreground">Recorded principal with a stale or unverified statement date, ranked by the balance needing confirmation.</p>
+        <ul className="divide-y border-y">{balances.map(({ property, balance }) => (
+          <li key={property.id} className="space-y-1 py-2">
+            <p className="font-semibold tabular-nums">{money(balance)}</p>
+            <button type="button" className="text-sm underline underline-offset-2 focus-visible:outline-ring" onClick={() => setSelectedProperty(property.id)}>
+              Filter to {property.alias}
+            </button>
+          </li>
+        ))}</ul>
+      </section>}
     </aside>
   );
 }

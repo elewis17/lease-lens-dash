@@ -236,24 +236,21 @@ export function recommendCapital(actions: CapitalOpportunity[], objective: Capit
 export function combinedCapitalPlan(actions: CapitalOpportunity[], monthsToStart: number | null, metrics: { noi: number | null; debtService: number | null }) {
   const validRefinanceTiming = monthsToStart !== null && Number.isInteger(monthsToStart) && monthsToStart >= 0 && monthsToStart <= 12;
   if (!actions.length || actions.some(action => !capitalProjection(action)) || capitalConflicts(actions).length) return null;
-  let costs = 0;
-  let runRate = 0;
-  let firstYear = 0;
+  const steps: { id: string; title: string; costMonth: number; startMonth: number; costs: number; runRate: number; firstYear: number }[] = [];
   let debtService = metrics.debtService;
   let noi = metrics.noi;
   for (const action of actions) {
+    const { id, title } = action;
     if (action.paydown) {
-      costs += action.paydown.closingCosts;
-      runRate += action.paydown.annualRunRateImpact;
-      firstYear += action.paydown.firstYearNet;
+      steps.push({ id, title, costMonth: 0, startMonth: 0, costs: action.paydown.closingCosts,
+        runRate: action.paydown.annualRunRateImpact, firstYear: action.paydown.firstYearNet });
       if (debtService !== null) debtService -= action.paydown.debtServiceReduction;
       continue;
     }
     if (action.rentPlan) {
       const { closingCosts, annualRunRateImpact, firstYearNet, monthlyNoi } = action.rentPlan;
-      costs += closingCosts;
-      runRate += annualRunRateImpact;
-      firstYear += firstYearNet;
+      steps.push({ id, title, costMonth: 0, startMonth: action.rentPlan.start, costs: closingCosts,
+        runRate: annualRunRateImpact, firstYear: firstYearNet });
       if (noi !== null) noi += monthlyNoi;
       continue;
     }
@@ -271,13 +268,19 @@ export function combinedCapitalPlan(actions: CapitalOpportunity[], monthsToStart
     if (baseline === null || closingBalance === null || ongoingService === null) return null;
     const cost = closingBalance * model.costPct / 100;
     const replacement = monthlyPayment(closingBalance, model.rate / 100, model.term);
-    costs += cost;
-    runRate += (ongoingService - replacement) * 12;
-    firstYear += baseline - activeMonths * replacement - (activeMonths > 0 ? cost : 0);
+    steps.push({ id, title, costMonth: monthsToStart, startMonth: monthsToStart, costs: cost,
+      runRate: (ongoingService - replacement) * 12,
+      firstYear: baseline - activeMonths * replacement - (activeMonths > 0 ? cost : 0) });
     if (debtService !== null) debtService += replacement - action.asset.debtService;
   }
   const dscr = noi !== null && debtService !== null && debtService > 0 ? noi / debtService : null;
-  return { costs, runRate, firstYear, dscr };
+  steps.sort((a, b) => a.costMonth - b.costMonth || a.startMonth - b.startMonth || a.title.localeCompare(b.title));
+  return {
+    costs: steps.reduce((sum, step) => sum + step.costs, 0),
+    runRate: steps.reduce((sum, step) => sum + step.runRate, 0),
+    firstYear: steps.reduce((sum, step) => sum + step.firstYear, 0),
+    dscr, steps,
+  };
 }
 
 

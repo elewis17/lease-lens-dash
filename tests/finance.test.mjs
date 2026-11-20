@@ -303,6 +303,10 @@ test("Capital combines rent and refinance timing without spending the reserve or
   assert.equal(Math.round(plan.firstYear), Math.round(individual.reduce((sum, result) => sum + result.firstYear, 0)));
   assert.ok(plan.costs <= budget);
   assert.ok(plan.dscr > metrics.dscr);
+  assert.deepEqual(plan.steps.map(({ costMonth, startMonth }) => [costMonth, startMonth]), [[0, 1], [0, 2], [2, 2]]);
+  assert.equal(plan.steps[1].costs, 5000);
+  assert.equal(plan.steps[1].runRate, 3900);
+  assert.equal(plan.steps[1].firstYear, -1750);
   assert.equal(netSaleProceeds("271000", "16260", "210000"), 44740);
   const refinance = selected.find(action => action.action === "refinance");
   const conflict = [refinance, { ...refinance, action: "sale", refinance: null }];
