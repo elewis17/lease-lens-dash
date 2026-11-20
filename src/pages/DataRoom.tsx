@@ -113,7 +113,7 @@ export default function DataRoom({
           </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        {termsOnly && <p className="text-sm text-muted-foreground">Edit the terms of an existing lease or confirm its deletion. Adding leases and changing tenants or units are unavailable in this preview.</p>}
+        {termsOnly && <p className="text-sm text-muted-foreground">Add a lease below the table. Existing leases allow term edits and confirmed deletion.</p>}
         {allowCapture && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
           onOpen={() => setLeaseSaved(false)}
           onUploadComplete={async () => {
@@ -123,6 +123,7 @@ export default function DataRoom({
         <LeaseTable
           leases={filteredLeases}
           termsOnly={termsOnly}
+          selectedProperty={selectedProperty}
           onUpdate={onUpdateLease}
           onDelete={onDeleteLease}
           onAdd={onAddLease}

@@ -44,7 +44,7 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
   };
 
   const saveManualLease = async (id: string, data: ManualLeaseInput, editing: boolean) => {
-    if (connectedReview && !updateDemo) {
+    if (connectedReview && !updateDemo && editing) {
       const result = leaseTermForm.safeParse(data);
       if (!result.success) return showWriteError("Check the lease", result.error.issues[0].message);
       const scope = editing ? await scopedLease(id) : null;
@@ -71,9 +71,8 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
       return true;
     }
 
-    const { data: saved, error } = await supabase.rpc("save_manual_lease", {
+    const input = {
       p_lease_id: id,
-      p_edit: editing,
       p_property_id: lease.property_id,
       p_unit_label: lease.unit_label,
       p_tenant_name: lease.tenant,
@@ -82,7 +81,14 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
       p_monthly_rent: lease.monthlyRent,
       p_deposit: lease.deposit,
       p_status: lease.status ?? null,
-    });
+    };
+    const standard = await supabase.rpc("save_manual_lease", { ...input, p_edit: editing });
+    const { data: saved, error } = connectedReview && standard.error?.code === "PGRST202"
+      ? await supabase.rpc("dealstack_add_lease", input)
+      : standard;
+    if (connectedReview && error?.code === "PGRST202") {
+      return showWriteError("Adding leases needs a database update", "Your draft is still open. The connected database has not enabled lease creation yet.");
+    }
     if (error || saved !== id) return showWriteError("Lease save failed", "Check the lease details and try again.");
     await refresh();
     toast({ title: editing ? "Lease updated" : "Lease added" });

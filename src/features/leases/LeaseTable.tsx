@@ -36,13 +36,14 @@ type PropertyOption = { id: string; name: string }; // NEW
 interface LeaseTableProps {
   leases: LeaseData[];
   termsOnly?: boolean;
+  selectedProperty?: string;
   onUpdate: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   onDelete: (id: string) => void;
   onAdd: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   propertyOptions: PropertyOption[]; 
 }
 
-export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions, termsOnly = false }: LeaseTableProps) => {
+export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions, termsOnly = false, selectedProperty }: LeaseTableProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<ManualLeaseInput>({});
   const [isAdding, setIsAdding] = useState(false);
@@ -220,7 +221,7 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions,
           {isAdding && (
             <TableRow className="bg-primary/5 animate-fade-in">
               <TableCell className="sticky left-0 bg-primary/5 backdrop-blur-sm">
-                <Input aria-label="Tenant name"
+                <Input autoFocus aria-label="Tenant name"
                   placeholder="Tenant name"
                   value={newLease.tenant ?? ""}
                   onChange={(e) => setNewLease({ ...newLease, tenant: e.target.value })}
@@ -315,11 +316,11 @@ export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions,
         </TableBody>
       </Table>
       </div>
-      {!termsOnly && !isAdding && (
+      {!isAdding && (
         <div className="p-3 border-t border-border">
-          <Button variant="outline" size="sm" disabled={saving} onClick={() => {
+          <Button variant="outline" size="sm" disabled={saving || !propertyOptions.length} onClick={() => {
             draftId.current = crypto.randomUUID();
-            setNewLease({});
+            setNewLease({ property_id: selectedProperty || (propertyOptions.length === 1 ? propertyOptions[0].id : undefined), status: "active" });
             handleCancel();
             setIsAdding(true);
           }} className="w-full hover:scale-105 transition-transform">

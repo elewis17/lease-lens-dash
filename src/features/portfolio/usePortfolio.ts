@@ -52,7 +52,7 @@ async function readLegacyRecords(ownerProperties: string[], signal: AbortSignal)
   const unitScope = new Set(unitIds);
   const [leaseRows, unitExpenses] = await Promise.all([
     readRelated("leases", unitIds, (ids, start, end) => supabase.from("leases")
-      .select("id, monthly_rent, status, start_date, end_date, deposit, doc_url, unit_id")
+      .select("id, monthly_rent, status, start_date, end_date, deposit, doc_url, unit_id, tenant:tenants(name)")
       .in("unit_id", ids).order("id").range(start, end).abortSignal(signal), signal),
     readRelated("unit expenses", unitIds, (ids, start, end) => supabase.from("expenses")
       .select("property_id, unit_id, date, amount, category").is("property_id", null).in("unit_id", ids)
@@ -67,7 +67,7 @@ async function readLegacyRecords(ownerProperties: string[], signal: AbortSignal)
     ...directExpenses.filter(expense => expense.property_id !== null && propertyScope.has(expense.property_id)),
     ...unitExpenses.filter(expense => expense.property_id === null && expense.unit_id !== null && unitScope.has(expense.unit_id)),
   ];
-  return [scopedUnits, loans, expenses, scopedLeases.map(lease => ({ ...lease, tenant: null })), [],
+  return [scopedUnits, loans, expenses, scopedLeases, [],
     payments.filter(payment => leaseScope.has(payment.lease_id))] as const;
 }
 

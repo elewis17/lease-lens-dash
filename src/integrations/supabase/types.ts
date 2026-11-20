@@ -612,6 +612,10 @@ export type Database = {
         }
         Returns: string
       }
+      dealstack_add_lease: {
+        Args: Omit<Database["public"]["Functions"]["save_manual_lease"]["Args"], "p_edit">
+        Returns: string
+      }
       update_property_unit_count: {
         Args: { target_property: string }
         Returns: number
