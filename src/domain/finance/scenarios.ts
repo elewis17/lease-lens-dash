@@ -3,18 +3,18 @@ import { MetricsCalculator } from "./MetricsCalculator.ts";
 import { sumKnown, type PortfolioMetrics } from "./portfolio.ts";
 import { monthlyPayment } from "./underwriting.ts";
 
-type RefinanceInputs = Pick<PortfolioMetrics, "debt" | "debtService" | "loans" | "noi">;
+type RefinanceInputs = Pick<PortfolioMetrics, "rentalDebt" | "debtService" | "rentalLoans" | "noi">;
 
 export function refinance(metrics: RefinanceInputs, ratePct: number, termMonths: number, closingCostPct: number) {
   if (![ratePct, closingCostPct].every(value => Number.isFinite(value) && value >= 0) ||
       !Number.isSafeInteger(termMonths) || termMonths <= 0 ||
-      metrics.debt === null || metrics.debt <= 0 || metrics.debtService === null || metrics.loans === null ||
+      metrics.rentalDebt === null || metrics.rentalDebt <= 0 || metrics.debtService === null || metrics.rentalLoans === null ||
       metrics.noi === null || termMonths < 12) return null;
-  const escrow = sumKnown(metrics.loans.map(loan => loan.escrow));
+  const escrow = sumKnown(metrics.rentalLoans.map(loan => loan.escrow));
   if (escrow === null) return null;
-  const newDebtService = monthlyPayment(metrics.debt, ratePct / 100, termMonths);
-  const closingCosts = metrics.debt * closingCostPct / 100;
-  const currentHorizonService = sumKnown(metrics.loans.map(loan =>
+  const newDebtService = monthlyPayment(metrics.rentalDebt, ratePct / 100, termMonths);
+  const closingCosts = metrics.rentalDebt * closingCostPct / 100;
+  const currentHorizonService = sumKnown(metrics.rentalLoans.map(loan =>
     loan.remaining === null || loan.principalInterest === null ? null : Math.min(12, loan.remaining) * loan.principalInterest,
   ));
   if (currentHorizonService === null) return null;
@@ -38,7 +38,7 @@ export function projectPortfolio(metrics: PortfolioMetrics, appreciationRatePct:
       const opex = asset.opex === null || opexGrowth == null
         ? null : asset.opex * 12 * (1 + opexGrowth / 100) ** offset;
       const monthsElapsed = offset * 12;
-      const debtService = asset.loans && sumKnown(asset.loans.map(loan =>
+      const debtService = asset.rentalLoans && sumKnown(asset.rentalLoans.map(loan =>
         loan.remaining === null || loan.principalInterest === null
           ? null : Math.max(0, Math.min(12, loan.remaining - monthsElapsed)) * loan.principalInterest,
       ));

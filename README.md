@@ -16,6 +16,8 @@ GitHub's label-triggered worker workflow is documented in [the worker operations
 
 The production candidate and the connected preview share Briefing, Capital, Underwrite, and Holdings. The preview uses the signed-in owner's existing Lease Lens portfolio. Holdings supports adding, editing, and confirming deletion of properties, mortgages, and leases without rolling out the DealStack schema. Relinking a lease preserves its old unit and any shared tenant record. Lease creation prefers the transactional database functions when installed and can fall back to the original table writes. These writes are separate requests. If a save stops partway through, the same draft can retry using its original record IDs.
 
+In Holdings, edit a mortgage and set **Rental treatment** to **Household mortgage** to separate its principal and interest from rental cash flow, coverage, and rental financing scenarios. Its recorded debt still reduces real estate equity, and operating costs including escrow remain in place. This preference is saved per owner in the current browser. It does not modify the mortgage record in Supabase.
+
 Pipeline, opportunity lifecycle, recorded decisions, and threshold settings become available when the connected project has the owner-scoped workspace entries migration. Lease and statement capture require their separately deployed storage policies, tables, and functions. The company build targets `/dealstack/` and uses the DealStack schema.
 
 - [ ] Publish the production candidate to the approved owner-only review URL. Confirm the Google return reaches the full workspace and the property filter remains consistent across routes.

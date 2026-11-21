@@ -38,6 +38,8 @@ export type MortgageInput = {
 type MortgagesTableProps = {
   mortgages: Mortgage[];
   selectedProperty?: string;
+  householdMortgages: ReadonlySet<string>;
+  onSaveTreatment: (id: string, household: boolean) => boolean;
   onUpdate: (id: string, data: MortgageInput) => Promise<boolean>;
   onDelete: (id: string) => void;
   onAdd: (data: MortgageInput) => Promise<boolean>;
@@ -54,23 +56,34 @@ const numericFields = [
 const toApiDate = (value: MortgageInput["start_date"]) => value instanceof Date
   ? value.toISOString().slice(0, 10) : value ?? "";
 
-export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyOptions, selectedProperty }: MortgagesTableProps) {
-  const [editor, setEditor] = useState<{ id?: string; data: MortgageInput } | null>(null);
+export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyOptions, selectedProperty, householdMortgages, onSaveTreatment }: MortgagesTableProps) {
+  const [editor, setEditor] = useState<{ id?: string; data: MortgageInput; household?: boolean; dirty?: boolean } | null>(null);
+  const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
   const opener = useRef<HTMLButtonElement | null>(null);
   const byProperty = new Map(propertyOptions.map(option => [option.id, option.name]));
   const data = editor?.data ?? {};
-  const close = () => setEditor(null);
-  const change = (patch: MortgageInput) => setEditor(previous => previous && { ...previous, data: { ...previous.data, ...patch } });
+  const close = () => { setError(false); setEditor(null); };
+  const change = (patch: MortgageInput) => setEditor(previous => previous && { ...previous, dirty: true, data: { ...previous.data, ...patch } });
 
   const save = async () => {
     if (!editor || inFlight.current) return;
     inFlight.current = true;
     setSaving(true);
     try {
-      const saved = editor.id ? await onUpdate(editor.id, editor.data) : await onAdd(editor.data);
-      if (saved) close();
+      if (!editor.id) {
+        if (await onAdd(editor.data)) close();
+        return;
+      }
+      if (editor.dirty && !await onUpdate(editor.id, editor.data)) return;
+      const household = editor.household ?? false;
+      if (household !== householdMortgages.has(editor.id) && !onSaveTreatment(editor.id, household)) {
+        setEditor({ ...editor, dirty: false });
+        setError(true);
+        return;
+      }
+      close();
     } finally {
       setSaving(false);
       inFlight.current = false;
@@ -101,6 +114,7 @@ export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyO
                 {name && <p className="mt-1 break-words text-xs text-muted-foreground">{name}</p>}
                 <p className="mt-1 text-xs text-muted-foreground md:hidden">{rate} · {money(mortgage.monthly_payment)} / mo</p>
                 {mortgage.includes_escrow != null && <p className="mt-1 text-xs text-muted-foreground">{mortgage.includes_escrow ? "Includes escrow" : "No escrow"}</p>}
+                {householdMortgages.has(mortgage.id) && <p className="mt-1 text-xs font-medium">Household mortgage</p>}
               </TableCell>
               <TableCell className="hidden lg:table-cell text-right">{money(mortgage.principal_original ?? mortgage.principal)}</TableCell>
               <TableCell className="text-right font-semibold">{money(mortgage.current_balance)}</TableCell>
@@ -113,7 +127,7 @@ export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyO
                   <Button variant="ghost" size="icon" aria-label={`Edit mortgage ${name ?? propertyName}`}
                     onClick={event => {
                       opener.current = event.currentTarget;
-                      setEditor({ id: mortgage.id, data: {
+                      setEditor({ id: mortgage.id, household: householdMortgages.has(mortgage.id), data: {
                         ...mortgage, principal_original: mortgage.principal_original ?? mortgage.principal,
                         includes_escrow: mortgage.includes_escrow ?? undefined,
                       } });
@@ -131,6 +145,17 @@ export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyO
       }}><Plus className="mr-2 h-4 w-4" />Add Mortgage</Button>
       <RecordSheet open={editor !== null} title={editor?.id ? "Edit mortgage" : "Add mortgage"}
         description="Use the balance and payment from your mortgage statement." saving={saving} onSave={save} onClose={close} returnFocus={opener}>
+        {editor?.id && <div className="col-span-2 space-y-1 border-b pb-4">
+          <RecordField label="Rental treatment" wide>
+            <select className={recordSelectClass} value={editor.household ? "household" : "rental"}
+              onChange={event => setEditor({ ...editor, household: event.target.value === "household" })}>
+              <option value="rental">Include in rental cash flow</option>
+              <option value="household">Household mortgage</option>
+            </select>
+          </RecordField>
+          {editor.household && <p className="text-xs text-muted-foreground">Excludes principal and interest from rental cash flow. Debt and escrow stay on record. Saved in this browser.</p>}
+          {error && <p role="alert" className="text-sm text-destructive">This browser could not save the rental treatment.</p>}
+        </div>}
         <RecordField label="Property">
           <select className={recordSelectClass} value={data.property_id ?? ""} onChange={event => change({ property_id: event.target.value })}>
             <option value="">Select property…</option>

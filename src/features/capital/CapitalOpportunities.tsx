@@ -98,7 +98,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
               <h3 className="text-sm font-medium">Evidence</h3>
               {action === "refinance" && (
                 <p className="text-sm text-muted-foreground">
-                  Estimate · Existing balance {money(asset.debt)}, balance-weighted loan rate {asset.loanRatePct === null ? "—" : percent(asset.loanRatePct / 100)}, and DSCR {coverage(asset)}.
+                  Estimate · Rental loan balance {money(asset.rentalDebt)}, balance-weighted loan rate {asset.loanRatePct === null ? "—" : percent(asset.loanRatePct / 100)}, and DSCR {coverage(asset)}.
                 </p>
               )}
               {(action === "refinance" || action === "paydown" || action === "sale") && debtEvidence && (
@@ -112,7 +112,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
               {action === "rent" && <p className="text-sm text-muted-foreground">Contractual · Active leases total {money(asset.expectedRent)} per month.</p>}
               {action === "paydown" && (
                 <p className="text-sm text-muted-foreground">
-                  Recorded loan balance {money(asset.debt)} · Scheduled monthly principal and interest {money(asset.debtService)}.
+                  Recorded rental loan balance {money(asset.rentalDebt)} · Scheduled monthly principal and interest {money(asset.debtService)}.
                 </p>
               )}
               {action === "sale" && (
@@ -177,7 +177,7 @@ function PaydownEditor({ row, value, change }: {
         <select value={value.loanId} onChange={event => change({ ...value, loanId: event.target.value })}
           className="block min-h-11 w-full rounded-md border bg-background px-2">
           <option value="">Select a loan</option>
-          {row.asset.loans?.filter(loan => loan.balance !== null && loan.balance > 0).map(loan => (
+          {row.asset.rentalLoans?.filter(loan => loan.balance !== null && loan.balance > 0).map(loan => (
             <option key={loan.id} value={loan.id}>{money(loan.balance)} recorded balance at {percent(loan.rate)}</option>
           ))}
         </select>
@@ -278,7 +278,7 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
   const [salePlans, setSalePlans] = useSessionState<Record<string, SalePlan>>(sessionKey + ":sale-plans", {});
   const changeRentPlan = (id: string, next: RentPlan) => setRentPlans({ ...rentPlans, [id]: next });
   const ranked = rankCapitalOpportunities(capitalOpportunities(assets, quote, rentPlans, paydownPlans), objective);
-  const paydownOptions = assets.filter(asset => (asset.debt ?? 0) > 0 && !paydownPlans[asset.property.id + ":paydown"]);
+  const paydownOptions = assets.filter(asset => (asset.rentalDebt ?? 0) > 0 && !paydownPlans[asset.property.id + ":paydown"]);
   const rentResetOptions = assets.filter(asset => (asset.expectedRent ?? 0) > 0 && !rentPlans[asset.property.id + ":rent"]);
 
   return (

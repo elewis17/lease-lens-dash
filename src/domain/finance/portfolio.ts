@@ -54,8 +54,12 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
       : vacancy == null ? null : expectedRent * (1 - vacancy / 100);
     const loanRows = record.loans?.filter(loan => loan.property_id === property.id);
     const loans = loanRows?.map(loan => ({ ...splitLoan(loan, asOf), id: loan.id })) ?? null;
+    const householdIds = new Set(loanRows?.filter(loan => loan.household).map(loan => loan.id));
+    const rentalLoans = loans?.filter(loan => !householdIds.has(loan.id)) ?? null;
+    const householdLoans = loans?.filter(loan => householdIds.has(loan.id)) ?? [];
     const debt = loans ? sumKnown(loans.map(loan => loan.balance)) : null;
-    const debtService = loans ? sumKnown(loans.map(loan => loan.principalInterest)) : null;
+    const rentalDebt = rentalLoans ? sumKnown(rentalLoans.map(loan => loan.balance)) : null;
+    const debtService = rentalLoans ? sumKnown(rentalLoans.map(loan => loan.principalInterest)) : null;
     const escrow = loans ? sumKnown(loans.map(loan => loan.escrow)) : null;
     const hasEscrow = loanRows?.some(loan => loan.includes_escrow !== false) ?? false;
     const value = property.property_value ?? null;
@@ -70,13 +74,13 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
       ? sumKnown(expenseLines.flatMap(line => line.amount === null ? [] : [line.amount])) : null;
     const noi = effectiveRent === null || opex === null ? null : effectiveRent - opex;
     const metrics = MetricsCalculator.summary({ noi, debtService, propertyValue: value, investedCash: null });
-    const rateBasis = loans ? sumKnown(loans.map(loan => loan.balance === null ? null : loan.balance * loan.rate * 100)) : null;
-    const loanRatePct = debt !== null && debt > 0 && rateBasis !== null ? rateBasis / debt : null;
+    const rateBasis = rentalLoans ? sumKnown(rentalLoans.map(loan => loan.balance === null ? null : loan.balance * loan.rate * 100)) : null;
+    const loanRatePct = rentalDebt !== null && rentalDebt > 0 && rateBasis !== null ? rateBasis / rentalDebt : null;
     const verdict = portfolioVerdict({ ...metrics, debtService, loanRatePct, marketRatePct }, propertyPolicies.get(property.type ?? "") ?? policy);
     return {
-      ...metrics, property, value, debt, debtService, escrow, loans, expectedRent, effectiveRent, occupancy,
+      ...metrics, property, value, debt, rentalDebt, debtService, escrow, loans, rentalLoans, householdLoans, expectedRent, effectiveRent, occupancy,
       debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
-      usesEstimatedDebtService: loanRows?.some(loan => loan.includes_escrow === true) ?? false,
+      usesEstimatedDebtService: loanRows?.some(loan => !loan.household && loan.includes_escrow === true) ?? false,
       loanRatePct, rateBasis, expenseLines, opex, equity: value === null || debt === null ? null : value - debt,
       verdict,
     };
@@ -91,16 +95,19 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
   const noi = aggregate(asset => asset.noi);
   const value = aggregate(asset => asset.value);
   const debt = aggregate(asset => asset.debt);
+  const rentalDebt = aggregate(asset => asset.rentalDebt);
   const debtService = aggregate(asset => asset.debtService);
   const rateBasis = aggregate(asset => asset.rateBasis);
-  const loanRatePct = debt !== null && debt > 0 && rateBasis !== null ? rateBasis / debt : null;
+  const loanRatePct = rentalDebt !== null && rentalDebt > 0 && rateBasis !== null ? rateBasis / rentalDebt : null;
   const metrics = MetricsCalculator.summary({ noi, debtService, propertyValue: value, investedCash: null });
   const totalUnits = aggregate(asset => asset.occupancy?.totalUnits ?? null);
   const occupiedUnits = aggregate(asset => asset.occupancy?.occupiedUnits ?? null);
   const loans = assets.every(asset => asset.loans !== null) ? assets.flatMap(asset => asset.loans ?? []) : null;
+  const rentalLoans = loans && assets.flatMap(asset => asset.rentalLoans ?? []);
+  const householdLoans = assets.flatMap(asset => asset.householdLoans);
   const nextBalance = loans !== null ? sumKnown(loans.map(loan => balanceAfter(loan, 12))) : null;
   return {
-    ...metrics, ...receipts, previousReceipts, assets, value, debt, debtService, loans, loanRatePct,
+    ...metrics, ...receipts, previousReceipts, assets, value, debt, rentalDebt, debtService, loans, rentalLoans, householdLoans, loanRatePct,
     debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
     annualizedCashFlow: metrics.cashFlow === null ? null : Math.round(metrics.cashFlow) * 12,
     equity: value === null || debt === null ? null : value - debt,

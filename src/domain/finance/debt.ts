@@ -9,6 +9,7 @@ export type LoanInput = {
   start_date: string;
   monthly_payment: number;
   includes_escrow: boolean | null;
+  household?: boolean;
 };
 
 export function splitLoan(loan: LoanInput, asOf: string) {

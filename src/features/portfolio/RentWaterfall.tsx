@@ -2,6 +2,7 @@ import { useState } from "react";
 import { money } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 import { cn } from "@/lib/utils";
+import { Disclosure } from "@/components/ui/disclosure";
 
 export function RentWaterfall({ metrics }: { metrics: PortfolioMetrics }) {
   const [selected, setSelected] = useState(0);
@@ -13,9 +14,9 @@ export function RentWaterfall({ metrics }: { metrics: PortfolioMetrics }) {
     { title: "Operating costs", value: opex === null ? null : -opex, before: effectiveRent, after: noi,
       basis: "Estimate · Monthly operating costs use recorded expenses and stated assumptions." },
     { title: "Debt service", value: debtService === null ? null : -debtService, before: noi, after: cashFlow,
-      basis: "Scheduled principal and interest · The amount may include an estimated split from escrow." },
+      basis: "Scheduled rental principal and interest · May use an estimated split from escrow." },
     { title: "Cash flow", value: cashFlow, before: 0, after: cashFlow,
-      basis: "Estimate · Monthly net operating income less scheduled principal and interest." },
+      basis: "Estimate · Monthly net operating income less scheduled rental principal and interest." },
   ];
   const points = stages.flatMap(stage => [stage.before ?? 0, stage.after ?? 0]);
   const low = Math.min(0, ...points);
@@ -49,9 +50,12 @@ export function RentWaterfall({ metrics }: { metrics: PortfolioMetrics }) {
         onChange={event => setSelected(Number(event.target.value))} />
       <p className="text-sm" aria-live="polite">
         <span className="font-medium">{active.title} · {money(active.value)}/mo</span>
-        <span className="block text-xs text-muted-foreground">{active.basis}{active.value === null && " The source needed to calculate this figure is missing."}</span>
+        {active.value === null && <span className="block text-xs text-muted-foreground">Required source missing.</span>}
       </p>
-      <p className="text-xs text-muted-foreground">Annualized cash flow from the rounded monthly estimate · {money(metrics.annualizedCashFlow)}</p>
+      <Disclosure label="Calculation basis">
+        <p>{active.basis}</p>
+        <p>Annualized rental cash flow · {money(metrics.annualizedCashFlow)}</p>
+      </Disclosure>
     </div>
   );
 }

@@ -173,6 +173,24 @@ test("escrowed, seasoned mortgage separates principal and interest once and neve
   assert.equal(refi.escrow, 250);
   assert.equal(refi.annualRunRateImpact, 0);
   assert.equal(refi.firstYearNet, -480);
+
+  const household = modelPortfolio([property], { ...record, loans: [{ ...loan, household: true }] }, reviewDate, 6.25);
+  assert.equal(household.cashFlow, 1500);
+  assert.equal(household.opex, 250);
+  assert.equal(household.dscr, null);
+  assert.equal(household.debt, 24000);
+  assert.equal(household.equity, 60000);
+  assert.equal(household.householdLoans[0].remaining, 24);
+  assert.equal(refinance(household, 0, 24, 2), null);
+  assert.equal(modelPaydown(household.assets[0], { loanId: loan.id, amount: "1000", fee: "0" }), null);
+
+  const rentalLoan = { ...loan, id: "rental", current_balance: 12000, monthly_payment: 500, includes_escrow: false };
+  const withRental = modelPortfolio([property], { ...record, loans: [{ ...loan, household: true }, rentalLoan] }, reviewDate, 6.25);
+  assert.equal(withRental.debt, 36000);
+  assert.equal(withRental.debtService, 500);
+  assert.equal(withRental.cashFlow, 1000);
+  assert.equal(withRental.dscr, 3);
+  assert.equal(refinance(withRental, 0, 24, 2).closingCosts, 240);
 });
 
 test("recorded unit expenses replace estimates in NOI and capital costs are separate", () => {

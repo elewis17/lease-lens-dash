@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { acquisitionVerdictDetail } from "@/domain/finance/verdicts";
 import { VerdictExplanation } from "@/components/VerdictExplanation";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,7 +72,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
             ? <div className={cn("space-y-1", testPrice !== null && "italic")}>
                 {testPrice !== null && <p className="text-xs text-muted-foreground">Hypothetical · if bought at {currency(testPrice)}</p>}
                 <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} live />
-                <p className="text-xs text-muted-foreground">Confidence · Price guidance depends on the entered rents, operating costs, financing and exit assumptions.</p>
+
               </div>
             : <p className="font-medium" role="status">Enter valid assumptions to calculate price guidance.</p>}
           {asking && assumptions && range && (
@@ -119,27 +120,23 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
             <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash flow / mo</dt><dd>{currency(model?.cashFlow)}</dd></div>
             <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash yield</dt><dd>{percent(model?.cashYield)}</dd></div>
           </dl>
-          <p className="text-sm text-muted-foreground">
-            Estimate · Buy requires DSCR ≥ {ratio(policy.buy.minimumDscr)} and IRR ≥ {percent(policy.buy.minimumIrr)}.
-            {model?.dscr != null && model.irr != null && ` ${testPrice === null ? "Asking price" : "Test price"} passes ${Number(dscrPasses) + Number(irrPasses)} of 2 gates.`}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Walk-away uses the {ratio(policy.lender.minimumDscr)} lender floor. Above max offer, verify rent, a rate buydown, or a larger down payment before proceeding.
-          </p>
+          <Disclosure label="Buy gates and walk-away">
+            <p>Buy requires DSCR ≥ {ratio(policy.buy.minimumDscr)} and IRR ≥ {percent(policy.buy.minimumIrr)}. Walk-away uses the {ratio(policy.lender.minimumDscr)} lender floor.</p>
+            <p>Above max offer, verify rent, a rate buydown, or a larger down payment. Guidance depends on the entered rents, costs, financing, and exit assumptions.</p>
+          </Disclosure>
           {model && <div className="space-y-2 border-t pt-3">
             <h4 className="text-sm font-medium">Break-evens · Estimate</h4>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div><dt>Minimum monthly rent</dt><dd className="font-medium">{currency(breakEvens?.rent)}</dd></div>
               <div><dt>Maximum loan rate</dt><dd className="font-medium">{breakEvens?.annualRate == null ? "—" : (breakEvens.annualRate * 100).toFixed(2) + "%"}</dd></div>
             </dl>
-            <p className="text-xs text-muted-foreground">Moves one assumption at a time to pass both buy gates. A dash means there is no supported break-even with the other inputs fixed.</p>
+            <Disclosure label="Break-even basis"><p>Changes one assumption at a time to pass both buy gates. A dash means no break-even was found with the other inputs fixed.</p></Disclosure>
           </div>}
           {model?.dscr === null && <p className="text-sm text-muted-foreground">DSCR requires scheduled debt service.</p>}
           {model?.irr === null && <p className="text-sm text-muted-foreground">Projected cash flows do not establish a unique IRR.</p>}
         </Card>
         {assumptions && model && <RentSensitivity assumptions={assumptions} irrGate={policy.buy.minimumIrr} />}
-        <Card className="space-y-4 p-5 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:self-start">
-          <h3 className="text-lg font-semibold">Deal inputs</h3>
+        <Disclosure section label="Deal inputs" initiallyOpen={!model} openOnDesktop className="lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:self-start">
           <label className="grid gap-1 text-sm">Property type
             <select className="rounded-md border bg-background p-2" value={values.propertyType ?? ""}
               onChange={event => onChange({ ...values, propertyType: event.target.value || undefined })}>
@@ -170,14 +167,13 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
               );
             })}
           </div>
-        </Card>
+        </Disclosure>
       </div>
 
-      {assumptions && model && <SensitivityTable assumptions={assumptions} minimumIrr={policy.buy.minimumIrr} />}
+      {assumptions && model && <Disclosure section label="Sensitivity grid"><SensitivityTable assumptions={assumptions} minimumIrr={policy.buy.minimumIrr} /></Disclosure>}
 
-      <Card className="space-y-3 p-5">
-        <h3 className="text-lg font-semibold">Scenario analysis</h3>
-        <p className="text-sm text-muted-foreground">The estimate uses operating income after vacancy and expenses. The sale uses next-year NOI at the exit cap, less selling costs and loan payoff.</p>
+      <Disclosure section label="Scenario analysis">
+        <Disclosure label="Scenario basis"><p>Uses operating income after vacancy and expenses. The modeled sale uses next-year NOI at the exit cap, less selling costs and loan payoff.</p></Disclosure>
         {scenarios.length ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -198,12 +194,11 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
             </table>
           </div>
         ) : <p className="text-sm text-muted-foreground">Complete the deal inputs to compare scenarios.</p>}
-      </Card>
+      </Disclosure>
 
-      <Card className="space-y-2 p-5">
-        <h3 className="text-lg font-semibold">Market comparables</h3>
+      <Disclosure section label="Market comparables">
         <p className="text-sm text-muted-foreground">No verified comparables are available for this deal.</p>
-      </Card>
+      </Disclosure>
     </section>
   );
 }

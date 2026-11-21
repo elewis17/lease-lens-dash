@@ -1,4 +1,5 @@
 import { useSessionState } from "@/features/navigation/sessionState";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { money, coverage } from "@/domain/finance/format";
@@ -38,8 +39,7 @@ export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentS
   );
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">What-if analysis</h2>
+    <Disclosure section label="What-if analysis">
       <Card className="space-y-3 p-4">
         <h3 className="font-medium">Refinance</h3>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -47,14 +47,14 @@ export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentS
           {numberField("Quoted term (years)", termYears, setTermYears)}
           {numberField("Upfront closing costs (% of balance)", costPct, setCostPct)}
         </div>
-        <p className="text-sm text-muted-foreground">Uses all loans in the selected scope and retains monthly escrow. Assumes a cash-paid closing with no cash-out. Enter quote assumptions including all fees and any prepayment charges.</p>
+        <Disclosure label="Refinance assumptions"><p>Uses rental loans in the selected scope and retains their monthly escrow. Assumes a cash-paid closing with no cash-out. Include fees and any prepayment charges.</p></Disclosure>
         {refi ? <p className="text-sm italic">If refinanced · Annualized cash flow change {money(refi.annualRunRateImpact)} · First 12 months after {money(refi.closingCosts)} closing costs {money(refi.firstYearNet)} · Retained escrow {money(refi.escrow)}/mo · DSCR {coverage({ dscr: refi.dscr, debtService: refi.newDebtService })}</p>
           : <p className="text-sm text-muted-foreground">Requires quote terms, current balances, existing loan schedules, and operating costs.</p>}
       </Card>
       <Card className="space-y-3 p-4">
         <h3 className="font-medium">Rent change</h3>
         {numberField("Change to active monthly rents (%)", rentPct, setRentPct)}
-        <p className="text-sm text-muted-foreground">Keeps vacancy assumptions and recorded costs fixed. Rent-based management and maintenance estimates recalculate.</p>
+        <Disclosure label="Rent assumptions"><p>Keeps vacancy assumptions and recorded costs fixed. Rent-based management and maintenance estimates recalculate.</p></Disclosure>
         <p className="text-sm italic">If rents change · Annualized NOI change {money(rentDelta)} · DSCR {rent ? coverage(rent) : "—"}</p>
       </Card>
       <Card className="space-y-3 p-4">
@@ -66,9 +66,9 @@ export function PortfolioWhatIf({ metrics, marketRate, onMarketRateChange, rentS
           {numberField("Marginal tax rate (%)", taxRate, setTaxRate)}
           {numberField("Placed-in-service year", serviceYear, setServiceYear)}
         </div>
-        <p className="text-sm text-muted-foreground">Uses your confirmed eligible basis and rates. Assumes the deduction can be used in the service year. Future recapture, other depreciation, and offset limits are excluded.</p>
+        <Disclosure label="Tax assumptions"><p>Uses your confirmed eligible basis and rates. Assumes the deduction can be used in the service year. Future recapture, other depreciation, and offset limits are excluded.</p></Disclosure>
         <p className="text-sm italic">If assumptions hold · Estimated first-year tax effect {money(tax)}</p>
       </Card>
-    </div>
+    </Disclosure>
   );
 }

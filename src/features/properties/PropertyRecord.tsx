@@ -122,7 +122,7 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
             <dd className="text-xl font-semibold tabular-nums">{money(asset.equity)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Cash flow / mo · Estimate</dt>
+            <dt className="text-muted-foreground">Rental cash flow / mo · Estimate</dt>
             <dd className="text-xl font-semibold tabular-nums">{money(asset.cashFlow)}</dd>
           </div>
           <div>
@@ -130,6 +130,7 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
             <dd className="text-xl font-semibold tabular-nums">{coverage(asset)}</dd>
           </div>
         </dl>
+        {asset.householdLoans.length > 0 && <p className="text-xs text-muted-foreground">Household mortgage principal and interest are separate from rental cash flow.</p>}
         {balanceEvidence && <p className="text-xs text-muted-foreground">{balanceEvidence}</p>}
         {cashEvidence && <p className="text-xs text-muted-foreground">{cashEvidence}</p>}
       </section>}
@@ -157,9 +158,12 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
               const source = statements.find(statement => statement.mortgage_id === loan.id);
               const backedByStatement = source?.principal_balance === loan.current_balance && !!source;
               const age = source ? Math.max(0, Math.floor((Date.now() - Date.parse(source.statement_date)) / 86_400_000)) : null;
+              const household = asset?.householdLoans.find(item => item.id === loan.id);
               return (
                 <li key={loan.id}>
                   <p className="font-medium">{loan.loan_name || "Mortgage"}</p>
+                  {household && <p className="text-sm">Household mortgage{household.remaining === null ? "" : household.remaining === 0
+                    ? " · No recorded balance" : ` · ${household.remaining} months left on recorded term`}</p>}
                   <p className="text-muted-foreground">Contractual · {percent(loan.interest_rate / 100)} · {loan.term_months} months · {money(loan.monthly_payment)} scheduled monthly payment</p>
                   <p className="text-muted-foreground">{loan.current_balance == null ? "Current balance unavailable" : "Recorded balance · " + money(loan.current_balance)}</p>
                   {backedByStatement && source ? (

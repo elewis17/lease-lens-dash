@@ -21,12 +21,12 @@ function modelRefinance(asset: AssetMetrics, quote: RefinanceQuote) {
   if (!result) return null;
 
   const months = capitalHorizonYears * 12;
-  const currentService = asset.loans && sumKnown(asset.loans.map(loan =>
+  const currentService = asset.rentalLoans && sumKnown(asset.rentalLoans.map(loan =>
     loan.remaining === null || loan.principalInterest === null ? null : Math.min(months, loan.remaining) * loan.principalInterest,
   ));
-  const currentBalance = asset.loans && sumKnown(asset.loans.map(loan => balanceAfter(loan, months)));
+  const currentBalance = asset.rentalLoans && sumKnown(asset.rentalLoans.map(loan => balanceAfter(loan, months)));
   const quoteBalance = balanceAfter({
-    balance: asset.debt, remaining: term, rate: rate / 100, principalInterest: result.newDebtService, escrow: result.escrow,
+    balance: asset.rentalDebt, remaining: term, rate: rate / 100, principalInterest: result.newDebtService, escrow: result.escrow,
   }, months);
   const cash = currentService === null ? null
     : currentService - Math.min(months, term) * result.newDebtService - result.closingCosts;
@@ -90,7 +90,7 @@ export function modelPaydown(asset: AssetMetrics, inputs: PaydownPlan) {
   if (!inputs.amount.trim() || !inputs.fee.trim()) return null;
   const amount = Number(inputs.amount);
   const fee = Number(inputs.fee);
-  const loan = asset.loans?.find(item => item.id === inputs.loanId);
+  const loan = asset.rentalLoans?.find(item => item.id === inputs.loanId);
   if (!loan || loan.balance === null || loan.remaining === null || !Number.isSafeInteger(loan.remaining) ||
       loan.remaining < 1 || loan.remaining > 1200 || !Number.isFinite(amount) || amount <= 0 || amount > loan.balance ||
       !Number.isFinite(fee) || fee < 0 || !Number.isFinite(amount + fee)) return null;
@@ -182,8 +182,8 @@ export function capitalOpportunities(assets: AssetMetrics[], quote: RefinanceQuo
     if (asset.verdict.label === "Refinance candidate") add("refinance");
     if (asset.occupancy && asset.occupancy.occupiedUnits < asset.occupancy.totalUnits) add("vacancy");
     if (rentPlans[asset.property.id + ":rent"] && (asset.expectedRent ?? 0) > 0) add("rent");
-    if (paydowns[asset.property.id + ":paydown"]) add("paydown");
-    if (asset.verdict.label === "Distress" || asset.verdict.label === "Sell candidate") add("sale");
+    if (asset.rentalLoans?.some(loan => (loan.balance ?? 0) > 0) && paydowns[asset.property.id + ":paydown"]) add("paydown");
+    if (!asset.householdLoans.length && (asset.verdict.label === "Distress" || asset.verdict.label === "Sell candidate")) add("sale");
   }
   return result;
 }
@@ -258,11 +258,11 @@ export function combinedCapitalPlan(actions: CapitalOpportunity[], monthsToStart
     const model = action.refinance;
     if (!model || action.asset.debtService === null) return null;
     const activeMonths = 12 - monthsToStart;
-    const baseline = action.asset.loans && sumKnown(action.asset.loans.map(loan =>
+    const baseline = action.asset.rentalLoans && sumKnown(action.asset.rentalLoans.map(loan =>
       loan.remaining === null || loan.principalInterest === null ? null : Math.min(activeMonths, Math.max(0, loan.remaining - monthsToStart)) * loan.principalInterest,
     ));
-    const closingBalance = action.asset.loans && sumKnown(action.asset.loans.map(loan => balanceAfter(loan, monthsToStart)));
-    const ongoingService = action.asset.loans && sumKnown(action.asset.loans.map(loan =>
+    const closingBalance = action.asset.rentalLoans && sumKnown(action.asset.rentalLoans.map(loan => balanceAfter(loan, monthsToStart)));
+    const ongoingService = action.asset.rentalLoans && sumKnown(action.asset.rentalLoans.map(loan =>
       loan.remaining === null || loan.principalInterest === null ? null : loan.remaining > monthsToStart ? loan.principalInterest : 0,
     ));
     if (baseline === null || closingBalance === null || ongoingService === null) return null;

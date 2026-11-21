@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/ui/disclosure";
 import { addDays, format, parseISO } from "date-fns";
 import { money } from "@/domain/finance/format";
 import { isActiveLease } from "@/domain/finance/activeLeases";
@@ -38,8 +39,8 @@ export function RenewalExposure() {
 
   return (
     <aside aria-label="Renewals to verify" className="space-y-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-      <h2 className="text-lg font-semibold">Renewals to verify</h2>
-      <p className="text-sm text-muted-foreground">Leases ending in the next {renewalWindowDays} days without a replacement on record, ranked by current annualized contractual rent.</p>
+      <Disclosure label={`Renewals to verify · ${gaps.length}`} openOnDesktop section>
+      <Disclosure label="Ranking basis"><p>Leases ending in the next {renewalWindowDays} days without a replacement on record, ranked by annualized contractual rent.</p></Disclosure>
       {!leases || !units ? <p className="text-sm text-muted-foreground">Lease or unit records are unavailable.</p>
         : gaps.length ? <ul className="divide-y border-y">
           {gaps.map(({ leaseId, endDate, property, annualRent }) => <li key={leaseId} className="space-y-1 py-2">
@@ -50,9 +51,9 @@ export function RenewalExposure() {
             <p className="text-xs text-muted-foreground">Current lease ends {endDate}.</p>
           </li>)}
         </ul> : <p className="text-sm text-muted-foreground">No upcoming renewals need review in the current records.</p>}
-      {balances.length > 0 && <section aria-label="Mortgage balances to verify" className="space-y-3 border-t pt-3">
-        <h2 className="text-lg font-semibold">Mortgage balances to verify</h2>
-        <p className="text-sm text-muted-foreground">Recorded principal with a stale or unverified statement date, ranked by the balance needing confirmation.</p>
+      </Disclosure>
+      {balances.length > 0 && <Disclosure label={`Mortgage balances to verify · ${balances.length}`} section>
+        <Disclosure label="Balance basis"><p>Recorded principal with a stale or unverified statement date.</p></Disclosure>
         <ul className="divide-y border-y">{balances.map(({ property, balance }) => (
           <li key={property.id} className="space-y-1 py-2">
             <p className="font-semibold tabular-nums">{money(balance)}</p>
@@ -61,7 +62,7 @@ export function RenewalExposure() {
             </button>
           </li>
         ))}</ul>
-      </section>}
+      </Disclosure>}
     </aside>
   );
 }

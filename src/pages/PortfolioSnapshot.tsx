@@ -4,6 +4,7 @@ import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { useSessionState } from "@/features/navigation/sessionState";
 import { Input } from "@/components/ui/input";
 import { projectNextYearWealth } from "@/domain/finance/scenarios";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Button } from "@/components/ui/button";
 import { WealthBuildChart } from "@/components/WealthBuildChart";
 import { balanceEvidenceText } from "@/domain/finance/debt";
@@ -19,7 +20,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   const [appreciationRate, setAppreciationRate] = useSessionState(sessionKey, initialAppreciation);
   const [equityGoal, setEquityGoal] = useSessionState(sessionKey + ":equityGoal", "");
   const [cashGoal, setCashGoal] = useSessionState(sessionKey + ":cashGoal", "");
-  const wealthHeading = useRef<HTMLHeadingElement>(null);
+  const wealthDetails = useRef<HTMLDetailsElement>(null);
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
@@ -69,8 +70,9 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
     <section className="space-y-6">
       <header className="space-y-2">
         <h1 className="view-title">{finding}</h1>
-        {metrics.cashFlow !== null && <p className="max-w-2xl text-sm text-muted-foreground">Estimated portfolio cash flow is {money(metrics.cashFlow)} per month.</p>}
+        {metrics.cashFlow !== null && <p className="max-w-2xl text-sm text-muted-foreground">Estimated rental cash flow is {money(metrics.cashFlow)} per month.</p>}
         {refinance && deficits.length > 0 && <p className="text-sm">{refinance.property.alias} qualifies for a refinance review.</p>}
+        {metrics.householdLoans.length > 0 && <p className="text-xs text-muted-foreground">Rental cash flow excludes household mortgage principal and interest.</p>}
         <VerdictExplanation {...metrics.verdict} />
       </header>
 
@@ -84,8 +86,11 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
             <dd className="text-xl font-semibold tabular-nums">{money(wealth.growth)}</dd></div>
         </dl>
         <Button variant="outline" onClick={() => {
-          wealthHeading.current?.focus({ preventScroll: true });
-          wealthHeading.current?.scrollIntoView({ block: "start" });
+          const section = wealthDetails.current;
+          if (!section) return;
+          section.open = true;
+          section.querySelector("summary")?.focus({ preventScroll: true });
+          section.scrollIntoView({ block: "start" });
         }}>View wealth</Button>
       </section>
 
@@ -109,12 +114,13 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
               <div className="flex justify-between gap-4"><dt>Economic occupancy · {metrics.month}</dt><dd>{percent(metrics.economicOccupancy)}</dd></div>
               <div className="flex justify-between gap-4"><dt>Recorded arrears</dt><dd>{money(metrics.arrears)}</dd></div>
             </dl>
-            <p className="text-xs text-muted-foreground">Economic occupancy uses recorded receipts divided by contractual amounts due on payment records for the completed month. Arrears use recorded amounts overdue.</p>
+            <Disclosure label="Receipts and occupancy basis">
+              <p>Economic occupancy is recorded receipts divided by contractual amounts due for the completed month. Arrears use recorded amounts overdue.</p>
+            </Disclosure>
           </section>
         </div>
         <aside className="min-w-0 space-y-6 lg:border-l lg:pl-6">
-          <section className="editorial-section">
-            <h2 className="text-lg font-semibold">Where money is leaking</h2>
+          <Disclosure section label="Where money is leaking" openOnDesktop>
             <section aria-label="Actual losses" className="space-y-2">
               <h3 className="font-medium">Actual losses</h3>
               <p className="text-sm text-muted-foreground">— · Verified losses require a complete record of cash paid, including debt payments.</p>
@@ -138,7 +144,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
                 ? "— · Vacancy opportunity requires a supported vacancy target." : "No modeled vacancy above the illustrative target."}</p>}
               <p className="text-sm text-muted-foreground">— · Below-market rent requires verified comparable rents.</p>
             </section>
-          </section>
+          </Disclosure>
           {priorities.length > 0 && (
             <section className="editorial-section">
               <h2 className="text-lg font-semibold">Needs you</h2>
@@ -151,17 +157,15 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
                       <p className="font-medium">{asset.property.alias} · {asset.verdict.label}</p>
                       <p className="text-sm text-muted-foreground">
                         Estimate · {money(asset.cashFlow)}/mo cash flow and {coverage(asset)} debt-service coverage.
-                        {" "}{asset.verdict.detail}
                       </p>
-                      <p className="text-xs text-muted-foreground">{evidence}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {isRefinance
-                          ? "Confirm the quote and fees before estimating savings."
-                          : "Verify rent and expenses and obtain a payoff quote and selling costs before considering a sale."}
-                      </p>
-                      <Button variant="outline" onClick={() => onReviewProperty(asset.property.id)}>
+                      <Disclosure label="Evidence and next steps">
+                        <p>{asset.verdict.detail}</p>
+                        <p>{evidence}</p>
+                        <p>{isRefinance ? "Confirm the quote and fees." : "Verify rental income and expenses."}</p>
+                      </Disclosure>
+                      {(isRefinance || !asset.householdLoans.length) && <Button variant="outline" onClick={() => onReviewProperty(asset.property.id)}>
                         Review {asset.property.alias} in Capital
-                      </Button>
+                      </Button>}
                     </li>
                   );
                 })}
@@ -177,13 +181,14 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
             <dt className="text-sm text-muted-foreground">{tile.label}</dt>
             <dd className="text-2xl font-semibold tabular-nums">{tile.value}</dd>
             <dd className="text-xs text-muted-foreground">{tile.basis}</dd>
-            {tile.source && <dd className="mt-1 text-xs text-muted-foreground">{tile.source}</dd>}
+            {tile.source && <dd><Disclosure label="Source"><p>{tile.source}</p></Disclosure></dd>}
           </div>
         ))}
       </dl>
 
-      <section className="editorial-section">
-        <h2 ref={wealthHeading} tabIndex={-1} className="scroll-mt-4 text-lg font-semibold focus-visible:outline-ring">Equity position</h2>
+      <details ref={wealthDetails} className="scroll-mt-4 space-y-4 border-y">
+        <summary className="min-h-11 cursor-pointer py-3 text-base font-semibold">Wealth and equity</summary>
+        <section className="space-y-4">
         <dl className="space-y-2 tabular-nums">
           <div className="flex justify-between gap-4"><dt>Property value · Estimate, source date unverified</dt><dd>{money(metrics.value)}</dd></div>
           <div className="flex justify-between gap-4"><dt>Debt · Recorded current balances</dt><dd>{money(metrics.debt)}</dd></div>
@@ -191,8 +196,10 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
           <div className="flex justify-between gap-4"><dt>Scheduled principal reduction · Next 12 months</dt><dd>{money(metrics.paydown)}</dd></div>
           <div className="flex justify-between gap-4"><dt>Physical occupancy · Contracted units</dt><dd>{percent(metrics.physicalOccupancy)}</dd></div>
         </dl>
-        {debtEvidence && <p className="text-xs text-muted-foreground">{debtEvidence}</p>}
-        <p className="text-xs text-muted-foreground">Equity requires a current valuation and current balances for every loan. Sale proceeds also require selling costs and payoff quotes.</p>
+        <Disclosure label="Equity and debt basis">
+          {debtEvidence && <p>{debtEvidence}</p>}
+          <p>Equity uses the valuation and balances for all loans, including household mortgages.</p>
+        </Disclosure>
         <div className="space-y-2 border-t pt-3">
           <h3 className="font-medium">Projected wealth growth · Next 12 months</h3>
           <label className="block text-sm">Expected annual appreciation (%)
@@ -202,12 +209,11 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
             <div className="flex justify-between gap-4"><dt>Appreciation · Estimate</dt><dd>{money(wealth.appreciation)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Projected growth · Estimate</dt><dd>{money(wealth.growth)}</dd></div>
           </dl>
-          <p className="text-xs text-muted-foreground">Adds the annualized cash flow, scheduled principal reduction, and entered appreciation. Requires all three.</p>
+          <Disclosure label="Projection basis"><p>Uses annualized rental cash flow, scheduled principal reduction on all recorded mortgages, and entered appreciation.</p></Disclosure>
         </div>
       </section>
 
-      <section className="editorial-section">
-        <h2 className="text-lg font-semibold">Expense evidence</h2>
+      <Disclosure section label="Expense evidence">
         {metrics.assets.map(asset => (
           <details key={asset.property.id} className="border-t pt-2">
             <summary>{asset.property.alias}</summary>
@@ -219,7 +225,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
             </dl> : <p className="text-sm text-muted-foreground">Expense records could not be loaded.</p>}
           </details>
         ))}
-      </section>
+      </Disclosure>
       <WealthBuildChart metrics={metrics} appreciationRatePct={appreciation} />
       <section className="editorial-section">
         <h2 className="text-lg font-semibold">Portfolio objectives</h2>
@@ -233,6 +239,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
         </div>
         <p className="text-sm tabular-nums">Estimated progress · Equity {progress(metrics.equity, equityGoal)} · Monthly cash flow {progress(metrics.cashFlow, cashGoal)}</p>
       </section>
+      </details>
     </section>
   );
 }

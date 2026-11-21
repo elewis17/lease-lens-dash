@@ -53,7 +53,7 @@ export default function DataRoom({
   onDeleteMortgage,
 }: DataRoomProps) {
   const [leaseSaved, setLeaseSaved] = useState(false);
-  const { metrics, illustrative } = useWorkspace();
+  const { metrics, illustrative, householdMortgages, saveMortgageTreatment } = useWorkspace();
   const allowCapture = !connectedReview && !illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
@@ -124,6 +124,8 @@ export default function DataRoom({
         {allowCapture && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
         <MortgagesTable
           mortgages={filteredMortgages}
+          householdMortgages={householdMortgages}
+          onSaveTreatment={saveMortgageTreatment}
           selectedProperty={selectedProperty}
           onUpdate={onUpdateMortgage}
           onDelete={onDeleteMortgage}

@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PropertyFilter } from "@/features/properties/PropertyFilter";
 import { usePortfolio } from "./usePortfolio";
@@ -20,6 +21,25 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   const query = usePortfolio(userId, illustrative);
   const entries = useWorkspaceEntries(userId, illustrative);
   const { properties, leases, mortgages, record } = query.portfolio;
+  const treatmentKey = `dealstack:${userId}:household-mortgages`;
+  const [householdMortgages, setHouseholdMortgages] = useState<Set<string>>(() => {
+    try {
+      const stored: unknown = JSON.parse((illustrative ? sessionStorage : localStorage).getItem(treatmentKey) ?? "[]");
+      return new Set(Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : []);
+    } catch { return new Set(); }
+  });
+  const saveMortgageTreatment = (id: string, household: boolean) => {
+    const next = new Set(householdMortgages);
+    if (household) next.add(id);
+    else next.delete(id);
+    try {
+      const storage = illustrative ? sessionStorage : localStorage;
+      storage.setItem(treatmentKey, JSON.stringify([...next]));
+    } catch { return false; }
+    setHouseholdMortgages(next);
+    return true;
+  };
+  const rentalRecord = { ...record, loans: record.loans?.map(loan => ({ ...loan, household: householdMortgages.has(loan.id) })) ?? null };
   const selection = new URLSearchParams(search).get("property") ?? "";
   const selectedProperty = properties.some(property => property.id === selection) ? selection : "";
   const filteredProperties = selectedProperty ? properties.filter(property => property.id === selectedProperty) : properties;
@@ -35,9 +55,9 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   const policyFor = (type?: string | null) => policies.get(type ?? "")?.policy ?? portfolioPolicy;
   const propertyPolicies = new Map([...policies].map(([target, value]) => [target, value.policy]));
   const asOf = format(new Date(), "yyyy-MM-dd");
-  const metrics = modelPortfolio(filteredProperties, record, asOf, marketRatePct, portfolioPolicy, propertyPolicies);
+  const metrics = modelPortfolio(filteredProperties, rentalRecord, asOf, marketRatePct, portfolioPolicy, propertyPolicies);
   const rentScenario = (increase: number) => modelPortfolio(filteredProperties, {
-    ...record,
+    ...rentalRecord,
     leases: record.leases?.map(lease => ({ ...lease, monthly_rent: lease.monthly_rent * (1 + increase / 100) })) ?? null,
   }, asOf, marketRatePct, portfolioPolicy, propertyPolicies);
 
@@ -65,7 +85,7 @@ function useWorkspaceState(userId: string, prefix: string, illustrative: boolean
   return {
     userId, illustrative, query, metrics, selectedProperty, setSelectedProperty, pathTo,
     properties, leases, mortgages, filteredProperties, filteredLeases, filteredMortgages, escrowByProperty, propertyOptions,
-    marketRate, setMarketRate, rentScenario,
+    marketRate, setMarketRate, rentScenario, householdMortgages, saveMortgageTreatment,
     draft, setDraft, entries, activeDealId, openDeal, policyFor, dealAssumptions: assumptionsFrom(draft),
   };
 }

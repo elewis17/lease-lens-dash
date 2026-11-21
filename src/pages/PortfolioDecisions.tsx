@@ -38,6 +38,7 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
       <header className="space-y-2">
         <h1 className="view-title">Where should the next dollar go?</h1>
         <VerdictExplanation {...metrics.verdict} />
+        {metrics.householdLoans.length > 0 && <p className="text-xs text-muted-foreground">Rental calculations exclude household mortgage principal and interest.</p>}
       </header>
       <CapitalOpportunities assets={metrics.assets} sessionKey={scenarios.sessionKey}
         quote={{ rate: scenarios.marketRate, years: termYears, cost: costPct }} />
