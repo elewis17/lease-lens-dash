@@ -5,7 +5,7 @@ import type { Mortgage } from "@/components/MortgagesTable";
 import type { LeaseData } from "@/features/leases/LeaseTable";
 import type { Property } from "@/features/properties/PropertiesTable";
 import type { Tables } from "@/integrations/supabase/types";
-import { connectedReview } from "./releaseProfile";
+import { legacyPortfolio } from "./releaseProfile";
 import { format } from "date-fns";
 import { illustrativePortfolio } from "@/domain/finance/illustrativePortfolio";
 
@@ -104,12 +104,12 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
   const returnedProperties = await readAll("properties", (start, end) =>
     supabase.from("properties").select("*").eq("user_id", userId).order("id").range(start, end).abortSignal(signal),
   signal);
-  const propertyRows = connectedReview ? returnedProperties.filter(property => property.user_id === userId) : returnedProperties;
+  const propertyRows = legacyPortfolio ? returnedProperties.filter(property => property.user_id === userId) : returnedProperties;
   if (propertyRows.length === 0) return emptyPortfolio;
   const properties = propertyRows.map(toProperty);
   const propertyIds = new Set(properties.map(property => property.id));
 
-  const [unitRows, loans, expenses, leaseRows, statements, payments] = connectedReview
+  const [unitRows, loans, expenses, leaseRows, statements, payments] = legacyPortfolio
     ? await readLegacyRecords([...propertyIds], signal)
     : await Promise.all([
     readAll("units", (start, end) => supabase.from("units").select("id, unit_label, property_id")
@@ -134,7 +134,7 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
   const leases: LeaseData[] = scopedLeases.map(lease => ({
     id: lease.id,
     property_id: unitById.get(lease.unit_id)?.property_id,
-    tenant: lease.tenant?.name ?? (connectedReview ? "Lease on record" : "Unknown"),
+    tenant: lease.tenant?.name ?? (legacyPortfolio ? "Lease on record" : "Unknown"),
     monthlyRent: lease.monthly_rent,
     deposit: lease.deposit ?? null,
     documentPath: lease.doc_url ?? null,

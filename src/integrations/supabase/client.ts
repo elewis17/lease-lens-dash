@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
-import { connectedReview } from "@/features/portfolio/releaseProfile";
+import { connectedReview, legacyPortfolio } from "@/features/portfolio/releaseProfile";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -9,7 +9,7 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  global: connectedReview ? { fetch: (input, init) => {
+  global: legacyPortfolio ? { fetch: (input, init) => {
     const url = new URL(input instanceof Request ? input.url : input);
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
     const auth = (method === "POST" && ["/auth/v1/token", "/auth/v1/logout"].includes(url.pathname))
@@ -29,7 +29,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       "/rest/v1/rpc/update_property_unit_count"].includes(url.pathname);
     const decisionAppend = method === "POST" && url.pathname === "/rest/v1/dealstack_workspace_entries";
     if (url.origin !== new URL(SUPABASE_URL).origin || (!auth && !dataRead && !scopedRecordChange && !newLease && !legacyRecordCreation && !decisionAppend)) {
-      return Promise.resolve(new Response(JSON.stringify({ message: "This action is unavailable in the connected preview." }), {
+      return Promise.resolve(new Response(JSON.stringify({ message: "This action is unavailable for the connected portfolio." }), {
         status: 403, headers: { "Content-Type": "application/json" },
       }));
     }

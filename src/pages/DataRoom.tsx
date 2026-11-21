@@ -8,7 +8,7 @@ import { StatementCapture } from "@/features/leases/StatementCapture";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { LeaseTable, type LeaseData, type ManualLeaseInput } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
-import { connectedReview } from "@/features/portfolio/releaseProfile";
+import { legacyPortfolio } from "@/features/portfolio/releaseProfile";
 
 type PropertyOption = { id: string; name: string };
 
@@ -62,7 +62,7 @@ export default function DataRoom({
     : flagged.length === 1 ? `${flagged[0].property.alias} needs attention.`
     : flagged.length ? `${flagged.length} of ${propertyCount} need attention.`
     : `${propertyCount} on record. Review the evidence gaps.`;
-  const allowCapture = !connectedReview && !illustrative;
+  const allowCapture = !legacyPortfolio && !illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]

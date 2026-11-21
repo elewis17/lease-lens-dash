@@ -10,7 +10,7 @@ import type { TablesUpdate } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { leaseTermForm, manualLeaseForm, mortgageEscrowChange, mortgageForm, propertyForm } from "@/features/portfolio/recordValidation";
 import { useToast } from "@/hooks/use-toast";
-import { connectedReview } from "./releaseProfile";
+import { legacyPortfolio } from "./releaseProfile";
 import type { WorkspacePortfolio } from "./usePortfolio";
 import { deleteDemoRecord, writeDemoLease, writeDemoMortgage, writeDemoProperty } from "./demoRecords";
 import { ownsLegacyProperties, resolveLegacyUnit, saveLegacyLease } from "./saveLegacyLease";
@@ -49,7 +49,7 @@ export function useRecordActions({ userId, properties, leases, mortgages, refres
   const leaseEditDraft = useRef<{ key: string; id: string; tenantSaved?: boolean } | null>(null);
 
   const saveManualLease = async (id: string, data: ManualLeaseInput, editing: boolean) => {
-    if (connectedReview && !updateDemo && editing) {
+    if (legacyPortfolio && !updateDemo && editing) {
       const result = leaseTermForm.safeParse(data);
       if (!result.success) return showWriteError("Check the lease", result.error.issues[0].message);
       const scope = await scopedLease(id);
@@ -125,10 +125,10 @@ export function useRecordActions({ userId, properties, leases, mortgages, refres
       p_status: lease.status ?? null,
     };
     const standard = await supabase.rpc("save_manual_lease", { ...input, p_edit: editing });
-    const { data: saved, error } = connectedReview && standard.error?.code === "PGRST202"
+    const { data: saved, error } = legacyPortfolio && standard.error?.code === "PGRST202"
       ? await supabase.rpc("dealstack_add_lease", input)
       : standard;
-    const savedLease = connectedReview && error?.code === "PGRST202"
+    const savedLease = legacyPortfolio && error?.code === "PGRST202"
       ? await saveLegacyLease(userId, input)
       : !error && saved === id;
     if (!savedLease) return showWriteError("Lease save failed", "Your draft is still open. The database did not accept the lease.");
@@ -164,14 +164,14 @@ export function useRecordActions({ userId, properties, leases, mortgages, refres
       };
 
       if (!id) {
-        if (connectedReview && !await ownsLegacyProperties(userId, mortgage.property_id)) {
+        if (legacyPortfolio && !await ownsLegacyProperties(userId, mortgage.property_id)) {
           return showWriteError("Property unavailable", "Choose a property from your signed-in portfolio.");
         }
         const { error } = await supabase.from("mortgages").insert({
           ...mortgage,
           loan_name: mortgage.loan_name || undefined,
           principal: mortgage.principal_original,
-          ...(!connectedReview && { user_id: userId }),
+          ...(!legacyPortfolio && { user_id: userId }),
         });
         if (error) return showWriteError("Mortgage save failed", "Check the mortgage details and try again.");
         await refresh();
@@ -180,8 +180,8 @@ export function useRecordActions({ userId, properties, leases, mortgages, refres
       }
     }
 
-    const currentPropertyId = connectedReview && id ? mortgageProperty(id) : null;
-    if (connectedReview && (!currentPropertyId || !await ownsLegacyProperties(userId, currentPropertyId, payload.property_id ?? currentPropertyId))) {
+    const currentPropertyId = legacyPortfolio && id ? mortgageProperty(id) : null;
+    if (legacyPortfolio && (!currentPropertyId || !await ownsLegacyProperties(userId, currentPropertyId, payload.property_id ?? currentPropertyId))) {
       return showWriteError("Mortgage unavailable", "Choose a mortgage and property from your signed-in portfolio.");
     }
     const { error } = await supabase.from("mortgages").update(payload).eq("id", id!)
@@ -239,10 +239,10 @@ export function useRecordActions({ userId, properties, leases, mortgages, refres
       if (updateDemo) {
         updateDemo(portfolio => deleteDemoRecord(portfolio, kind, id));
       } else {
-        const scope = connectedReview && kind === "lease" ? await scopedLease(id) : null;
-        const loanProperty = connectedReview && kind === "mortgage" ? mortgageProperty(id) : null;
-        if ((connectedReview && kind === "lease" && !scope) ||
-            (connectedReview && kind === "mortgage" && (!loanProperty || !await ownsLegacyProperties(userId, loanProperty)))) {
+        const scope = legacyPortfolio && kind === "lease" ? await scopedLease(id) : null;
+        const loanProperty = legacyPortfolio && kind === "mortgage" ? mortgageProperty(id) : null;
+        if ((legacyPortfolio && kind === "lease" && !scope) ||
+            (legacyPortfolio && kind === "mortgage" && (!loanProperty || !await ownsLegacyProperties(userId, loanProperty)))) {
           setDeleteError(true);
           return;
         }

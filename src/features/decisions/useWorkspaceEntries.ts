@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { entrySchema, freezeAcquisition, type Entry, type EntryPayload } from "./entries";
-import { connectedReview } from "@/features/portfolio/releaseProfile";
+import { legacyPortfolio } from "@/features/portfolio/releaseProfile";
 import { kirkwoodExample } from "@/domain/finance/underwriting";
 import { loadSessionValue, storeSessionValue } from "@/features/navigation/sessionState";
 
@@ -29,7 +29,7 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
         const { data, error } = await supabase.from("dealstack_workspace_entries")
           .select("id, created_at, payload").eq("user_id", userId)
           .order("created_at", { ascending: false }).order("id").range(start, start + 499).abortSignal(signal);
-        if (connectedReview && (error?.code === "PGRST205" || error?.code === "42P01")) return null;
+        if (legacyPortfolio && (error?.code === "PGRST205" || error?.code === "42P01")) return null;
         if (error || !data) throw new Error("The decision record could not be loaded.");
         for (const row of data) {
           const payload = entrySchema.safeParse(row.payload);
@@ -40,7 +40,7 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
       }
     },
   });
-  const available = illustrative || !connectedReview || (query.isSuccess && query.data !== null);
+  const available = illustrative || !legacyPortfolio || (query.isSuccess && query.data !== null);
 
   const append = async (payload: EntryPayload) => {
     if (!available) throw new Error("Saving decisions requires a connected Decision Log.");

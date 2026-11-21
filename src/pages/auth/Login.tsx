@@ -7,7 +7,7 @@ import { ReturnToWorkspace } from "@/features/navigation/returnTo";
 import { callbackUrl } from "@/features/auth/authRedirect";
 import { useAuth } from "@/context/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { connectedReview, connectedReviewCallback } from "@/features/portfolio/releaseProfile";
+import { connectedReview, connectedReviewCallback, legacyPortfolio } from "@/features/portfolio/releaseProfile";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -21,19 +21,23 @@ export default function Login() {
   if (loading) return <section role="status" aria-label="Loading sign-in" className="mx-auto max-w-md space-y-4 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-32 w-full" /></section>;
   if (user && !retry) return <ReturnToWorkspace />;
 
-  if (connectedReview) {
+  if (legacyPortfolio) {
+    const redirect = connectedReview
+      ? new URL(connectedReviewCallback, window.location.origin).href
+      : callbackUrl(window.location.origin, import.meta.env.BASE_URL) + "/";
+    const signIn = new URL("auth/login/", new URL(import.meta.env.BASE_URL, window.location.origin)).href;
     return (
       <section className="mx-auto max-w-md space-y-4 p-6">
         <h1 className="text-2xl font-semibold">Sign in to DealStack</h1>
         {error && <p role="alert">Google sign-in could not start. Try again.</p>}
         {window.top !== window.self
-          ? <Button asChild><a href="/auth/login" target="_blank" rel="noopener noreferrer">Open sign-in in a browser tab</a></Button>
+          ? <Button asChild><a href={signIn} target="_blank" rel="noopener noreferrer">Open sign-in in a browser tab</a></Button>
           : <Button disabled={pending} onClick={async () => {
               setPending(true);
               setError(false);
               try {
                 const result = await supabase.auth.signInWithOAuth({ provider: "google", options: {
-                  redirectTo: new URL(connectedReviewCallback, window.location.origin).href,
+                  redirectTo: redirect,
                 } });
                 if (result.error) throw result.error;
               } catch {

@@ -18,7 +18,7 @@ The production candidate and the connected preview share Briefing, Capital, Unde
 
 In Holdings, edit a mortgage and set **Rental treatment** to **Household mortgage** to separate its principal and interest from rental cash flow, coverage, and rental financing scenarios. Its recorded debt still reduces real estate equity, and operating costs including escrow remain in place. This preference is saved per owner in the current browser. It does not modify the mortgage record in Supabase.
 
-Pipeline, opportunity lifecycle, recorded decisions, and threshold settings become available when the connected project has the owner-scoped workspace entries migration. Lease and statement capture require their separately deployed storage policies, tables, and functions. The company build targets `/dealstack/` and uses the DealStack schema.
+Pipeline, opportunity lifecycle, recorded decisions, and threshold settings become available when the connected project has the owner-scoped workspace entries migration. Lease and statement capture require their separately deployed storage policies, tables, and functions. The company build targets `/dealstack/` and uses the existing Lease Lens database compatibility layer. See the [production cutover runbook](docs/production-cutover.md).
 
 - [ ] Publish the production candidate to the approved owner-only review URL. Confirm the Google return reaches the full workspace and the property filter remains consistent across routes.
 - [ ] Validate the connected history against the owner’s records, including existing document availability and absence of cross-property records.
