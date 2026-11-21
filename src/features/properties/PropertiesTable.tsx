@@ -82,9 +82,9 @@ export default function PropertiesTable({ properties, metrics, renderName, onAdd
                 {asset && <p className="mt-1 text-xs text-muted-foreground">{asset.verdict.label}</p>}
               </div>
               <dl className="grid grid-cols-3 gap-2 text-sm tabular-nums">
-                <div><dt className="text-xs text-muted-foreground">Rent / mo</dt><dd className="font-semibold">{money(asset?.expectedRent)}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">Cash flow / mo</dt><dd className="font-semibold">{money(asset?.cashFlow)}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">DSCR</dt><dd className="font-semibold">{asset ? coverage(asset) : "—"}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Contractual rent</dt><dd className="font-semibold">{money(asset?.expectedRent)}<span className="text-xs font-normal text-muted-foreground"> / mo</span></dd></div>
+                <div><dt className="text-xs text-muted-foreground">Est. cash flow</dt><dd className="font-semibold">{money(asset?.cashFlow)}<span className="text-xs font-normal text-muted-foreground"> / mo</span></dd></div>
+                <div><dt className="text-xs text-muted-foreground">Est. DSCR</dt><dd className="font-semibold">{asset ? coverage(asset) : "—"}</dd></div>
               </dl>
               <div className="absolute right-0 top-2 flex xl:static">
                 <Button variant="ghost" size="icon" onClick={event => {
@@ -114,7 +114,7 @@ export default function PropertiesTable({ properties, metrics, renderName, onAdd
         <RecordField label="Address" wide><Input value={data.address ?? ""} onChange={event => change({ address: event.target.value })} /></RecordField>
         {fields.map(([key, label]) => {
           const inEscrow = !!editor?.id && escrowByProperty?.[editor.id] && (key === "property_taxes" || key === "insurance");
-          return <RecordField key={key} label={inEscrow ? `${label} · In mortgage escrow` : label}>
+          return <RecordField key={key} compact label={inEscrow ? `${label} · In mortgage escrow` : label}>
             <Input type="number" inputMode="decimal" min="0" step="0.01" value={inEscrow ? "" : data[key] ?? ""} disabled={inEscrow}
               onChange={event => change({ [key]: event.target.value === "" ? null : Number(event.target.value) })} />
           </RecordField>;

@@ -134,10 +134,10 @@ export function LeaseTable({ leases, onUpdate, onDelete, onAdd, propertyOptions,
             {Object.entries(leaseStatusLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
           </select>
         </RecordField>
-        <RecordField label="Lease start date"><Input type="date" value={data.startDate ?? ""} onChange={event => change({ startDate: event.target.value })} /></RecordField>
-        <RecordField label="Lease end date"><Input type="date" value={data.leaseEnd ?? ""} onChange={event => change({ leaseEnd: event.target.value })} /></RecordField>
-        <RecordField label="Monthly rent"><Input type="number" inputMode="decimal" step="0.01" min="0" value={data.monthlyRent ?? ""} onChange={event => change({ monthlyRent: event.target.value })} /></RecordField>
-        <RecordField label="Deposit"><Input type="number" inputMode="decimal" step="0.01" min="0" value={data.deposit ?? ""} onChange={event => change({ deposit: event.target.value })} /></RecordField>
+        <RecordField compact label="Lease start date"><Input className="min-w-0" type="date" value={data.startDate ?? ""} onChange={event => change({ startDate: event.target.value })} /></RecordField>
+        <RecordField compact label="Lease end date"><Input className="min-w-0" type="date" value={data.leaseEnd ?? ""} onChange={event => change({ leaseEnd: event.target.value })} /></RecordField>
+        <RecordField compact label="Monthly rent"><Input type="number" inputMode="decimal" step="0.01" min="0" value={data.monthlyRent ?? ""} onChange={event => change({ monthlyRent: event.target.value })} /></RecordField>
+        <RecordField compact label="Deposit"><Input type="number" inputMode="decimal" step="0.01" min="0" value={data.deposit ?? ""} onChange={event => change({ deposit: event.target.value })} /></RecordField>
       </RecordSheet>
     </div>
   );

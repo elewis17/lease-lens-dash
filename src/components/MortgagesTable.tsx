@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { money } from "@/domain/finance/format";
 import { RecordField, RecordSheet, recordSelectClass } from "@/features/portfolio/RecordSheet";
 
@@ -106,7 +106,7 @@ export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyO
               <TableCell className="text-right font-semibold">{money(mortgage.current_balance)}</TableCell>
               <TableCell className="hidden md:table-cell text-right">{rate}</TableCell>
               <TableCell className="hidden lg:table-cell text-right">{mortgage.term_months} mo</TableCell>
-              <TableCell className="hidden lg:table-cell">{mortgage.start_date ? format(mortgage.start_date, "MMM d, yyyy") : "—"}</TableCell>
+              <TableCell className="hidden lg:table-cell">{mortgage.start_date ? format(parseISO(toApiDate(mortgage.start_date)), "MMM d, yyyy") : "—"}</TableCell>
               <TableCell className="hidden md:table-cell text-right">{money(mortgage.monthly_payment)}</TableCell>
               <TableCell className="w-0">
                 <div className="flex justify-end">
@@ -138,10 +138,10 @@ export function MortgagesTable({ mortgages, onUpdate, onDelete, onAdd, propertyO
           </select>
         </RecordField>
         <RecordField label="Loan name"><Input value={data.loan_name ?? ""} onChange={event => change({ loan_name: event.target.value })} /></RecordField>
-        {numericFields.map(([key, label, step]) => <RecordField key={key} label={label}>
+        {numericFields.map(([key, label, step]) => <RecordField key={key} label={label} compact>
           <Input type="number" inputMode="decimal" min="0" step={step} value={data[key] ?? ""} onChange={event => change({ [key]: event.target.value })} />
         </RecordField>)}
-        <RecordField label="Loan start date"><Input type="date" value={toApiDate(data.start_date)} onChange={event => change({ start_date: event.target.value })} /></RecordField>
+        <RecordField compact label="Loan start date"><Input className="min-w-0" type="date" value={toApiDate(data.start_date)} onChange={event => change({ start_date: event.target.value })} /></RecordField>
         <RecordField label="Escrow">
           <select className={recordSelectClass} value={data.includes_escrow === undefined ? "" : String(data.includes_escrow)}
             onChange={event => change({ includes_escrow: event.target.value === "" ? undefined : event.target.value === "true" })}>
