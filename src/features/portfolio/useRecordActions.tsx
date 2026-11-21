@@ -4,7 +4,7 @@ import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Property } from "@/features/properties/PropertiesTable";
-import type { MortgageInput } from "@/components/MortgagesTable";
+import type { Mortgage, MortgageInput } from "@/components/MortgagesTable";
 import type { LeaseData, ManualLeaseInput } from "@/features/leases/LeaseTable";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,15 +13,16 @@ import { useToast } from "@/hooks/use-toast";
 import { connectedReview } from "./releaseProfile";
 import type { WorkspacePortfolio } from "./usePortfolio";
 import { deleteDemoRecord, writeDemoLease, writeDemoMortgage, writeDemoProperty } from "./demoRecords";
-import { saveLegacyLease } from "./saveLegacyLease";
+import { ownsLegacyProperties, resolveLegacyUnit, saveLegacyLease } from "./saveLegacyLease";
 
 type RecordKind = "property" | "lease" | "mortgage";
 const recordTable = { property: "properties", lease: "leases", mortgage: "mortgages" } as const;
 
-export function useRecordActions({ userId, properties, leases, refresh, updateDemo, selectedProperty, clearProperty }: {
+export function useRecordActions({ userId, properties, leases, mortgages, refresh, updateDemo, selectedProperty, clearProperty }: {
   userId: string;
   properties: Property[];
   leases: LeaseData[];
+  mortgages: Mortgage[];
   refresh: () => Promise<void>;
   updateDemo?: (update: (portfolio: WorkspacePortfolio) => WorkspacePortfolio) => void;
   selectedProperty: string;
@@ -41,21 +42,61 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
       supabase.from("properties").select("id").eq("id", lease.property_id).eq("user_id", userId).maybeSingle(),
       supabase.from("units").select("id").eq("id", lease.unit_id).eq("property_id", lease.property_id).maybeSingle(),
     ]);
-    return !property.error && property.data && !unit.error && unit.data ? { leaseId: id, unitId: lease.unit_id } : null;
+    return !property.error && property.data && !unit.error && unit.data ? { lease, unitId: lease.unit_id } : null;
   };
+
+  const mortgageProperty = (id: string) => mortgages.find(loan => loan.id === id)?.property_id ?? null;
+  const leaseEditDraft = useRef<{ key: string; id: string; tenantSaved?: boolean } | null>(null);
 
   const saveManualLease = async (id: string, data: ManualLeaseInput, editing: boolean) => {
     if (connectedReview && !updateDemo && editing) {
       const result = leaseTermForm.safeParse(data);
       if (!result.success) return showWriteError("Check the lease", result.error.issues[0].message);
-      const scope = editing ? await scopedLease(id) : null;
+      const scope = await scopedLease(id);
       if (!scope) return showWriteError("Lease unavailable", "Open an existing lease from your signed-in portfolio.");
       const lease = result.data;
-      const { error } = await supabase.from("leases").update({
+      const payload: TablesUpdate<"leases"> = {
         start_date: lease.startDate, end_date: lease.leaseEnd, monthly_rent: lease.monthlyRent,
         deposit: lease.deposit, status: lease.status ?? null, updated_at: new Date().toISOString(),
-      }).eq("id", scope.leaseId).eq("unit_id", scope.unitId).select("id").single();
-      if (error) return showWriteError("Lease save failed", "The database did not accept this change. Your input is still in the row.");
+      };
+      const propertyId = data.property_id;
+      const label = data.unit_label?.trim();
+      const tenant = data.tenant?.trim();
+      const unitChanged = propertyId !== scope.lease.property_id || label !== scope.lease.unit_label?.trim();
+      const tenantChanged = tenant !== scope.lease.tenant.trim();
+      let newUnitId: string | undefined;
+      if (unitChanged || tenantChanged) {
+        const details = manualLeaseForm.safeParse(data);
+        if (!details.success) return showWriteError("Check the lease", details.error.issues[0].message);
+        const { property_id, unit_label, tenant: tenantName } = details.data;
+        if (!properties.some(property => property.id === property_id) || !await ownsLegacyProperties(userId, property_id)) {
+          return showWriteError("Property unavailable", "Choose a property from your signed-in portfolio.");
+        }
+        const key = JSON.stringify([id, propertyId, label, tenant]);
+        if (leaseEditDraft.current?.key !== key) leaseEditDraft.current = { key, id: crypto.randomUUID() };
+        const draft = leaseEditDraft.current;
+        if (unitChanged) {
+          const unit = await resolveLegacyUnit(property_id, unit_label, draft.id);
+          if (!unit) return showWriteError("Unit save failed", "The database did not accept this unit. Your draft is still open.");
+          payload.property_id = property_id;
+          payload.unit_id = unit;
+          if (unit === draft.id) newUnitId = property_id;
+        }
+        if (tenantChanged) {
+          // Relink only this lease. A legacy tenant record can be shared by several leases.
+          if (!draft.tenantSaved) {
+            const { error } = await supabase.from("tenants").insert({ id: draft.id, name: tenantName });
+            if (error) return showWriteError("Tenant save failed", "The database did not accept this tenant. Your draft is still open.");
+            draft.tenantSaved = true;
+          }
+          payload.tenant_id = draft.id;
+        }
+      }
+      const { error } = await supabase.from("leases").update(payload)
+        .eq("id", id).eq("unit_id", scope.unitId).select("id").single();
+      if (error) return showWriteError("Lease save failed", "The database did not accept this change. Your draft is still open.");
+      leaseEditDraft.current = null;
+      if (newUnitId) await supabase.rpc("update_property_unit_count", { target_property: newUnitId });
       await refresh();
       toast({ title: "Lease updated" });
       return true;
@@ -123,11 +164,14 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
       };
 
       if (!id) {
+        if (connectedReview && !await ownsLegacyProperties(userId, mortgage.property_id)) {
+          return showWriteError("Property unavailable", "Choose a property from your signed-in portfolio.");
+        }
         const { error } = await supabase.from("mortgages").insert({
           ...mortgage,
           loan_name: mortgage.loan_name || undefined,
           principal: mortgage.principal_original,
-          user_id: userId,
+          ...(!connectedReview && { user_id: userId }),
         });
         if (error) return showWriteError("Mortgage save failed", "Check the mortgage details and try again.");
         await refresh();
@@ -136,8 +180,12 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
       }
     }
 
-    const { error } = await supabase.from("mortgages").update(payload)
-      .eq("user_id", userId).eq("id", id!).select("id").single();
+    const currentPropertyId = connectedReview && id ? mortgageProperty(id) : null;
+    if (connectedReview && (!currentPropertyId || !await ownsLegacyProperties(userId, currentPropertyId, payload.property_id ?? currentPropertyId))) {
+      return showWriteError("Mortgage unavailable", "Choose a mortgage and property from your signed-in portfolio.");
+    }
+    const { error } = await supabase.from("mortgages").update(payload).eq("id", id!)
+      .eq(currentPropertyId ? "property_id" : "user_id", currentPropertyId ?? userId).select("id").single();
     if (error) return showWriteError("Mortgage save failed", "Check the mortgage details and try again.");
     await refresh();
     toast({ title: "Mortgage updated" });
@@ -192,13 +240,16 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
         updateDemo(portfolio => deleteDemoRecord(portfolio, kind, id));
       } else {
         const scope = connectedReview && kind === "lease" ? await scopedLease(id) : null;
-        if (connectedReview && !scope) {
+        const loanProperty = connectedReview && kind === "mortgage" ? mortgageProperty(id) : null;
+        if ((connectedReview && kind === "lease" && !scope) ||
+            (connectedReview && kind === "mortgage" && (!loanProperty || !await ownsLegacyProperties(userId, loanProperty)))) {
           setDeleteError(true);
           return;
         }
         const { error } = scope
-          ? await supabase.from("leases").delete().eq("id", scope.leaseId).eq("unit_id", scope.unitId).select("id").single()
-          : await supabase.from(recordTable[kind]).delete().eq("user_id", userId).eq("id", id).select("id").single();
+          ? await supabase.from("leases").delete().eq("id", id).eq("unit_id", scope.unitId).select("id").single()
+          : await supabase.from(recordTable[kind]).delete().eq("id", id)
+            .eq(loanProperty ? "property_id" : "user_id", loanProperty ?? userId).select("id").single();
         if (error) {
           setDeleteError(true);
           return;

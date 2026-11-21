@@ -12,7 +12,6 @@ import { useSessionState } from "@/features/navigation/sessionState";
 import { assumptionsFrom, draftFragment, initialValues, readDraft, type AssumptionInputs } from "@/features/underwriting/draft";
 import { kirkwoodExample } from "@/domain/finance/underwriting";
 import { modelPortfolio } from "@/domain/finance/portfolio";
-import { connectedReview } from "./releaseProfile";
 
 function useWorkspaceState(userId: string, prefix: string, illustrative: boolean) {
   const location = useLocation();
@@ -84,18 +83,20 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <PortfolioNav prefix={prefix} />
-      <div className="container min-w-0 flex-1 space-y-6 px-4 pt-8 pb-[calc(9rem+env(safe-area-inset-bottom))] sm:px-8 lg:pb-8">
-        {(illustrative || connectedReview) && <p className="text-sm text-muted-foreground">
-          {illustrative ? "Illustrative data · Demo portfolio" : "Connected portfolio · Existing lease terms can be edited in Holdings"}
-        </p>}
-        {query.isSuccess && properties.length > 0 && (
-          <PropertyFilter properties={properties.map(property => ({
-            id: property.id, alias: property.alias, address: property.address ?? "",
-          }))} selectedProperty={selectedProperty} onPropertyChange={setSelectedProperty} />
+      <div className="container min-w-0 flex-1 space-y-6 px-4 pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-8 lg:space-y-8 lg:px-10 lg:pt-8 lg:pb-12">
+        {(query.isSuccess && properties.length > 0 || context.entries.available) && (
+          <div className="flex min-w-0 items-center gap-3">
+            {query.isSuccess && properties.length > 0 && <PropertyFilter properties={properties.map(property => ({
+              id: property.id, alias: property.alias, address: property.address ?? "",
+            }))} selectedProperty={selectedProperty} onPropertyChange={setSelectedProperty} />}
+            {context.entries.available && <PolicySettings store={context.entries} />}
+          </div>
         )}
-        {(!connectedReview || illustrative) && <PolicySettings store={context.entries} />}
         <ScrollRestoration ownerId={userId} />
-        <div key={pathnameForView} className={/\/(holdings|underwrite)\/?$/.test(pathnameForView) ? undefined : "animate-fade-in"}><Outlet context={context} /></div>
+        <div key={pathnameForView} className="animate-fade-in">
+          {illustrative && <p className="mb-3 text-xs font-medium text-muted-foreground">Illustrative data · Demo portfolio</p>}
+          <Outlet context={context} />
+        </div>
       </div>
     </div>
   );

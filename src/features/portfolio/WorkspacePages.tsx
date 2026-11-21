@@ -7,7 +7,6 @@ import { RecordedMemo } from "@/features/decisions/RecordedMemo";
 import { InvestmentPipeline } from "@/features/underwriting/InvestmentPipeline";
 import { PortfolioStatus } from "./PortfolioStatus";
 import { useWorkspace } from "./useWorkspace";
-import { connectedReview } from "./releaseProfile";
 
 export function Briefing() {
   const { metrics, pathTo, illustrative, userId } = useWorkspace();
@@ -39,10 +38,12 @@ export function Capital() {
 }
 
 export function Underwrite() {
-  const { draft, setDraft, illustrative, policyFor } = useWorkspace();
+  const { draft, setDraft, illustrative, policyFor, entries } = useWorkspace();
   return <div className="space-y-8">
     <DealsScenarios values={draft} onChange={setDraft} illustrative={illustrative} policy={policyFor(draft.propertyType)} />
-    {connectedReview && !illustrative ? <p className="text-sm text-muted-foreground">Model a deal here. Saving to the pipeline is unavailable in this review.</p> : <InvestmentPipeline />}
+    {entries.available ? <InvestmentPipeline /> : entries.isPending ? null : (
+      <p className="border-t pt-3 text-sm text-muted-foreground">{entries.isError ? "The investment pipeline could not be loaded." : "The connected database does not have the investment pipeline table yet."}</p>
+    )}
   </div>;
 }
 

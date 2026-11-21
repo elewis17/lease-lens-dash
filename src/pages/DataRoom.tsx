@@ -19,7 +19,6 @@ type DataRoomProps = {
   renderPropertyName: (property: Property) => ReactNode;
   filteredLeases: LeaseData[];
   filteredMortgages: Mortgage[];
-  mortgages: Mortgage[];
   propertyOptions: PropertyOption[];
   escrowByProperty: Map<string, boolean>;
   onAddProperty: (data: Partial<Property>) => Promise<boolean>;
@@ -41,7 +40,6 @@ export default function DataRoom({
   renderPropertyName,
   filteredLeases,
   filteredMortgages,
-  mortgages,
   propertyOptions,
   escrowByProperty,
   onAddProperty,
@@ -56,7 +54,6 @@ export default function DataRoom({
 }: DataRoomProps) {
   const [leaseSaved, setLeaseSaved] = useState(false);
   const { metrics, illustrative } = useWorkspace();
-  const termsOnly = connectedReview && !illustrative;
   const allowCapture = !connectedReview && !illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
@@ -64,18 +61,14 @@ export default function DataRoom({
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 lg:space-y-10">
       <header className="space-y-2">
-        <h1 id="holdings-title" tabIndex={-1} className="text-3xl font-semibold">Holdings</h1>
-        <p className="text-sm text-muted-foreground">Open a property to review its records and sources.</p>
-        {illustrative && <p className="text-sm text-muted-foreground">Demo record changes reset when you reload.</p>}
-        {filteredProperties.length > 0 && <dl aria-label="Holdings at a glance" className="grid grid-cols-2 gap-4 border-y py-3 text-sm sm:grid-cols-3">
-          <div><dt className="text-xs text-muted-foreground">Real estate equity · Estimate</dt>
-            <dd className="font-semibold tabular-nums">{money(metrics.equity)}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Debt · Recorded balances</dt>
-            <dd className="font-semibold tabular-nums">{money(metrics.debt)}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Physical occupancy · Contracted units</dt>
-            <dd className="font-semibold tabular-nums">{percent(metrics.physicalOccupancy)}</dd></div>
+        <h1 id="holdings-title" tabIndex={-1} className="text-[32px] font-semibold leading-[1.12] tracking-tight">Holdings</h1>
+        {illustrative && <p className="text-xs text-muted-foreground">Demo edits reset on reload.</p>}
+        {filteredProperties.length > 0 && <dl aria-label="Holdings at a glance" className="holdings-totals grid grid-cols-1 gap-y-3 border-y py-4 min-[390px]:grid-cols-3">
+          <div><dt>Real estate equity</dt><dd>{money(metrics.equity)}</dd><small>Estimate</small></div>
+          <div><dt>Debt</dt><dd>{money(metrics.debt)}</dd><small>Recorded balances</small></div>
+          <div><dt>Physical occupancy</dt><dd>{percent(metrics.physicalOccupancy)}</dd><small>Contracted units</small></div>
         </dl>}
       </header>
 
@@ -85,14 +78,10 @@ export default function DataRoom({
             <h2 className="text-xl font-semibold leading-snug">
               Properties <span className="text-base text-muted-foreground">({filteredProperties.length})</span>
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Supports valuation, operating assumptions, and portfolio-level decision context.
-            </p>
           </div>
           <PropertiesTable
             properties={filteredProperties}
             metrics={metrics.assets}
-            readOnly={termsOnly}
             renderName={renderPropertyName}
             onAdd={onAddProperty}
             onUpdate={onUpdateProperty}
@@ -106,14 +95,10 @@ export default function DataRoom({
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold leading-snug">
-            Active Leases <span className="text-base text-muted-foreground">({filteredLeases.length})</span>
+            Leases <span className="text-base text-muted-foreground">({filteredLeases.length})</span>
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Feeds rent quality, occupancy, monthly cash flow, and investment memo support.
-          </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        {termsOnly && <p className="text-sm text-muted-foreground">Add a lease below the table. Existing leases allow term edits and confirmed deletion.</p>}
         {allowCapture && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
           onOpen={() => setLeaseSaved(false)}
           onUploadComplete={async () => {
@@ -122,7 +107,6 @@ export default function DataRoom({
           }} />}
         <LeaseTable
           leases={filteredLeases}
-          termsOnly={termsOnly}
           selectedProperty={selectedProperty}
           onUpdate={onUpdateLease}
           onDelete={onDeleteLease}
@@ -134,22 +118,18 @@ export default function DataRoom({
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold leading-snug">
-            Mortgages <span className="text-base text-muted-foreground">({mortgages.length})</span>
+            Mortgages <span className="text-base text-muted-foreground">({filteredMortgages.length})</span>
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Drives DSCR, debt stress, refinance capacity, equity visibility, and cash-flow pressure.
-          </p>
         </div>
         {allowCapture && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
-        <fieldset className="min-w-0" disabled={termsOnly}>
         <MortgagesTable
           mortgages={filteredMortgages}
+          selectedProperty={selectedProperty}
           onUpdate={onUpdateMortgage}
           onDelete={onDeleteMortgage}
           onAdd={onAddMortgage}
           propertyOptions={propertyOptions}
         />
-        </fieldset>
       </section>
     </div>
   );

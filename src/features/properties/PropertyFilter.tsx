@@ -21,8 +21,7 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
   const buttonLabel = selectedProperty === "" ? "All Properties" : (currentProperty?.alias ?? "Select property...");
 
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium">Property:</label>
+    <div className="flex min-w-0 max-w-xs flex-1 items-center">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -31,13 +30,13 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
             role="combobox"
             aria-label={`Property filter, ${buttonLabel}`}
             aria-expanded={open}
-            className="w-[300px] justify-between"
+            className="w-full min-w-0 justify-between"
           >
-            {buttonLabel}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <span className="truncate">{buttonLabel}</span>
+            <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0 bg-background z-50"
+        <PopoverContent className="z-50 w-[min(20rem,calc(100vw-2rem))] bg-background p-0" align="start"
           onEscapeKeyDown={() => { restoreFocus.current = true; }}
           onCloseAutoFocus={event => {
             if (!restoreFocus.current) return;
@@ -84,7 +83,8 @@ export const PropertyFilter = ({ properties, selectedProperty, onPropertyChange 
             {properties.map((property) => (
               <CommandItem
                 key={property.id}
-                value={property.alias}
+                value={property.id}
+                keywords={[property.alias, property.address]}
                 onSelect={() => {
                   onPropertyChange(property.id);
                   setOpen(false);

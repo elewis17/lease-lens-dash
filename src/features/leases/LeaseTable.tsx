@@ -2,14 +2,18 @@ import { useRef, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Save, X, Plus, Pencil } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-
 import { Constants, type Enums } from "@/integrations/supabase/types";
+import { RecordField, RecordSheet, recordSelectClass } from "@/features/portfolio/RecordSheet";
+import { money } from "@/domain/finance/format";
 
 type LeaseStatus = Enums<"lease_status">;
 const isLeaseStatus = (value: string): value is LeaseStatus =>
-  Constants.public.Enums.lease_status.some((status) => value === status);
+  Constants.public.Enums.lease_status.some(status => value === status);
+const leaseStatusLabels: Record<LeaseStatus, string> = {
+  active: "Active", expiring: "Expiring", vacant: "Vacant", expired: "Expired",
+};
 
 export interface LeaseData {
   id: string;
@@ -20,10 +24,9 @@ export interface LeaseData {
   startDate: string | null;
   leaseEnd: string | null;
   property_id?: string;
-  // NEW FIELDS
   status?: LeaseStatus | null;
   unit_id?: string | null;
-  unit_label?: string | null; // from units table (joined in Index.tsx)
+  unit_label?: string | null;
 }
 
 export type ManualLeaseInput = Partial<Omit<LeaseData, "id" | "monthlyRent" | "deposit" | "documentPath">> & {
@@ -31,304 +34,111 @@ export type ManualLeaseInput = Partial<Omit<LeaseData, "id" | "monthlyRent" | "d
   deposit?: number | string | null;
 };
 
-type PropertyOption = { id: string; name: string }; // NEW
-
-interface LeaseTableProps {
+type LeaseTableProps = {
   leases: LeaseData[];
-  termsOnly?: boolean;
   selectedProperty?: string;
   onUpdate: (id: string, data: ManualLeaseInput) => Promise<boolean>;
   onDelete: (id: string) => void;
   onAdd: (id: string, data: ManualLeaseInput) => Promise<boolean>;
-  propertyOptions: PropertyOption[]; 
-}
+  propertyOptions: { id: string; name: string }[];
+};
 
-export const LeaseTable = ({ leases, onUpdate, onDelete, onAdd, propertyOptions, termsOnly = false, selectedProperty }: LeaseTableProps) => {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<ManualLeaseInput>({});
-  const [isAdding, setIsAdding] = useState(false);
-  const [newLease, setNewLease] = useState<ManualLeaseInput>({});
+export function LeaseTable({ leases, onUpdate, onDelete, onAdd, propertyOptions, selectedProperty }: LeaseTableProps) {
+  const [editor, setEditor] = useState<{ id: string; editing: boolean; data: ManualLeaseInput } | null>(null);
   const [saving, setSaving] = useState(false);
-  const draftId = useRef<string | null>(null);
   const inFlight = useRef(false);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const byProperty = new Map(propertyOptions.map(option => [option.id, option.name]));
+  const data = editor?.data ?? {};
+  const change = (patch: ManualLeaseInput) => setEditor(previous => previous && { ...previous, data: { ...previous.data, ...patch } });
+  const close = () => setEditor(null);
 
-  const handleEdit = (lease: LeaseData) => {
-    setEditingId(lease.id);
-    setEditData(lease);
-    setIsAdding(false);
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditData({});
-  };
-
-  const save = async (editing: boolean) => {
-    if (inFlight.current) return;
-    const id = editing ? editingId : draftId.current;
-    if (!id) return;
+  const save = async () => {
+    if (!editor || inFlight.current) return;
     inFlight.current = true;
     setSaving(true);
     try {
-      const saved = editing ? await onUpdate(id, editData) : await onAdd(id, newLease);
-      if (!saved) return;
-      if (editing) handleCancel();
-      else {
-        setNewLease({});
-        setIsAdding(false);
-      }
+      const action = editor.editing ? onUpdate : onAdd;
+      if (await action(editor.id, editor.data)) close();
     } finally {
-      inFlight.current = false;
       setSaving(false);
+      inFlight.current = false;
     }
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="font-semibold text-sm sticky left-0 bg-muted/50 backdrop-blur-sm">Tenant</TableHead>
-              <TableHead className="font-semibold text-sm">Property</TableHead>
-              <TableHead className="font-semibold text-sm">Unit</TableHead>
-              <TableHead className="font-semibold text-sm">Status</TableHead>
-              <TableHead className="font-semibold text-sm">Monthly Rent</TableHead>
-              <TableHead className="font-semibold text-sm">Lease Start</TableHead>
-              <TableHead className="font-semibold text-sm">Lease End</TableHead>
-              <TableHead className="font-semibold text-sm">Deposit</TableHead>
-              <TableHead className="font-semibold text-sm">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-        <TableBody>
-          {leases.map((lease) => (
-            <TableRow key={lease.id} className="hover:bg-muted/30 transition-colors">
-              {editingId === lease.id ? (
-                <>
-                  <TableCell className="sticky left-0 bg-card backdrop-blur-sm">
-                    <Input aria-label="Tenant name" disabled={termsOnly}
-                      value={editData.tenant || ""}
-                      onChange={(e) => setEditData({ ...editData, tenant: e.target.value })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <select aria-label="Property" disabled={termsOnly}
-                      className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
-                      value={editData.property_id ?? ""}
-                      onChange={(e) => setEditData({ ...editData, property_id: e.target.value || undefined })}
-                    >
-                      <option value="">Select property…</option>
-                      {propertyOptions.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </TableCell>
-                  {/* Unit */}
-                  <TableCell>
-                    <Input aria-label="Unit label" disabled={termsOnly}
-                      placeholder="Unit"
-                      value={editData.unit_label || ""}
-                      onChange={(e) =>
-                        setEditData({ ...editData, unit_label: e.target.value })
-                      }
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  {/* Status */}
-                  <TableCell>
-                    <select aria-label="Lease status"
-                      className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
-                      value={editData.status ?? ""}
-                      onChange={({ target: { value } }) => {
-                        setEditData({ ...editData, status: isLeaseStatus(value) ? value : null });
-                      }}
-                    >
-                      <option value="">Unspecified</option>
-                      <option value="active">Active</option>
-                      <option value="expiring">Expiring</option>
-                      <option value="vacant">Vacant</option>
-                      <option value="expired">Inactive</option>
-                    </select>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      aria-label="Monthly rent" value={editData.monthlyRent ?? ""}
-                      onChange={(e) => setEditData({ ...editData, monthlyRent: e.target.value })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="date" aria-label="Lease start date"
-                      value={editData.startDate ?? ""}
-                      onChange={(e) => setEditData({ ...editData, startDate: e.target.value || null })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="date" aria-label="Lease end date"
-                      value={editData.leaseEnd ?? ""}
-                      onChange={(e) => setEditData({ ...editData, leaseEnd: e.target.value || null })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      aria-label="Deposit" value={editData.deposit ?? ""}
-                      onChange={(e) => setEditData({ ...editData, deposit: e.target.value })}
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => void save(true)} aria-label="Save lease" disabled={saving} className="hover:scale-105 transition-transform">
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={handleCancel} aria-label="Cancel lease edit" disabled={saving} className="hover:scale-105 transition-transform">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </>
-              ) : (
-                <>
-                  <TableCell className="font-medium text-sm sticky left-0 bg-card backdrop-blur-sm">{lease.tenant}</TableCell>
-                  <TableCell className="text-sm">{propertyOptions.find(p => p.id === lease.property_id)?.name ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{lease.unit_label ?? "—"}</TableCell>
-                  <TableCell className="text-sm capitalize">{lease.status ?? "—"}</TableCell>
-                  <TableCell className="text-sm font-semibold">${lease.monthlyRent.toLocaleString()}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{lease.startDate ? format(parseISO(lease.startDate), "MMM d, yyyy") : "—"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{lease.leaseEnd ? format(parseISO(lease.leaseEnd), "MMM d, yyyy") : "—"}</TableCell>
-                  <TableCell className="text-sm">{lease.deposit == null ? "—" : `$${lease.deposit.toLocaleString()}`}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(lease)} aria-label={termsOnly ? `Edit lease · ${lease.unit_label}` : `Edit lease for ${lease.tenant}`} disabled={saving} className="hover:scale-105 transition-transform">
-                        <Pencil className="h-3 w-3 mr-1" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => onDelete(lease.id)} aria-label={termsOnly ? `Delete lease · ${lease.unit_label}` : `Delete lease for ${lease.tenant}`} disabled={saving} className="hover:scale-105 transition-transform">
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </>
-              )}
-            </TableRow>
-          ))}
-          {isAdding && (
-            <TableRow className="bg-primary/5 animate-fade-in">
-              <TableCell className="sticky left-0 bg-primary/5 backdrop-blur-sm">
-                <Input autoFocus aria-label="Tenant name"
-                  placeholder="Tenant name"
-                  value={newLease.tenant ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, tenant: e.target.value })}
-                  className="h-8 text-sm"
-                />
+    <div className="space-y-3">
+      {leases.length ? <Table className="record-table">
+        <TableHeader><TableRow>
+          <TableHead>Tenant</TableHead>
+          <TableHead className="hidden md:table-cell">Property/Unit</TableHead>
+          <TableHead className="text-right">Rent / mo</TableHead>
+          <TableHead className="hidden lg:table-cell">Lease start</TableHead>
+          <TableHead className="hidden md:table-cell">Lease end</TableHead>
+          <TableHead className="hidden lg:table-cell text-right">Deposit</TableHead>
+          <TableHead><span className="sr-only">Actions</span></TableHead>
+        </TableRow></TableHeader>
+        <TableBody>{leases.map(lease => {
+          const property = (lease.property_id && byProperty.get(lease.property_id)) || "—";
+          const unit = lease.unit_label;
+          const ends = lease.leaseEnd ? format(parseISO(lease.leaseEnd), "MMM d, yyyy") : "—";
+          const status = lease.status ? leaseStatusLabels[lease.status] : "Unspecified";
+          return (
+            <TableRow key={lease.id}>
+              <TableCell className="min-w-0">
+                <p className="break-words font-semibold">{lease.tenant}</p>
+                <p className="mt-1 text-xs text-muted-foreground md:hidden">{property}{unit && ` · Unit ${unit}`}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{status}<span className="md:hidden">{lease.leaseEnd && ` · Ends ${ends}`}</span></p>
               </TableCell>
-              <TableCell>
-                <select aria-label="Property"
-                  className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
-                  value={newLease.property_id ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, property_id: e.target.value || undefined })}>
-                  <option value="">Select property…</option>
-                  {propertyOptions.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </TableCell>
-               {/* Unit */}
-              <TableCell>
-                <Input aria-label="Unit label"
-                  placeholder="Unit"
-                  value={newLease.unit_label || ""}
-                  onChange={(e) =>
-                    setNewLease({ ...newLease, unit_label: e.target.value })
-                  }
-                  className="h-8 text-sm"
-                />
-              </TableCell>
-
-              {/* Status */}
-              <TableCell>
-                <select aria-label="Lease status"
-                  className="h-8 text-sm w-full rounded-md border border-input bg-background px-2"
-                  value={newLease.status ?? ""}
-                  onChange={({ target: { value } }) => {
-                    setNewLease({ ...newLease, status: isLeaseStatus(value) ? value : null });
-                  }}
-                >
-                  <option value="">Unspecified</option>
-                      <option value="active">Active</option>
-                  <option value="expiring">Expiring</option>
-                  <option value="vacant">Vacant</option>
-                  <option value="expired">Inactive</option>
-                </select>
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  placeholder="Rent"
-                  aria-label="Monthly rent" value={newLease.monthlyRent ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, monthlyRent: e.target.value })}
-                  className="h-8 text-sm"
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="date" aria-label="Lease start date"
-                  value={newLease.startDate ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, startDate: e.target.value || null })}
-                  className="h-8 text-sm"
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="date" aria-label="Lease end date"
-                  value={newLease.leaseEnd ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, leaseEnd: e.target.value || null })}
-                  className="h-8 text-sm"
-                />
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  placeholder="Deposit"
-                  aria-label="Deposit" value={newLease.deposit ?? ""}
-                  onChange={(e) => setNewLease({ ...newLease, deposit: e.target.value })}
-                  className="h-8 text-sm"
-                />
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => void save(false)} aria-label="Save lease" disabled={saving} className="hover:scale-105 transition-transform">
-                    <Save className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)} aria-label="Cancel new lease" disabled={saving} className="hover:scale-105 transition-transform">
-                    <X className="h-4 w-4" />
-                  </Button>
+              <TableCell className="hidden md:table-cell">{property}{unit && <span className="block text-xs text-muted-foreground">Unit {unit}</span>}</TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">{money(lease.monthlyRent)}</TableCell>
+              <TableCell className="hidden lg:table-cell">{lease.startDate ? format(parseISO(lease.startDate), "MMM d, yyyy") : "—"}</TableCell>
+              <TableCell className="hidden md:table-cell">{ends}</TableCell>
+              <TableCell className="hidden lg:table-cell text-right">{money(lease.deposit)}</TableCell>
+              <TableCell className="w-0">
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="icon" aria-label={`Edit lease for ${lease.tenant}`} onClick={event => {
+                    opener.current = event.currentTarget;
+                    setEditor({ id: lease.id, editing: true, data: lease });
+                  }}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" aria-label={`Delete lease for ${lease.tenant}`} onClick={() => onDelete(lease.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </TableCell>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-      </div>
-      {!isAdding && (
-        <div className="p-3 border-t border-border">
-          <Button variant="outline" size="sm" disabled={saving || !propertyOptions.length} onClick={() => {
-            draftId.current = crypto.randomUUID();
-            setNewLease({ property_id: selectedProperty || (propertyOptions.length === 1 ? propertyOptions[0].id : undefined), status: "active" });
-            handleCancel();
-            setIsAdding(true);
-          }} className="w-full hover:scale-105 transition-transform">
-            <Plus className="h-4 w-4 mr-2" />
-            Add New Lease
-          </Button>
-        </div>
-      )}
+          );
+        })}</TableBody>
+      </Table> : <p className="border-y py-4 text-sm text-muted-foreground">No leases on record for this selection.</p>}
+      <Button variant="outline" disabled={!propertyOptions.length} onClick={event => {
+        opener.current = event.currentTarget;
+        setEditor({ id: crypto.randomUUID(), editing: false, data: {
+          property_id: selectedProperty || (propertyOptions.length === 1 ? propertyOptions[0].id : undefined), status: "active",
+        } });
+      }}><Plus className="mr-2 h-4 w-4" />Add New Lease</Button>
+      <RecordSheet open={editor !== null} title={editor?.editing ? "Edit lease" : "Add lease"}
+        description={editor?.editing ? "Changing the unit reassigns this lease. The previous unit stays on record." : "Review the property, tenant, and signed terms before saving."}
+        saving={saving} onSave={save} onClose={close} returnFocus={opener}>
+        <RecordField label="Property">
+          <select className={recordSelectClass} value={data.property_id ?? ""} onChange={event => change({ property_id: event.target.value })}>
+            <option value="">Select property…</option>
+            {propertyOptions.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}
+          </select>
+        </RecordField>
+        <RecordField label="Unit label"><Input value={data.unit_label ?? ""} onChange={event => change({ unit_label: event.target.value })} /></RecordField>
+        <RecordField label="Tenant name"><Input value={data.tenant ?? ""} onChange={event => change({ tenant: event.target.value })} /></RecordField>
+        <RecordField label="Lease status">
+          <select className={recordSelectClass} value={data.status ?? ""} onChange={event => {
+            const value = event.target.value;
+            change({ status: isLeaseStatus(value) ? value : null });
+          }}>
+            <option value="">Unspecified</option>
+            {Object.entries(leaseStatusLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}
+          </select>
+        </RecordField>
+        <RecordField label="Lease start date"><Input type="date" value={data.startDate ?? ""} onChange={event => change({ startDate: event.target.value })} /></RecordField>
+        <RecordField label="Lease end date"><Input type="date" value={data.leaseEnd ?? ""} onChange={event => change({ leaseEnd: event.target.value })} /></RecordField>
+        <RecordField label="Monthly rent"><Input type="number" inputMode="decimal" step="0.01" min="0" value={data.monthlyRent ?? ""} onChange={event => change({ monthlyRent: event.target.value })} /></RecordField>
+        <RecordField label="Deposit"><Input type="number" inputMode="decimal" step="0.01" min="0" value={data.deposit ?? ""} onChange={event => change({ deposit: event.target.value })} /></RecordField>
+      </RecordSheet>
     </div>
   );
-};
+}

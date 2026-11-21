@@ -17,7 +17,6 @@ import { CapitalLifecycle } from "@/features/decisions/CapitalLifecycle";
 import { capitalHistory } from "@/features/decisions/entries";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { useSessionState } from "@/features/navigation/sessionState";
-import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 const horizon = `${capitalHorizonYears}-year`;
 const objectiveBasis: Record<CapitalObjective, string> = {
@@ -40,7 +39,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
   const { action, asset, refinance: model, rentPlan } = row;
   const projection = capitalProjection(row);
   const netProceeds = action === "sale" ? netSaleProceeds(saleInputs.price, saleInputs.costs, saleInputs.payoff) : null;
-  const { entries, illustrative } = useWorkspace();
+  const { entries } = useWorkspace();
   const history = capitalHistory(entries.entries, row.id);
   const latest = history.at(0)?.payload;
   const stage = latest?.status ?? "identified";
@@ -157,7 +156,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
             )}
           </div>
           <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-            {(!connectedReview || illustrative) && <CapitalLifecycle current={current} />}
+            {entries.available && <CapitalLifecycle current={current} />}
             <SheetClose asChild><Button variant="outline" className="min-h-11">Close</Button></SheetClose>
           </footer>
         </SheetContent>

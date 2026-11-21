@@ -10,7 +10,7 @@ export default function Holdings() {
     filteredProperties, filteredLeases, filteredMortgages, propertyOptions, escrowByProperty,
   } = useWorkspace();
   const { saveProperty, saveManualLease, saveMortgage, requestDelete, deleteDialog } = useRecordActions({
-    userId, properties, leases, refresh: query.refresh, updateDemo: query.updateDemo, selectedProperty,
+    userId, properties, leases, mortgages, refresh: query.refresh, updateDemo: query.updateDemo, selectedProperty,
     clearProperty: () => setSelectedProperty(""),
   });
 
@@ -26,7 +26,6 @@ export default function Holdings() {
         )}
         filteredLeases={filteredLeases}
         filteredMortgages={filteredMortgages}
-        mortgages={mortgages}
         propertyOptions={propertyOptions}
         escrowByProperty={escrowByProperty}
         onAddProperty={saveProperty}

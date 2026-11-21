@@ -10,7 +10,6 @@ import { balanceEvidenceText, staleStatementDays } from "@/domain/finance/debt";
 import { coverage, money, percent } from "@/domain/finance/format";
 import { operatingConfidence } from "@/domain/finance/portfolio";
 import type { Property } from "./PropertiesTable";
-import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 type Portfolio = ReturnType<typeof usePortfolio>["portfolio"];
 const shortDate = (value: string | null) => value
@@ -57,7 +56,7 @@ function RecordedDocument({ ownerId, path, title }: { ownerId: string; path: str
 }
 
 function RecordSections({ ownerId, property, portfolio }: { ownerId: string; property: Property; portfolio: Portfolio }) {
-  const { entries, metrics, pathTo, illustrative } = useWorkspace();
+  const { entries, metrics, pathTo } = useWorkspace();
   const asset = metrics.assets.find(item => item.property.id === property.id);
   const cashEvidence = asset && operatingConfidence([asset]);
   const balanceEvidence = asset && balanceEvidenceText(asset.debtEvidence);
@@ -202,8 +201,9 @@ function RecordSections({ ownerId, property, portfolio }: { ownerId: string; pro
             </ul> : <p className="text-muted-foreground">No lease documents or mortgage statements linked.</p>}
           </Section>
           <Section title="Decisions">
-            {connectedReview && !illustrative ? <p className="text-muted-foreground">Saved decisions are unavailable in the connected review.</p>
+            {entries.isPending ? <div className="h-8 animate-pulse bg-muted/30" aria-label="Loading property decisions" />
               : entries.isError ? <p className="text-muted-foreground">Could not load property-linked decisions.</p>
+              : !entries.available ? <p className="text-muted-foreground">The connected database does not have the Decision Log table yet.</p>
               : propertyDecisions.length ? <ul className="space-y-2">{propertyDecisions.map(entry => (
                 <li key={entry.id}><Link className="underline" to={pathTo("/decisions/" + entry.id + "/memo")}>{entry.title}</Link></li>
               ))}</ul>

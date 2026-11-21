@@ -22,14 +22,14 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
   const query = useQuery({
     queryKey: key,
     retry: false,
-    queryFn: async ({ signal }): Promise<Entry[]> => {
+    queryFn: async ({ signal }): Promise<Entry[] | null> => {
       if (illustrative) return loadSessionValue(local, sampleEntries);
-      if (connectedReview) return [];
       const rows: Entry[] = [];
       for (let start = 0; ; start += 500) {
         const { data, error } = await supabase.from("dealstack_workspace_entries")
           .select("id, created_at, payload").eq("user_id", userId)
           .order("created_at", { ascending: false }).order("id").range(start, start + 499).abortSignal(signal);
+        if (connectedReview && (error?.code === "PGRST205" || error?.code === "42P01")) return null;
         if (error || !data) throw new Error("The decision record could not be loaded.");
         for (const row of data) {
           const payload = entrySchema.safeParse(row.payload);
@@ -40,9 +40,10 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
       }
     },
   });
+  const available = illustrative || !connectedReview || (query.isSuccess && query.data !== null);
 
   const append = async (payload: EntryPayload) => {
-    if (connectedReview && !illustrative) throw new Error("Saving decisions is unavailable in the connected review.");
+    if (!available) throw new Error("Saving decisions requires a connected Decision Log.");
     const validated = entrySchema.parse(payload);
     const id = crypto.randomUUID();
     if (illustrative) {
@@ -58,5 +59,5 @@ export function useWorkspaceEntries(userId: string, illustrative: boolean) {
     await client.invalidateQueries({ queryKey: key, exact: true });
     return id;
   };
-  return { ...query, append, entries: query.data ?? [] };
+  return { ...query, available, append, entries: query.data ?? [] };
 }

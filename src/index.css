@@ -82,6 +82,51 @@
 
   body {
     @apply bg-background font-sans text-foreground;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .record-table {
+    @apply border-y;
+  }
+
+  .record-table th {
+    @apply h-9 px-2 text-xs font-medium sm:px-3;
+  }
+
+  .record-table td {
+    @apply px-2 py-2 sm:px-3;
+  }
+
+  .record-table :is(th, td):first-child {
+    @apply pl-0;
+  }
+
+  .record-table :is(th, td):last-child {
+    @apply pr-0;
+  }
+
+  .holdings-totals :is(dt, small) {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .holdings-totals dd {
+    @apply text-xl font-semibold leading-tight tracking-tight;
+  }
+
+  .view-title {
+    @apply max-w-3xl text-[32px] font-semibold leading-[1.12] tracking-tight;
+  }
+
+  .editorial-section {
+    @apply space-y-3 border-t pt-4;
+  }
+
+  .editorial-section > h2 {
+    @apply text-xl font-semibold leading-tight tracking-tight;
   }
 }
 

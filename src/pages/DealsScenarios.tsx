@@ -60,7 +60,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
   return (
     <section aria-labelledby="underwriting-title" className="space-y-6 tabular-nums">
       <header className="space-y-1">
-        <h2 id="underwriting-title" tabIndex={-1} className="text-2xl font-semibold">Deal Underwriting</h2>
+        <h1 id="underwriting-title" tabIndex={-1} className="view-title">Deal Underwriting</h1>
         {illustrative && <p className="text-sm text-muted-foreground">Illustrative data · Kirkwood</p>}
       </header>
 

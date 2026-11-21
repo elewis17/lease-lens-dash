@@ -1,5 +1,5 @@
 import { Calculator, Database, FileText, Home, TrendingUp } from "lucide-react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 const destinations = [
   { path: "/briefing", label: "Briefing", icon: Home },
@@ -14,12 +14,6 @@ export function PortfolioNav({ prefix }: { prefix: string }) {
   const destination = (path: string) => ({ pathname: prefix + path, search, hash });
   return (
     <aside className="shrink-0 lg:w-56 lg:border-r lg:border-border">
-      <div className="flex justify-end px-4 pt-3 lg:hidden">
-        <Link className="inline-flex min-h-11 items-center gap-2 text-sm underline underline-offset-4" to={destination("/decisions")}>
-          <FileText className="h-4 w-4" aria-hidden />
-          Decision Log
-        </Link>
-      </div>
       <nav aria-label="Portfolio views"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] lg:static lg:flex lg:flex-col lg:gap-1 lg:border-t-0 lg:p-2">
         {destinations.map(({ path, label, icon: Icon, desktopOnly }) => (
