@@ -19,7 +19,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       && ["id", "unit_id"].every(column => /^eq\.[0-9a-f-]{36}$/i.test(url.searchParams.get(column) ?? ""));
     const newLease = method === "POST" && (url.pathname === "/rest/v1/rpc/dealstack_add_lease" ||
       (url.pathname === "/rest/v1/rpc/save_manual_lease" && typeof init?.body === "string" && /"p_edit":false[,}]/.test(init.body)));
-    if (url.origin !== new URL(SUPABASE_URL).origin || (!auth && !dataRead && !scopedLeaseChange && !newLease)) {
+    const legacyLeaseCreation = method === "POST" && ["/rest/v1/units", "/rest/v1/tenants", "/rest/v1/leases",
+      "/rest/v1/rpc/update_property_unit_count"].includes(url.pathname);
+    if (url.origin !== new URL(SUPABASE_URL).origin || (!auth && !dataRead && !scopedLeaseChange && !newLease && !legacyLeaseCreation)) {
       return Promise.resolve(new Response(JSON.stringify({ message: "The connected review is read-only." }), {
         status: 403, headers: { "Content-Type": "application/json" },
       }));

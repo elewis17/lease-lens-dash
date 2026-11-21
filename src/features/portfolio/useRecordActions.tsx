@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { connectedReview } from "./releaseProfile";
 import type { WorkspacePortfolio } from "./usePortfolio";
 import { deleteDemoRecord, writeDemoLease, writeDemoMortgage, writeDemoProperty } from "./demoRecords";
+import { saveLegacyLease } from "./saveLegacyLease";
 
 type RecordKind = "property" | "lease" | "mortgage";
 const recordTable = { property: "properties", lease: "leases", mortgage: "mortgages" } as const;
@@ -86,10 +87,10 @@ export function useRecordActions({ userId, properties, leases, refresh, updateDe
     const { data: saved, error } = connectedReview && standard.error?.code === "PGRST202"
       ? await supabase.rpc("dealstack_add_lease", input)
       : standard;
-    if (connectedReview && error?.code === "PGRST202") {
-      return showWriteError("Adding leases needs a database update", "Your draft is still open. The connected database has not enabled lease creation yet.");
-    }
-    if (error || saved !== id) return showWriteError("Lease save failed", "Check the lease details and try again.");
+    const savedLease = connectedReview && error?.code === "PGRST202"
+      ? await saveLegacyLease(userId, input)
+      : !error && saved === id;
+    if (!savedLease) return showWriteError("Lease save failed", "Your draft is still open. The database did not accept the lease.");
     await refresh();
     toast({ title: editing ? "Lease updated" : "Lease added" });
     return true;
