@@ -25,3 +25,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local agent and Supabase CLI state
+/runtime/runs/
+/task/
+/issue_outputs.txt
+/supabase/.temp/
+/supabase/.branches/
+/bun.lockb
+__pycache__/
+/scripts/run_agent.py

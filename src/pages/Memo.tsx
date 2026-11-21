@@ -4,15 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { money, ratio, percent } from "@/domain/finance/format";
 import { modelDeal, priceGates, type DealAssumptions } from "@/domain/finance/underwriting";
-import { defaultThresholds } from "@/domain/finance/thresholds";
+import type { ThresholdPolicy } from "@/domain/finance/thresholds";
 
-export default function Memo({ assumptions, onOpenUnderwriting }: { assumptions: DealAssumptions | null; onOpenUnderwriting: () => void }) {
+export default function Memo({ dealName, assumptions, onOpenUnderwriting, policy }: { assumptions: DealAssumptions | null; onOpenUnderwriting: () => void; policy: ThresholdPolicy; dealName?: string }) {
   const model = assumptions && modelDeal(assumptions);
-  const gates = assumptions && priceGates(assumptions);
+  const gates = assumptions && priceGates(assumptions, policy.buy, policy.lender);
   if (!assumptions || !model || !gates) {
     return (
       <section className="space-y-4">
-        <h1 className="text-3xl font-semibold">Investment Memo</h1>
+        <h1 className="view-title">Complete the deal assumptions to prepare a memo.</h1>
         <p className="text-muted-foreground">Complete the assumptions in Deal Underwriting to prepare a memo.</p>
         <Button onClick={onOpenUnderwriting}>Open Deal Underwriting</Button>
       </section>
@@ -27,19 +27,24 @@ export default function Memo({ assumptions, onOpenUnderwriting }: { assumptions:
     [`${assumptions.holdYears}-year modelled IRR · Estimate`, percent(model.irr)],
     ["First-year cash flow / mo · Estimate", money(model.cashFlow)],
   ];
-  const basis = `Buy gates use ${ratio(defaultThresholds.buy.minimumDscr)} DSCR and ${percent(defaultThresholds.buy.minimumIrr)} modelled IRR. Exit proceeds use next-year NOI at the entered exit cap, less selling costs and the remaining loan payoff.`;
-  const text = ["Investment Memo", `Verdict · ${gates.verdict}`, ...summary.map(([label, value]) => `${label} · ${value}`), basis].join("\n");
+  const basis = `Buy gates use ${ratio(policy.buy.minimumDscr)} DSCR and ${percent(policy.buy.minimumIrr)} modelled IRR. Exit proceeds use next-year NOI at the entered exit cap, less selling costs and the remaining loan payoff.`;
+  const headline = gates.verdict === "Buy" ? `Buy ${dealName ?? "the deal"} at ${money(assumptions.price)}.`
+    : gates.verdict === "Do not pursue" ? `Do not pursue ${dealName ?? "the deal"} at ${money(assumptions.price)}.`
+    : gates.verdict === "Verify mitigations" ? `Verify mitigations for ${dealName ?? "the deal"}.`
+    : `Verify the assumptions for ${dealName ?? "the deal"}.`;
+  const text = [headline, `Verdict · ${gates.verdict}`, ...summary.map(([label, value]) => `${label} · ${value}`), basis].join("\n");
   return (
     <section className="space-y-4">
-      <h1 className="text-3xl font-semibold">Investment Memo</h1>
-      <Card className="space-y-4 p-5 shadow-none">
+      <h1 className="view-title">{headline}</h1>
+      <Card className="space-y-4 p-5">
         <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} />
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 tabular-nums">
-          {summary.map(([label, value]) => <div key={label}>
+          {summary.filter(([, value]) => value !== "—" && value !== "n/a").map(([label, value]) => <div key={label}>
             <dt className="text-sm text-muted-foreground">{label}</dt>
             <dd className="text-xl font-semibold">{value}</dd>
           </div>)}
         </dl>
+        {summary.some(([, value]) => value === "—" || value === "n/a") && <p className="text-xs text-muted-foreground">Some projected figures need a complete basis.</p>}
         <p className="text-sm text-muted-foreground">{basis}</p>
         <p className="text-sm text-muted-foreground">Verify rent evidence, operating costs, and financing terms before recording a decision.</p>
       </Card>

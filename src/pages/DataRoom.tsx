@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Database, FileText, Home, Landmark } from "lucide-react";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
+import { RenewalExposure } from "@/features/properties/RenewalExposure";
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
+import { money, percent } from "@/domain/finance/format";
+import { useMemo, useState, type ReactNode } from "react";
 import PropertiesTable, { type Property } from "@/features/properties/PropertiesTable";
-import { Button } from "@/components/ui/button";
+import { StatementCapture } from "@/features/leases/StatementCapture";
 import { LeaseUploader } from "@/features/leases/LeaseUploader";
 import { LeaseTable, type LeaseData, type ManualLeaseInput } from "@/features/leases/LeaseTable";
 import { MortgagesTable, type Mortgage, type MortgageInput } from "@/components/MortgagesTable";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 type PropertyOption = { id: string; name: string };
 
@@ -13,10 +17,9 @@ type DataRoomProps = {
   selectedProperty: string;
   onLeaseCaptured: () => Promise<void>;
   filteredProperties: Property[];
+  renderPropertyName: (property: Property) => ReactNode;
   filteredLeases: LeaseData[];
   filteredMortgages: Mortgage[];
-  mortgages: Mortgage[];
-  properties: Property[];
   propertyOptions: PropertyOption[];
   escrowByProperty: Map<string, boolean>;
   onAddProperty: (data: Partial<Property>) => Promise<boolean>;
@@ -30,46 +33,14 @@ type DataRoomProps = {
   onDeleteMortgage: (id: string) => void;
 };
 
-const DataSignal = ({
-  icon: Icon,
-  title,
-  value,
-  cue,
-  description,
-}: {
-  icon: React.ElementType;
-  title: string;
-  value: string | number;
-  cue: string;
-  description: string;
-}) => (
-  <div className="rounded-xl bg-muted/30 p-4 shadow-sm">
-    <div className="flex items-start gap-3">
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Icon className="h-4 w-4" />
-      </span>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-foreground">{value} {title}</p>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {cue}
-          </span>
-        </div>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  </div>
-);
-
 export default function DataRoom({
   ownerId,
   selectedProperty,
   onLeaseCaptured,
   filteredProperties,
+  renderPropertyName,
   filteredLeases,
   filteredMortgages,
-  mortgages,
-  properties,
   propertyOptions,
   escrowByProperty,
   onAddProperty,
@@ -82,163 +53,70 @@ export default function DataRoom({
   onUpdateMortgage,
   onDeleteMortgage,
 }: DataRoomProps) {
-  const [showLeaseUpload, setShowLeaseUpload] = useState(false);
   const [leaseSaved, setLeaseSaved] = useState(false);
+  const { metrics, illustrative, householdMortgages, saveMortgageTreatment } = useWorkspace();
+  const flagged = metrics.assets.filter(asset => ["Distress", "Sell candidate"].includes(asset.verdict.label));
+  const count = filteredProperties.length;
+  const propertyCount = `${count} ${count === 1 ? "property" : "properties"}`;
+  const headline = !count ? "Add your first property to build the record."
+    : flagged.length === 1 ? `${flagged[0].property.alias} needs attention.`
+    : flagged.length ? `${flagged.length} of ${propertyCount} need attention.`
+    : `${propertyCount} on record. Review the evidence gaps.`;
+  const allowCapture = !connectedReview && !illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
     [escrowByProperty]
   );
 
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    const compute = () => {
-      const th = el.querySelector<HTMLElement>('th.bg-rose-50\\/60, th.bg-rose-50\\/40');
-      if (!th) return;
-
-      const thRect = th.getBoundingClientRect();
-      const containerRect = el.getBoundingClientRect();
-      setPos({
-        left: thRect.left - containerRect.left + 4,
-        top: thRect.top - containerRect.top - 6,
-      });
-    };
-
-    compute();
-    window.addEventListener("resize", compute);
-    return () => window.removeEventListener("resize", compute);
-  }, [filteredProperties.length]);
-
-
   return (
-    <div className="space-y-8">
-      <section className="rounded-[28px] bg-[#050817] p-6 sm:p-8 text-white shadow-sm">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8 lg:space-y-10">
+      <header className="space-y-2">
+        <h1 id="holdings-title" tabIndex={-1} className="view-title">{headline}</h1>
+        {flagged.length > 0 && <p className="text-sm text-muted-foreground">{propertyCount} on record · {flagged.map(asset => asset.property.alias).join(", ")}</p>}
+        {illustrative && <p className="text-xs text-muted-foreground">Demo edits reset on reload.</p>}
+        {filteredProperties.length > 0 && <dl aria-label="Holdings at a glance" className="holdings-totals grid grid-cols-1 gap-y-3 border-y py-4 min-[390px]:grid-cols-3">
+          <div><dt>Real estate equity</dt><dd><AnimatedNumber value={metrics.equity} format={money} /></dd><small>Estimate</small></div>
+          <div><dt>Debt</dt><dd><AnimatedNumber value={metrics.debt} format={money} /></dd><small>Recorded balances</small></div>
+          <div><dt>Physical occupancy</dt><dd><AnimatedNumber value={metrics.physicalOccupancy} format={percent} /></dd><small>Contracted units</small></div>
+        </dl>}
+      </header>
+
+      <div className="grid items-start gap-5 lg:grid-cols-[3fr_2fr]">
+        <section className="space-y-3">
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
-              <Database className="h-4 w-4" />
-              Data Room
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">Decision Data Room</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/80">
-              The source data behind underwriting, portfolio decisions, investment memos, and valuation support.
-            </p>
+            <h2 className="text-xl font-semibold leading-snug">
+              Properties <span className="text-base text-muted-foreground">({filteredProperties.length})</span>
+            </h2>
           </div>
-
-          <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/10 p-4 text-sm">
-            <div>
-              <p className="text-xs text-white/70">Properties</p>
-              <p className="text-2xl font-bold">{filteredProperties.length}</p>
-            </div>
-            <div>
-              <p className="text-xs text-white/70">Leases</p>
-              <p className="text-2xl font-bold">{filteredLeases.length}</p>
-            </div>
-            <div>
-              <p className="text-xs text-white/70">Mortgages</p>
-              <p className="text-2xl font-bold">{filteredMortgages.length}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Decision-ready data signals</h2>
-            <p className="text-sm text-muted-foreground">
-              These cues show how each dataset supports the rest of the system.
-            </p>
-          </div>
-          <span className="w-fit rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            feeds underwriting + memo
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <DataSignal
-            icon={Home}
-            value={filteredProperties.length}
-            title="properties"
-            cue="used in snapshot"
-            description="Property value, type, taxes, insurance, vacancy, and maintenance assumptions drive portfolio value and operating reality."
-          />
-          <DataSignal
-            icon={FileText}
-            value={filteredLeases.length}
-            title="leases"
-            cue="supports rent quality"
-            description="Lease records feed contracted rent, occupancy, and estimated cash flow."
-          />
-          <DataSignal
-            icon={Landmark}
-            value={filteredMortgages.length}
-            title="mortgages"
-            cue="feeds debt stress"
-            description="Debt balances, payments, rates, and escrow flags drive DSCR, cash flow, and coverage."
-          />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-xl font-semibold leading-snug">
-            Properties <span className="text-base text-muted-foreground">({filteredProperties.length})</span>
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Supports valuation, operating assumptions, and portfolio-level decision context.
-          </p>
-        </div>
-        <div ref={wrapRef} className="relative">
-          {pos && (
-            <span
-              className="absolute z-20 inline-flex -translate-y-full items-center rounded-t-lg bg-rose-100 px-3 py-0.5 text-xs font-medium text-rose-700 shadow-sm pointer-events-none"
-              style={{ left: pos.left, top: pos.top }}
-            >
-              OPEX
-            </span>
-          )}
-
           <PropertiesTable
             properties={filteredProperties}
+            metrics={metrics.assets}
+            renderName={renderPropertyName}
             onAdd={onAddProperty}
             onUpdate={onUpdateProperty}
             onDelete={onDeleteProperty}
             escrowByProperty={escrowObject}
           />
-        </div>
-      </section>
+        </section>
+        <RenewalExposure />
+      </div>
 
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold leading-snug">
-            Active Leases <span className="text-base text-muted-foreground">({filteredLeases.length})</span>
+            Leases <span className="text-base text-muted-foreground">({filteredLeases.length})</span>
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Feeds rent quality, occupancy, monthly cash flow, and investment memo support.
-          </p>
         </div>
         {leaseSaved && <p role="status" className="text-sm">Lease saved.</p>}
-        {showLeaseUpload ? (
-          <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
-            onClose={() => setShowLeaseUpload(false)}
-            onUploadComplete={async () => {
-              setShowLeaseUpload(false);
-              setLeaseSaved(true);
-              await onLeaseCaptured();
-            }} />
-        ) : (
-          <Button variant="outline" disabled={!properties.length} onClick={() => {
-            setLeaseSaved(false);
-            setShowLeaseUpload(true);
-          }}>Upload lease</Button>
-        )}
+        {allowCapture && <LeaseUploader ownerId={ownerId} properties={propertyOptions} selectedProperty={selectedProperty}
+          onOpen={() => setLeaseSaved(false)}
+          onUploadComplete={async () => {
+            setLeaseSaved(true);
+            await onLeaseCaptured();
+          }} />}
         <LeaseTable
           leases={filteredLeases}
+          selectedProperty={selectedProperty}
           onUpdate={onUpdateLease}
           onDelete={onDeleteLease}
           onAdd={onAddLease}
@@ -249,14 +127,15 @@ export default function DataRoom({
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold leading-snug">
-            Mortgages <span className="text-base text-muted-foreground">({mortgages.length})</span>
+            Mortgages <span className="text-base text-muted-foreground">({filteredMortgages.length})</span>
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Drives DSCR, debt stress, refinance capacity, equity visibility, and cash-flow pressure.
-          </p>
         </div>
+        {allowCapture && <StatementCapture ownerId={ownerId} mortgages={filteredMortgages} refresh={onLeaseCaptured} />}
         <MortgagesTable
           mortgages={filteredMortgages}
+          householdMortgages={householdMortgages}
+          onSaveTreatment={saveMortgageTreatment}
+          selectedProperty={selectedProperty}
           onUpdate={onUpdateMortgage}
           onDelete={onDeleteMortgage}
           onAdd={onAddMortgage}

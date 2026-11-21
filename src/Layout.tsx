@@ -1,74 +1,53 @@
-import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { useAuth } from "@/context/auth";
 import { rememberWorkspaceLocation } from "@/features/navigation/sessionState";
 import UserMenu from "@/components/ui/UserMenu";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const isDemo = /^\/demo(?:\/|$)/.test(location.pathname);
 
-  // Theme state (light / dark)
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem("theme") || "light"
-  );
-
-  useEffect(() => {
-    // Apply theme to <html>
-    document.documentElement.classList.remove("light", "dark");
-    document.documentElement.classList.add(theme);
-
-    // Persist
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+  const { resolvedTheme, setTheme } = useTheme();
+  const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors">
-      {/* --- Top Bar --- */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-         {/* LEFT: brand + sidebar toggle (aligned to sidebar width) */}
-        <div>
-          <div>
-            <h1 className="text-2xl font-bold">DealStack</h1>
-            <p className="text-sm text-muted-foreground -mt-1">
-              AI Co-Pilot for Investors
-            </p>
-          </div>
+      <header className="flex min-h-16 items-center justify-between gap-2 border-b border-border px-4 sm:px-6">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-3 w-3 shrink-0 bg-brand" />
+          <span className="text-lg font-semibold tracking-tight">DealStack</span>
         </div>
-        {/* RIGHT: controls */}
-        <div className="flex items-center gap-3">
-          {/* THEME TOGGLE (pill shaped) */}
-          <button
-            onClick={toggleTheme}
-            className="px-4 py-1.5 rounded-full border border-border text-sm transition-colors bg-card text-card-foreground"
-          >
-            {theme === "dark" ? "Dark Mode" : "Light Mode"}
-          </button>
+        <div className="flex items-center gap-1 sm:gap-3">
+          <Button type="button" size="icon" variant="ghost" onClick={() => setTheme(nextTheme)}
+            aria-label={`Use ${nextTheme} theme`} title={`Use ${nextTheme} theme`}>
+            {nextTheme === "dark" ? <Moon /> : <Sun />}
+          </Button>
 
-          {/* Log In button – only when logged out */}
           {!user && (
-            <button
+            <Button size="sm"
               onClick={() => {
-                rememberWorkspaceLocation(location);
+                rememberWorkspaceLocation({ pathname: location.pathname, search: "", hash: "" });
                 navigate("/auth/login");
               }}
-              className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
             >
               Sign in
-            </button>
+            </Button>
           )}
 
-          {/* User avatar + dropdown – only when logged in */}
-          {user && <UserMenu />}
+          {user && <>
+            <Link className="px-2 py-2 text-sm underline underline-offset-4" to={isDemo ? "/briefing" : "/demo"}>
+              {isDemo ? "Your portfolio" : "Demo"}
+            </Link>
+            <UserMenu />
+          </>}
         </div>
       </header>
 
-      {/* --- Main Content --- */}
       <main>{children}</main>
     </div>
   );

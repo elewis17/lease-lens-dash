@@ -5,6 +5,9 @@ import type { Mortgage } from "@/components/MortgagesTable";
 import type { LeaseData } from "@/features/leases/LeaseTable";
 import type { Property } from "@/features/properties/PropertiesTable";
 import type { Tables } from "@/integrations/supabase/types";
+import { connectedReview } from "./releaseProfile";
+import { format } from "date-fns";
+import { illustrativePortfolio } from "@/domain/finance/illustrativePortfolio";
 
 const portfolioKey = (userId: string) => ["portfolio", userId] as const;
 
@@ -23,12 +26,58 @@ async function readAll<T>(source: string, read: (start: number, end: number) => 
   }
 }
 
+async function readRelated<T>(source: string, ids: readonly string[],
+  read: (ids: string[], start: number, end: number) => Page<T>, signal: AbortSignal) {
+  const rows: T[] = [];
+  for (let start = 0; start < ids.length; start += 80) {
+    const batch = ids.slice(start, start + 80);
+    rows.push(...await readAll(source, (from, to) => read(batch, from, to), signal));
+  }
+  return rows;
+}
+
+async function readLegacyRecords(ownerProperties: string[], signal: AbortSignal) {
+  // Descendant IDs come exclusively from the signed-in user's owned properties.
+  const [units, loans, directExpenses] = await Promise.all([
+    readRelated("units", ownerProperties, (ids, start, end) => supabase.from("units")
+      .select("id, unit_label, property_id").in("property_id", ids).order("id").range(start, end).abortSignal(signal), signal),
+    readRelated("mortgages", ownerProperties, (ids, start, end) => supabase.from("mortgages")
+      .select("*").in("property_id", ids).order("id").range(start, end).abortSignal(signal), signal),
+    readRelated("property expenses", ownerProperties, (ids, start, end) => supabase.from("expenses")
+      .select("property_id, unit_id, date, amount, category").in("property_id", ids).order("id").range(start, end).abortSignal(signal), signal),
+  ]);
+  const propertyScope = new Set(ownerProperties);
+  const scopedUnits = units.filter(unit => propertyScope.has(unit.property_id));
+  const unitIds = scopedUnits.map(unit => unit.id);
+  const unitScope = new Set(unitIds);
+  const [leaseRows, unitExpenses] = await Promise.all([
+    readRelated("leases", unitIds, (ids, start, end) => supabase.from("leases")
+      .select("id, monthly_rent, status, start_date, end_date, deposit, doc_url, unit_id, tenant:tenants(name)")
+      .in("unit_id", ids).order("id").range(start, end).abortSignal(signal), signal),
+    readRelated("unit expenses", unitIds, (ids, start, end) => supabase.from("expenses")
+      .select("property_id, unit_id, date, amount, category").is("property_id", null).in("unit_id", ids)
+      .order("id").range(start, end).abortSignal(signal), signal),
+  ]);
+  const scopedLeases = leaseRows.filter(lease => unitScope.has(lease.unit_id));
+  const leaseScope = new Set(scopedLeases.map(lease => lease.id));
+  const payments = await readRelated("payments", [...leaseScope], (ids, start, end) => supabase.from("payments")
+    .select("lease_id, due_date, amount_due, paid_date, paid_amount").in("lease_id", ids)
+    .order("id").range(start, end).abortSignal(signal), signal);
+  const expenses = [
+    ...directExpenses.filter(expense => expense.property_id !== null && propertyScope.has(expense.property_id)),
+    ...unitExpenses.filter(expense => expense.property_id === null && expense.unit_id !== null && unitScope.has(expense.unit_id)),
+  ];
+  return [scopedUnits, loans, expenses, scopedLeases, [],
+    payments.filter(payment => leaseScope.has(payment.lease_id))] as const;
+}
+
 function toProperty(property: Tables<"properties">): Property {
   return {
     id: property.id,
     alias: property.alias ?? property.name ?? property.address,
     address: property.address,
     type: property.type,
+    purchase_price: property.purchase_price,
     sale_price: property.purchase_price ?? property.sale_price,
     property_value: property.property_value,
     property_taxes: property.property_taxes,
@@ -41,22 +90,28 @@ function toProperty(property: Tables<"properties">): Property {
   };
 }
 
-const emptyPortfolio: { properties: Property[]; leases: LeaseData[]; mortgages: Mortgage[]; record: PortfolioRecord } = {
+export type WorkspacePortfolio = { properties: Property[]; leases: LeaseData[]; mortgages: Mortgage[];
+  statements: Tables<"dealstack_mortgage_statements">[]; record: PortfolioRecord };
+const emptyPortfolio: WorkspacePortfolio = {
   properties: [],
   leases: [],
   mortgages: [],
+  statements: [],
   record: { units: [], leases: [], loans: [], expenses: [], payments: [] },
 };
 
 async function readPortfolio(userId: string, signal: AbortSignal) {
-  const propertyRows = await readAll("properties", (start, end) =>
+  const returnedProperties = await readAll("properties", (start, end) =>
     supabase.from("properties").select("*").eq("user_id", userId).order("id").range(start, end).abortSignal(signal),
   signal);
+  const propertyRows = connectedReview ? returnedProperties.filter(property => property.user_id === userId) : returnedProperties;
   if (propertyRows.length === 0) return emptyPortfolio;
   const properties = propertyRows.map(toProperty);
   const propertyIds = new Set(properties.map(property => property.id));
 
-  const [unitRows, loans, expenses, leaseRows, payments] = await Promise.all([
+  const [unitRows, loans, expenses, leaseRows, statements, payments] = connectedReview
+    ? await readLegacyRecords([...propertyIds], signal)
+    : await Promise.all([
     readAll("units", (start, end) => supabase.from("units").select("id, unit_label, property_id")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("mortgages", (start, end) => supabase.from("mortgages").select("*")
@@ -64,7 +119,9 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     readAll("expenses", (start, end) => supabase.from("expenses").select("property_id, unit_id, date, amount, category")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("leases", (start, end) => supabase.from("leases")
-      .select("id, monthly_rent, status, start_date, end_date, deposit, tenant:tenants(name), unit_id")
+      .select("id, monthly_rent, status, start_date, end_date, deposit, doc_url, tenant:tenants(name), unit_id")
+      .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
+    readAll("mortgage statements", (start, end) => supabase.from("dealstack_mortgage_statements").select("*")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
     readAll("payments", (start, end) => supabase.from("payments").select("lease_id, due_date, amount_due, paid_date, paid_amount")
       .eq("user_id", userId).order("id").range(start, end).abortSignal(signal), signal),
@@ -77,9 +134,10 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
   const leases: LeaseData[] = scopedLeases.map(lease => ({
     id: lease.id,
     property_id: unitById.get(lease.unit_id)?.property_id,
-    tenant: lease.tenant?.name ?? "Unknown",
+    tenant: lease.tenant?.name ?? (connectedReview ? "Lease on record" : "Unknown"),
     monthlyRent: lease.monthly_rent,
     deposit: lease.deposit ?? null,
+    documentPath: lease.doc_url ?? null,
     startDate: lease.start_date,
     leaseEnd: lease.end_date,
     status: lease.status,
@@ -91,17 +149,32 @@ async function readPortfolio(userId: string, signal: AbortSignal) {
     start_date: loan.start_date ? new Date(loan.start_date) : null,
   }));
 
-  return { properties, leases, mortgages, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments } };
+  return { properties, leases, mortgages, statements, record: { units, leases: scopedLeases, loans: scopedLoans, expenses, payments, statements } };
 }
 
-export function usePortfolio(userId: string) {
+export function usePortfolio(userId: string, illustrative = false) {
   const client = useQueryClient();
   const key = portfolioKey(userId);
   const query = useQuery({
     queryKey: key,
-    queryFn: ({ signal }) => readPortfolio(userId, signal),
+    queryFn: ({ signal }) => {
+      if (!illustrative) return readPortfolio(userId, signal);
+      const sample = illustrativePortfolio(format(new Date(), "yyyy-MM-dd"));
+      const labels = new Map(sample.units.map(unit => [unit.id, unit.unit_label]));
+      const properties = sample.properties.map(property => ({
+        ...property, sale_price: null, purchase_price: null,
+      }));
+      const leases: LeaseData[] = sample.leases.map(lease => ({
+        id: lease.id, property_id: lease.property_id, unit_id: lease.unit_id, unit_label: labels.get(lease.unit_id),
+        tenant: lease.tenant.name, monthlyRent: lease.monthly_rent, status: lease.status,
+        startDate: lease.start_date, leaseEnd: lease.end_date, deposit: null,
+      }));
+      const mortgages = sample.mortgages.map(loan => ({ ...loan, start_date: new Date(loan.start_date) }));
+      return { properties, leases, mortgages, statements: [], record: sample };
+    },
     retry: false,
-    gcTime: 0,
+    gcTime: illustrative ? 30 * 60 * 1000 : 0,
+    staleTime: illustrative ? Infinity : 0,
   });
 
   const refresh = async () => {
@@ -109,5 +182,7 @@ export function usePortfolio(userId: string) {
     await client.invalidateQueries({ queryKey: key, exact: true });
   };
 
-  return { ...query, portfolio: query.data ?? emptyPortfolio, refresh };
+  const updateDemo = illustrative ? (update: (portfolio: WorkspacePortfolio) => WorkspacePortfolio) =>
+    client.setQueryData<WorkspacePortfolio>(key, current => current && update(current)) : undefined;
+  return { ...query, portfolio: query.data ?? emptyPortfolio, refresh, updateDemo };
 }

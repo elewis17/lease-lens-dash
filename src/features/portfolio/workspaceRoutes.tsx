@@ -12,8 +12,9 @@ export function workspaceRoutes(element: ReactNode, path?: string, includeIndex 
       <Route path="capital" element={<Capital />} />
       <Route path="underwrite" element={<Underwrite />} />
       <Route path="holdings" element={<Holdings />} />
-      <Route path="decisions" element={<DecisionLog />} />
-      <Route path="decisions/:id/memo" element={<DecisionMemo />} />
+      <Route path="decisions" element={<DecisionLog />}>
+        <Route path=":id/memo" element={<DecisionMemo />} />
+      </Route>
     </Route>
   );
 }

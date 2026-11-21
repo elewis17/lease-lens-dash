@@ -1,12 +1,15 @@
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { ReturnToWorkspace } from "@/features/navigation/returnTo";
 import { callbackHasError } from "@/features/auth/authRedirect";
 import { supabase } from "@/integrations/supabase/client";
+import { connectedReview } from "@/features/portfolio/releaseProfile";
 
 export default function AuthCallback() {
   const { search, hash } = useLocation();
   const providerError = callbackHasError(search, hash);
+  const [arrivedWithCode] = useState(() => new URLSearchParams(search).has("code"));
   const [result, setResult] = useState<"checking" | "success" | "failure">("checking");
 
   useEffect(() => {
@@ -34,7 +37,8 @@ export default function AuthCallback() {
   }, [providerError]);
 
   if (!providerError && result === "success") return <ReturnToWorkspace />;
-  if (!providerError && result === "checking") return <p className="p-6" role="status">Completing sign-in…</p>;
+  if (!providerError && result === "checking") return <section role="status" aria-label="Completing sign-in" className="mx-auto max-w-md space-y-4 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-32 w-full" /></section>;
+  if (connectedReview && !providerError && !arrivedWithCode) return <Navigate to="/auth/login" replace />;
 
   return (
     <section aria-labelledby="sign-in-error" className="mx-auto max-w-md space-y-4 px-6 py-10">

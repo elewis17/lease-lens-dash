@@ -12,8 +12,10 @@ export function leaseReceipts(payments: PaymentInput[] | null | undefined, lease
   const month = priorMonth.toISOString().slice(0, 7);
   const records = payments?.filter(payment => leaseIds.has(payment.lease_id));
   const due = records?.filter(payment => payment.due_date.startsWith(month));
-  const receipts = due?.length && records ? records.reduce((sum, payment) =>
-    payment.paid_date?.startsWith(month) ? sum + (payment.paid_amount ?? 0) : sum, 0) : null;
+  const recordedReceipts = records?.filter(payment => payment.paid_date?.startsWith(month)) ?? [];
+  const receipts = (due?.length || recordedReceipts.length) &&
+    recordedReceipts.every(payment => payment.paid_amount !== null && Number.isFinite(payment.paid_amount))
+    ? recordedReceipts.reduce((sum, payment) => sum + (payment.paid_amount ?? 0), 0) : null;
   const rentDue = due?.length ? due.reduce((sum, payment) => sum + payment.amount_due, 0) : null;
   const arrearsRows = records?.filter(payment => payment.due_date < asOf);
   const arrears = arrearsRows?.length ? arrearsRows.reduce((sum, payment) =>

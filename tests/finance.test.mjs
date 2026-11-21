@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { capitalBudget, capitalConflicts, capitalOpportunities, combinedCapitalPlan, netSaleProceeds, modelPaydown, rankCapitalOpportunities, recommendCapital } from "../src/domain/finance/capital.ts";
+import { leaseReceipts } from "../src/domain/finance/receipts.ts";
 import { isActiveLease } from "../src/domain/finance/activeLeases.ts";
 import { defaultThresholds } from "../src/domain/finance/thresholds.ts";
-import { kirkwoodExample, modelDeal, priceGates, solveIrr } from "../src/domain/finance/underwriting.ts";
+import { breakEvenInputs, kirkwoodExample, modelDeal, priceGates, solveIrr } from "../src/domain/finance/underwriting.ts";
 
 test("Kirkwood reproduces the deck examples and preserves whole-dollar gate boundaries", () => {
   const deal = modelDeal(kirkwoodExample);
@@ -69,7 +71,7 @@ test("active and expiring lease dates are inclusive and stale status cannot add 
   assert.equal(isActiveLease({ ...lease, start_date: null }, "2026-11-18"), false);
 });
 
-import { modelPortfolio } from "../src/domain/finance/portfolio.ts";
+import { modelPortfolio, operatingConfidence, vacancyOpportunity } from "../src/domain/finance/portfolio.ts";
 import { MetricsCalculator } from "../src/domain/finance/MetricsCalculator.ts";
 import { splitLoan } from "../src/domain/finance/debt.ts";
 import { projectNextYearWealth, projectPortfolio, refinance } from "../src/domain/finance/scenarios.ts";
@@ -89,6 +91,9 @@ test("portfolio matches the deck's illustrative waterfall, coverage, occupancy, 
   assert.equal(metrics.dscr.toFixed(2), "1.49");
   assert.deepEqual(metrics.assets.map(asset => asset.dscr.toFixed(2)), ["1.65", "1.81", "1.60", "1.32", "0.82"]);
   assert.equal(metrics.assets[4].verdict.label, "Distress");
+  assert.equal(vacancyOpportunity(metrics.assets[3], 5), 3906);
+  assert.equal(vacancyOpportunity(metrics.assets[0], 5), 0);
+  assert.equal(vacancyOpportunity(metrics.assets[3], null), null);
   assert.equal(metrics.equity, 711000);
   assert.equal(metrics.debt, 1400000);
   assert.equal((metrics.ltv * 100).toFixed(1), "66.3");
@@ -97,6 +102,9 @@ test("portfolio matches the deck's illustrative waterfall, coverage, occupancy, 
   assert.equal(metrics.occupiedUnits, 10);
   assert.equal(metrics.annualizedCashFlow, 57216);
   assert.equal(metrics.receipts, 20197);
+  assert.equal(metrics.month, "2026-10");
+  assert.equal(metrics.previousReceipts.month, "2026-09");
+  assert.equal(metrics.previousReceipts.receipts, null);
   assert.equal((100 * metrics.economicOccupancy).toFixed(1), "93.9");
   assert.equal((100 * metrics.physicalOccupancy).toFixed(1), "90.9");
   assert.equal(metrics.arrears, 1303);
@@ -104,6 +112,20 @@ test("portfolio matches the deck's illustrative waterfall, coverage, occupancy, 
   assert.equal(wealth.appreciation, 63330);
   assert.equal(Math.round(wealth.growth), 144888);
   assert.equal(projectNextYearWealth(metrics, null).growth, null);
+});
+
+test("prior-period receipts and occupancy use the same selected property", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const lease = record.leases[0];
+  const other = record.leases.find(item => item.unit_id === record.units.find(unit => unit.property_id === record.properties[1].id).id);
+  const payments = [
+    { lease_id: lease.id, due_date: "2026-09-01", amount_due: 2000, paid_date: "2026-09-12", paid_amount: 1500 },
+    { lease_id: other.id, due_date: "2026-09-01", amount_due: 3000, paid_date: "2026-09-10", paid_amount: 3000 },
+    ...record.payments,
+  ];
+  const { previousReceipts } = modelPortfolio([record.properties[0]], { ...record, payments }, reviewDate, 6.25);
+  assert.equal(previousReceipts.receipts, 1500);
+  assert.equal(previousReceipts.economicOccupancy, 0.75);
 });
 
 test("post-debt cash flow drives ROI and cash-on-cash, and absent denominators stay missing", () => {
@@ -135,6 +157,13 @@ test("escrowed, seasoned mortgage separates principal and interest once and neve
     leases: [{ id: "lease", unit_id: "unit", monthly_rent: 1750, start_date: "2026-01-01", end_date: "2026-12-31", status: "active" }],
   };
   const metrics = modelPortfolio([property], record, reviewDate, null);
+  const statement = { mortgage_id: loan.id, principal_balance: loan.current_balance, statement_date: "2026-09-01" };
+  const fromStatement = statement_date => modelPortfolio(
+    [property], { ...record, statements: [{ ...statement, statement_date }] }, reviewDate, null,
+  );
+  assert.match(operatingConfidence(metrics.assets), /principal and interest split.*unverified source date/);
+  assert.match(operatingConfidence(fromStatement("2026-09-01").assets), /stale statement/);
+  assert.doesNotMatch(operatingConfidence(fromStatement("2026-11-15").assets), /stale statement|unverified source date/);
   assert.equal(metrics.opex, 250);
   assert.equal(metrics.noi, 1500);
   assert.equal(metrics.dscr, 1.5);
@@ -144,6 +173,24 @@ test("escrowed, seasoned mortgage separates principal and interest once and neve
   assert.equal(refi.escrow, 250);
   assert.equal(refi.annualRunRateImpact, 0);
   assert.equal(refi.firstYearNet, -480);
+
+  const household = modelPortfolio([property], { ...record, loans: [{ ...loan, household: true }] }, reviewDate, 6.25);
+  assert.equal(household.cashFlow, 1500);
+  assert.equal(household.opex, 250);
+  assert.equal(household.dscr, null);
+  assert.equal(household.debt, 24000);
+  assert.equal(household.equity, 60000);
+  assert.equal(household.householdLoans[0].remaining, 24);
+  assert.equal(refinance(household, 0, 24, 2), null);
+  assert.equal(modelPaydown(household.assets[0], { loanId: loan.id, amount: "1000", fee: "0" }), null);
+
+  const rentalLoan = { ...loan, id: "rental", current_balance: 12000, monthly_payment: 500, includes_escrow: false };
+  const withRental = modelPortfolio([property], { ...record, loans: [{ ...loan, household: true }, rentalLoan] }, reviewDate, 6.25);
+  assert.equal(withRental.debt, 36000);
+  assert.equal(withRental.debtService, 500);
+  assert.equal(withRental.cashFlow, 1000);
+  assert.equal(withRental.dscr, 3);
+  assert.equal(refinance(withRental, 0, 24, 2).closingCosts, 240);
 });
 
 test("recorded unit expenses replace estimates in NOI and capital costs are separate", () => {
@@ -214,4 +261,124 @@ test("refinance uses all balances and shows net first-year cash after closing co
   const refi = refinance(metrics, 6.25, 360, 2);
   assert.equal(refi.closingCosts, 28000);
   assert.equal(Math.round(refi.firstYearNet), Math.round(refi.annualRunRateImpact - 28000));
+});
+
+test("Capital ranks refinance scenarios by separate cash, net worth, and coverage objectives", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const { assets } = modelPortfolio(record.properties, record, reviewDate, 5);
+  const actionRows = capitalOpportunities(assets, { rate: "5", years: "25", cost: "2" });
+  const first = objective => rankCapitalOpportunities(actionRows, objective)[0].title;
+  assert.equal(first("cash"), "Refinance North Ave Fourplex");
+  assert.equal(first("wealth"), "Refinance Monroe Duplex");
+  assert.equal(first("risk"), "Refinance Ponce Cottage");
+  const ponce = actionRows.find(row => row.title === "Refinance Ponce Cottage").refinance;
+  assert.equal(ponce.closingCosts, 3900);
+  assert.equal(Math.round(ponce.firstYearNet), -189);
+  assert.equal(Math.round(ponce.cash), 33212);
+  assert.equal(Math.round(ponce.wealth), 40403);
+  assert.equal(ponce.risk.toFixed(2), "0.43");
+  assert.equal(actionRows.find(row => row.action === "vacancy").refinance, null);
+  assert.equal(actionRows.find(row => row.action === "sale").refinance, null);
+});
+
+test("Capital preserves missing refinance costs and treats zero-cost cash yield as undefined", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const { assets } = modelPortfolio(record.properties, record, reviewDate, 6.25);
+  const missing = capitalOpportunities(assets, { rate: "6.25", years: "30", cost: " " });
+  assert.equal(missing.find(row => row.action === "refinance").refinance, null);
+  const noCost = capitalOpportunities(assets, { rate: "6.25", years: "30", cost: "0" });
+  assert.equal(noCost.find(row => row.action === "refinance").refinance.cashYield, null);
+});
+
+
+test("underwriting break-evens clear both gates at the displayed precision", () => {
+  const { rent, annualRate } = breakEvenInputs(kirkwoodExample);
+  assert.equal(rent, 5714);
+  assert.equal(annualRate, 0.0563);
+  for (const input of [{ rentMonthly: rent }, { annualRate }]) {
+    assert.equal(priceGates({ ...kirkwoodExample, ...input }).verdict, "Buy");
+  }
+  assert.notEqual(priceGates({ ...kirkwoodExample, rentMonthly: rent - 1 }).verdict, "Buy");
+  assert.notEqual(priceGates({ ...kirkwoodExample, annualRate: 0.0564 }).verdict, "Buy");
+});
+
+test("Capital combines rent and refinance timing without spending the reserve or counting sale proceeds early", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const metrics = modelPortfolio(record.properties, record, reviewDate, 6.25);
+  const glen = metrics.assets.find(asset => asset.property.alias === "Glen Iris Triplex");
+  const monroe = metrics.assets.find(asset => asset.property.alias === "Monroe Duplex");
+  const rentPlans = {
+    [glen.property.id + ":vacancy"]: { rent: "375", expenses: "50", cost: "5000", start: "2" },
+    [monroe.property.id + ":rent"]: { rent: "360", expenses: "14.40", cost: "0", start: "1" },
+  };
+  const opportunities = capitalOpportunities(metrics.assets, { rate: "6.25", years: "24", cost: "2" }, rentPlans);
+  const budget = capitalBudget("26000", "15000");
+  const selected = recommendCapital(opportunities, "cash", budget);
+  assert.equal(selected.length, 3);
+  const plan = combinedCapitalPlan(selected, 2, metrics);
+  const individual = selected.map(action => combinedCapitalPlan([action], 2, metrics));
+  assert.equal(Math.round(plan.runRate), Math.round(individual.reduce((sum, result) => sum + result.runRate, 0)));
+  assert.equal(Math.round(plan.firstYear), Math.round(individual.reduce((sum, result) => sum + result.firstYear, 0)));
+  assert.ok(plan.costs <= budget);
+  assert.ok(plan.dscr > metrics.dscr);
+  assert.deepEqual(plan.steps.map(({ costMonth, startMonth }) => [costMonth, startMonth]), [[0, 1], [0, 2], [2, 2]]);
+  assert.equal(plan.steps[1].costs, 5000);
+  assert.equal(plan.steps[1].runRate, 3900);
+  assert.equal(plan.steps[1].firstYear, -1750);
+  assert.equal(netSaleProceeds("271000", "16260", "210000"), 44740);
+  const refinance = selected.find(action => action.action === "refinance");
+  const conflict = [refinance, { ...refinance, action: "sale", refinance: null }];
+  assert.ok(capitalConflicts(conflict)[0].startsWith("Conflict"));
+  assert.equal(combinedCapitalPlan(conflict, 2, metrics), null);
+});
+
+
+test("recorded receipts are reported separately from contractual amounts due and a blank payment amount is not zero", () => {
+  const backRent = { lease_id: "owner-lease", due_date: "2026-09-01", paid_date: "2026-10-04", paid_amount: 500, amount_due: 500 };
+  const ids = new Set(["owner-lease"]);
+  const latePayment = leaseReceipts([backRent], ids, "2026-11-06");
+  assert.equal(latePayment.receipts, 500);
+  assert.equal(latePayment.rentDue, null);
+  assert.equal(latePayment.economicOccupancy, null);
+  assert.equal(leaseReceipts([{ ...backRent, paid_amount: null }], ids, "2026-11-06").receipts, null);
+  assert.equal(leaseReceipts([{ ...backRent, due_date: "2026-10-01", paid_date: null, paid_amount: null }], ids, "2026-11-06").receipts, 0);
+});
+
+
+test("Glen Iris paydown keeps the scheduled payment, shortens the term, and charges the correct upfront capital", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const metrics = modelPortfolio(record.properties, record, reviewDate, 6.25);
+  const glen = metrics.assets.find(asset => asset.property.alias === "Glen Iris Triplex");
+  const inputs = { loanId: glen.loans[0].id, amount: "50000", fee: "0" };
+  const projection = modelPaydown(glen, inputs);
+  assert.equal(projection.annualRunRateImpact, 0);
+  assert.equal(projection.firstYearNet, -50000);
+  assert.equal(projection.firstYearCashYield, 0);
+  assert.equal(projection.monthsSaved, 93);
+  assert.equal(Math.round(projection.lifetimeInterestSaved), 145027);
+  assert.equal(Math.round(projection.tenYearInterestSaved), 45609);
+  assert.equal(modelPaydown(glen, { ...inputs, fee: "" }), null);
+  assert.equal(modelPaydown(glen, { ...inputs, amount: "310001" }), null);
+  const rows = capitalOpportunities(metrics.assets, { rate: "", years: "", cost: "" }, {}, {
+    [glen.property.id + ":paydown"]: inputs,
+  });
+  assert.equal(recommendCapital(rows, "wealth", 49999).length, 0);
+  const selected = recommendCapital(rows, "wealth", 50000);
+  assert.equal(selected.length, 1);
+  assert.equal(combinedCapitalPlan(selected, null, metrics).costs, 50000);
+  assert.equal(combinedCapitalPlan(selected, null, metrics).dscr, metrics.dscr);
+});
+
+test("portfolio debt evidence follows the latest matching balance instead of an older or superseded statement", () => {
+  const record = illustrativePortfolio(reviewDate);
+  const [property] = record.properties;
+  const [loan] = record.loans;
+  const metrics = (statements) => modelPortfolio([property], { ...record, statements }, reviewDate, 6.25);
+  const older = { mortgage_id: loan.id, principal_balance: loan.current_balance, statement_date: "2026-09-01" };
+  const latest = { ...older, statement_date: "2026-11-15" };
+  assert.equal(metrics([older]).debtEvidence.stale, 1);
+  assert.equal(metrics([older]).assets[0].debtEvidence.stale, 1);
+  assert.equal(metrics([latest, older]).debtEvidence.confirmed, 1);
+  assert.equal(metrics([older, { ...latest, principal_balance: 1 }]).debtEvidence.undated, 1);
+  assert.equal(metrics([older, { ...latest, statement_date: "2026-12-01" }]).debtEvidence.stale, 1);
 });

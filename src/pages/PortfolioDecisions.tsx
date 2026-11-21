@@ -1,6 +1,7 @@
-import { VerdictExplanation } from "@/components/VerdictExplanation";
+import { useSessionState } from "@/features/navigation/sessionState";
+import { CapitalOpportunities } from "@/features/capital/CapitalOpportunities";
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { coverage, money } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 import { PortfolioWhatIf } from "./PortfolioWhatIf";
@@ -13,12 +14,16 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
   sessionKey: string;
   rentScenario: (increase: number) => PortfolioMetrics;
 }) {
+  const { illustrative } = useWorkspace();
+  const [termYears, setTermYears] = useSessionState(`${scenarios.sessionKey}:termYears`, illustrative ? "24" : "");
+  const [costPct, setCostPct] = useSessionState(`${scenarios.sessionKey}:costPct`, illustrative ? String(3500 / 195000 * 100) : "");
+
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
-        <h1 className="text-3xl font-semibold">Portfolio Decisions</h1>
-        <p className="text-muted-foreground">Add records in the Data Room to compare assets and model changes.</p>
-        <Button onClick={onAddData}>Open Data Room</Button>
+        <h1 className="view-title">Add a property to compare capital opportunities.</h1>
+        <p className="text-muted-foreground">Add records in Holdings to compare assets and model changes.</p>
+        <Button onClick={onAddData}>Open Holdings</Button>
       </section>
     );
   }
@@ -31,20 +36,20 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
 
   return (
     <section className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold">Portfolio Decisions</h1>
-        <VerdictExplanation {...metrics.verdict} />
-      </header>
-      <dl className="grid gap-3 sm:grid-cols-3">
+      <CapitalOpportunities assets={metrics.assets} sessionKey={scenarios.sessionKey}
+        quote={{ rate: scenarios.marketRate, years: termYears, cost: costPct }} />
+      <details className="border-y">
+        <summary className="cursor-pointer py-4 text-sm font-semibold">Portfolio comparison</summary>
+        <dl className="grid grid-cols-3 gap-3 px-1 pb-4">
         {[
           ["Monthly cash flow", money(metrics.cashFlow)],
           ["DSCR", coverage(metrics)],
           ["Real estate equity", money(metrics.equity)],
-        ].map(([label, value]) => <Card className="p-4 shadow-none" key={label}>
+        ].map(([label, value]) => <div key={label}>
           <dt className="text-sm text-muted-foreground">{label} · Estimate</dt><dd className="text-2xl font-semibold tabular-nums">{value}</dd>
-        </Card>)}
+        </div>)}
       </dl>
-      <Card className="space-y-3 p-5 shadow-none">
+      <section className="space-y-3 border-t px-1 pb-4 pt-4">
         <h2 className="text-lg font-semibold">Asset ranking</h2>
         <p className="text-sm text-muted-foreground">Estimated monthly cash flow, with coverage and real estate equity as tie-breakers. A rank requires all three measures.</p>
         <div className="overflow-x-auto">
@@ -62,8 +67,10 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
             ))}</tbody>
           </table>
         </div>
-      </Card>
-      <PortfolioWhatIf metrics={metrics} {...scenarios} />
+      </section>
+      </details>
+      <PortfolioWhatIf metrics={metrics} {...scenarios}
+        termYears={termYears} setTermYears={setTermYears} costPct={costPct} setCostPct={setCostPct} />
     </section>
   );
 }

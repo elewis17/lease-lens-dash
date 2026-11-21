@@ -1,5 +1,5 @@
 import { isActiveLease } from "./activeLeases.ts";
-import { splitLoan, balanceAfter, type LoanInput } from "./debt.ts";
+import { splitLoan, balanceAfter, balanceEvidence, balanceEvidenceText, type BalanceStatement, type LoanInput } from "./debt.ts";
 import { MetricsCalculator } from "./MetricsCalculator.ts";
 import { operatingExpenses, type ExpenseInput } from "./OpexCalculator.ts";
 import { defaultThresholds, type ThresholdPolicy } from "./thresholds.ts";
@@ -9,6 +9,7 @@ import { portfolioVerdict } from "./verdicts.ts";
 type PropertyInput = {
   id: string;
   alias: string;
+  type?: string | null;
   property_value?: number | null;
   property_taxes?: number | null;
   insurance?: number | null;
@@ -25,6 +26,7 @@ export type PortfolioRecord = {
   loans: LoanInput[] | null;
   expenses: ExpenseInput[] | null;
   payments?: PaymentInput[] | null;
+  statements?: readonly BalanceStatement[];
 };
 
 export const sumKnown = (values: readonly (number | null)[]): number | null =>
@@ -40,7 +42,7 @@ function dateYearBefore(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
-export function modelPortfolio(properties: readonly PropertyInput[], record: PortfolioRecord, asOf: string, marketRatePct: number | null, policy: ThresholdPolicy = defaultThresholds) {
+export function modelPortfolio(properties: readonly PropertyInput[], record: PortfolioRecord, asOf: string, marketRatePct: number | null, policy: ThresholdPolicy = defaultThresholds, propertyPolicies: ReadonlyMap<string, ThresholdPolicy> = new Map()) {
   const trailingStart = dateYearBefore(asOf);
   const assets = properties.map(property => {
     const unitIds = record.units === null ? null : new Set(record.units.filter(unit => unit.property_id === property.id).map(unit => unit.id));
@@ -51,9 +53,13 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
     const effectiveRent = expectedRent === null ? null : expectedRent === 0 ? 0
       : vacancy == null ? null : expectedRent * (1 - vacancy / 100);
     const loanRows = record.loans?.filter(loan => loan.property_id === property.id);
-    const loans = loanRows?.map(loan => splitLoan(loan, asOf)) ?? null;
+    const loans = loanRows?.map(loan => ({ ...splitLoan(loan, asOf), id: loan.id })) ?? null;
+    const householdIds = new Set(loanRows?.filter(loan => loan.household).map(loan => loan.id));
+    const rentalLoans = loans?.filter(loan => !householdIds.has(loan.id)) ?? null;
+    const householdLoans = loans?.filter(loan => householdIds.has(loan.id)) ?? [];
     const debt = loans ? sumKnown(loans.map(loan => loan.balance)) : null;
-    const debtService = loans ? sumKnown(loans.map(loan => loan.principalInterest)) : null;
+    const rentalDebt = rentalLoans ? sumKnown(rentalLoans.map(loan => loan.balance)) : null;
+    const debtService = rentalLoans ? sumKnown(rentalLoans.map(loan => loan.principalInterest)) : null;
     const escrow = loans ? sumKnown(loans.map(loan => loan.escrow)) : null;
     const hasEscrow = loanRows?.some(loan => loan.includes_escrow !== false) ?? false;
     const value = property.property_value ?? null;
@@ -68,11 +74,13 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
       ? sumKnown(expenseLines.flatMap(line => line.amount === null ? [] : [line.amount])) : null;
     const noi = effectiveRent === null || opex === null ? null : effectiveRent - opex;
     const metrics = MetricsCalculator.summary({ noi, debtService, propertyValue: value, investedCash: null });
-    const rateBasis = loans ? sumKnown(loans.map(loan => loan.balance === null ? null : loan.balance * loan.rate * 100)) : null;
-    const loanRatePct = debt !== null && debt > 0 && rateBasis !== null ? rateBasis / debt : null;
-    const verdict = portfolioVerdict({ ...metrics, debtService, loanRatePct, marketRatePct }, policy);
+    const rateBasis = rentalLoans ? sumKnown(rentalLoans.map(loan => loan.balance === null ? null : loan.balance * loan.rate * 100)) : null;
+    const loanRatePct = rentalDebt !== null && rentalDebt > 0 && rateBasis !== null ? rateBasis / rentalDebt : null;
+    const verdict = portfolioVerdict({ ...metrics, debtService, loanRatePct, marketRatePct }, propertyPolicies.get(property.type ?? "") ?? policy);
     return {
-      ...metrics, property, value, debt, debtService, escrow, loans, expectedRent, effectiveRent, occupancy,
+      ...metrics, property, value, debt, rentalDebt, debtService, escrow, loans, rentalLoans, householdLoans, expectedRent, effectiveRent, occupancy,
+      debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
+      usesEstimatedDebtService: loanRows?.some(loan => !loan.household && loan.includes_escrow === true) ?? false,
       loanRatePct, rateBasis, expenseLines, opex, equity: value === null || debt === null ? null : value - debt,
       verdict,
     };
@@ -83,19 +91,24 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
   const scopedUnits = new Set(record.units?.filter(unit => propertyIds.has(unit.property_id)).map(unit => unit.id));
   const scopedLeases = new Set(record.leases?.filter(lease => scopedUnits.has(lease.unit_id)).map(lease => lease.id));
   const receipts = leaseReceipts(record.payments, scopedLeases, asOf);
+  const previousReceipts = leaseReceipts(record.payments, scopedLeases, receipts.month + "-01");
   const noi = aggregate(asset => asset.noi);
   const value = aggregate(asset => asset.value);
   const debt = aggregate(asset => asset.debt);
+  const rentalDebt = aggregate(asset => asset.rentalDebt);
   const debtService = aggregate(asset => asset.debtService);
   const rateBasis = aggregate(asset => asset.rateBasis);
-  const loanRatePct = debt !== null && debt > 0 && rateBasis !== null ? rateBasis / debt : null;
+  const loanRatePct = rentalDebt !== null && rentalDebt > 0 && rateBasis !== null ? rateBasis / rentalDebt : null;
   const metrics = MetricsCalculator.summary({ noi, debtService, propertyValue: value, investedCash: null });
   const totalUnits = aggregate(asset => asset.occupancy?.totalUnits ?? null);
   const occupiedUnits = aggregate(asset => asset.occupancy?.occupiedUnits ?? null);
   const loans = assets.every(asset => asset.loans !== null) ? assets.flatMap(asset => asset.loans ?? []) : null;
+  const rentalLoans = loans && assets.flatMap(asset => asset.rentalLoans ?? []);
+  const householdLoans = assets.flatMap(asset => asset.householdLoans);
   const nextBalance = loans !== null ? sumKnown(loans.map(loan => balanceAfter(loan, 12))) : null;
   return {
-    ...metrics, ...receipts, assets, value, debt, debtService, loans, loanRatePct,
+    ...metrics, ...receipts, previousReceipts, assets, value, debt, rentalDebt, debtService, loans, rentalLoans, householdLoans, loanRatePct,
+    debtEvidence: balanceEvidence(loans, record.statements ?? [], asOf),
     annualizedCashFlow: metrics.cashFlow === null ? null : Math.round(metrics.cashFlow) * 12,
     equity: value === null || debt === null ? null : value - debt,
     ltv: value !== null && value > 0 && debt !== null ? debt / value : null,
@@ -112,3 +125,33 @@ export function modelPortfolio(properties: readonly PropertyInput[], record: Por
 export type PortfolioMetrics = ReturnType<typeof modelPortfolio>;
 // The property metrics are inferred from the shared calculation.
 export type AssetMetrics = PortfolioMetrics["assets"][number];
+
+export function vacancyOpportunity(asset: Pick<AssetMetrics, "expectedRent" | "property">, targetPercent: number | null) {
+  const vacancyPercent = asset.property.vacancy_pct;
+  if (asset.expectedRent === null || targetPercent === null || vacancyPercent == null ||
+    !Number.isFinite(targetPercent) || targetPercent < 0 || targetPercent > 100 ||
+    !Number.isFinite(vacancyPercent) || vacancyPercent < 0 || vacancyPercent > 100) return null;
+  return asset.expectedRent * Math.max(0, vacancyPercent - targetPercent) / 100 * 12;
+}
+
+export function operatingConfidence(assets: readonly AssetMetrics[]) {
+  if (assets.some(asset => asset.cashFlow === null)) return "Confidence limited · Rent, expenses, or debt service is missing.";
+  const estimates = [
+    assets.some(asset => asset.expectedRent !== null && asset.expectedRent > 0 && asset.property.vacancy_pct !== 0)
+      ? "vacancy" : null,
+    assets.some(asset => asset.expenseLines.some(line => line.basis === "Estimate"))
+      ? "operating costs" : null,
+    assets.some(asset => asset.usesEstimatedDebtService) ? "principal and interest split" : null,
+  ].filter(Boolean);
+  const missing = assets.some(asset => asset.expenseLines.some(line => line.basis === "Missing"));
+  const modeledDebtSources = new Set(assets.flatMap(asset => {
+    if (!asset.usesEstimatedDebtService) return [];
+    const source = balanceEvidenceText(asset.debtEvidence);
+    return source && (asset.debtEvidence.stale || asset.debtEvidence.undated || asset.debtEvidence.missing) ? [source] : [];
+  }));
+  return [
+    estimates.length ? "Confidence limited · Uses estimates for " + estimates.join(", ") + "." : null,
+    missing ? "Some operating expense categories have no recorded amounts." : null,
+    ...modeledDebtSources,
+  ].filter(Boolean).join(" ");
+}

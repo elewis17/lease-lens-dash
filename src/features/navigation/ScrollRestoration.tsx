@@ -5,7 +5,7 @@ import { loadSessionValue, storeSessionValue } from "./sessionState";
 export function ScrollRestoration({ ownerId }: { ownerId: string }) {
   const { pathname, search } = useLocation();
   const scope = new URLSearchParams(search).get("property") ?? "";
-  const key = `dealstack:${ownerId}:scroll:${pathname}:${scope}`;
+  const key = `dealstack:${ownerId}:scroll:${pathname.replace(/\/decisions\/[^/]+\/memo\/?$/, "/decisions")}:${scope}`;
 
   useEffect(() => {
     const previous = window.history.scrollRestoration;

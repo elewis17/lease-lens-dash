@@ -9,3 +9,12 @@ export const defaultThresholds = {
 
 export type ThresholdPolicy = typeof defaultThresholds;
 export type BuyThresholds = typeof defaultThresholds.buy;
+
+export const strategyPresets = {
+  Growth: { ...defaultThresholds, buy: { ...defaultThresholds.buy, minimumIrr: 0.15 } },
+  Balanced: defaultThresholds,
+  Income: { ...defaultThresholds, buy: { ...defaultThresholds.buy, minimumDscr: 1.35 } },
+};
+export type Strategy = keyof typeof strategyPresets;
+
+export const propertyTypes = ["Single-Family", "Multi-Family", "Commercial", "Industrial"] as const;
