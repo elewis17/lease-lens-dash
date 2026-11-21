@@ -1,6 +1,6 @@
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { cn } from "@/lib/utils";
 import { acquisitionVerdictDetail } from "@/domain/finance/verdicts";
-import { VerdictExplanation } from "@/components/VerdictExplanation";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,8 +31,9 @@ function priceRange(asking: number, test: number, walkAway: number, maxOffer: nu
   return Number.isSafeInteger(max) && max > min ? { min, max, step: Math.max(1, tick / 10) } : null;
 }
 
-export default function DealsScenarios({ illustrative = false, values, onChange, policy }: {
-  illustrative?: boolean;
+export default function DealsScenarios({ dealName = "this deal", values, onChange, policy, actionRef }: {
+  dealName?: string;
+  actionRef: (element: HTMLDivElement | null) => void;
   policy: ThresholdPolicy;
   values: AssumptionInputs;
   onChange: (values: AssumptionInputs) => void;
@@ -58,23 +59,24 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
   const dscrPasses = model?.dscr != null && model.dscr >= policy.buy.minimumDscr;
   const irrPasses = model?.irr != null && model.irr >= policy.buy.minimumIrr;
 
+  const headline = !gates || !assumptions ? "Enter assumptions to price the deal."
+    : gates.verdict === "Buy" ? `${dealName === "this deal" ? "This deal" : dealName} clears both buy gates at ${currency(assumptions.price)}.`
+    : gates.verdict === "Do not pursue" ? `Do not pursue ${dealName} at ${currency(assumptions.price)}.`
+    : gates.verdict === "Verify mitigations" ? `Verify mitigations for ${dealName} at ${currency(assumptions.price)}.`
+    : `More evidence is needed to price ${dealName}.`;
   return (
     <section aria-labelledby="underwriting-title" className="space-y-6 tabular-nums">
       <header className="space-y-1">
-        <h1 id="underwriting-title" tabIndex={-1} className="view-title">Deal Underwriting</h1>
-        {illustrative && <p className="text-sm text-muted-foreground">Illustrative data · Kirkwood</p>}
+        <h1 id="underwriting-title" tabIndex={-1} className="view-title">{headline}</h1>
+        {model?.dscr != null && !dscrPasses && <p className="text-sm text-destructive">Fails the DSCR gate: {ratio(model.dscr)} vs {ratio(policy.buy.minimumDscr)} required.</p>}
+        {model?.irr != null && !irrPasses && <p className="text-sm text-destructive">Fails the IRR gate: {percent(model.irr)} vs {percent(policy.buy.minimumIrr)} required.</p>}
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
         <Card className="space-y-4 p-5 lg:col-start-2 lg:row-start-1">
           <h3 className="text-lg font-semibold">Price guidance</h3>
-          {model && gates
-            ? <div className={cn("space-y-1", testPrice !== null && "italic")}>
-                {testPrice !== null && <p className="text-xs text-muted-foreground">Hypothetical · if bought at {currency(testPrice)}</p>}
-                <VerdictExplanation label={gates.verdict} detail={acquisitionVerdictDetail(gates.verdict)} live />
-
-              </div>
-            : <p className="font-medium" role="status">Enter valid assumptions to calculate price guidance.</p>}
+          {testPrice !== null && assumptions && <p className="text-xs italic text-muted-foreground">Hypothetical · if bought at {currency(testPrice)}</p>}
+          {!model && <p className="font-medium" role="status">Enter valid assumptions to calculate price guidance.</p>}
           {asking && assumptions && range && (
             <div className="space-y-1 border-y py-3">
               <div className="flex flex-wrap items-center justify-between gap-x-4">
@@ -106,21 +108,23 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
               </div>
             </div>
           )}
-          <dl className="grid grid-cols-2 gap-4">
-            <div><dt className="text-sm text-muted-foreground">Max offer</dt><dd className="text-xl font-semibold">{currency(gates?.maxOffer)}</dd></div>
-            <div><dt className="text-sm text-muted-foreground">Walk-away</dt><dd className="text-xl font-semibold">{currency(gates?.walkAway)}</dd></div>
+          {model && <dl className="grid grid-cols-2 gap-4">
+            <div><dt className="text-sm text-muted-foreground">Max offer</dt><dd className="text-xl font-semibold"><AnimatedNumber value={gates?.maxOffer} format={currency} /></dd></div>
+            <div><dt className="text-sm text-muted-foreground">Walk-away</dt><dd className="text-xl font-semibold"><AnimatedNumber value={gates?.walkAway} format={currency} /></dd></div>
             <div className={testPrice !== null ? "italic" : undefined}>
-              <dt className="text-sm text-muted-foreground">First-year DSCR</dt><dd>{ratio(model?.dscr)}</dd>
-              {model?.dscr != null && <dd className={cn("text-xs", dscrPasses ? "text-brand" : "text-destructive")}>{dscrPasses ? "Pass" : "Fail"} · {ratio(policy.buy.minimumDscr)} minimum</dd>}
+              <dt className="text-sm text-muted-foreground">First-year DSCR</dt><dd><AnimatedNumber value={model?.dscr} format={ratio} /></dd>
+              {model?.dscr != null && <dd className={cn("text-xs", dscrPasses ? "text-brand" : "text-destructive")}>{dscrPasses ? "Meets DSCR gate" : "Fails DSCR gate"} · {ratio(policy.buy.minimumDscr)} minimum</dd>}
             </div>
             <div className={testPrice !== null ? "italic" : undefined}>
-              <dt className="text-sm text-muted-foreground">{holdYears}-year modelled IRR</dt><dd>{percent(model?.irr)}</dd>
-              {model?.irr != null && <dd className={cn("text-xs", irrPasses ? "text-brand" : "text-destructive")}>{irrPasses ? "Pass" : "Fail"} · {percent(policy.buy.minimumIrr)} minimum</dd>}
+              <dt className="text-sm text-muted-foreground">{holdYears}-year modelled IRR</dt><dd><AnimatedNumber value={model?.irr} format={percent} /></dd>
+              {model?.irr != null && <dd className={cn("text-xs", irrPasses ? "text-brand" : "text-destructive")}>{irrPasses ? "Meets IRR gate" : "Fails IRR gate"} · {percent(policy.buy.minimumIrr)} minimum</dd>}
             </div>
-            <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash flow / mo</dt><dd>{currency(model?.cashFlow)}</dd></div>
+            <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash flow / mo</dt><dd><AnimatedNumber value={model?.cashFlow} format={currency} /></dd></div>
             <div className={testPrice !== null ? "italic" : undefined}><dt className="text-sm text-muted-foreground">First-year cash yield</dt><dd>{percent(model?.cashYield)}</dd></div>
-          </dl>
+          </dl>}
+          <div ref={actionRef} className="empty:hidden" />
           <Disclosure label="Buy gates and walk-away">
+            {gates && <p>{acquisitionVerdictDetail(gates.verdict)}</p>}
             <p>Buy requires DSCR ≥ {ratio(policy.buy.minimumDscr)} and IRR ≥ {percent(policy.buy.minimumIrr)}. Walk-away uses the {ratio(policy.lender.minimumDscr)} lender floor.</p>
             <p>Above max offer, verify rent, a rate buydown, or a larger down payment. Guidance depends on the entered rents, costs, financing, and exit assumptions.</p>
           </Disclosure>
@@ -170,7 +174,7 @@ export default function DealsScenarios({ illustrative = false, values, onChange,
         </Disclosure>
       </div>
 
-      {assumptions && model && <Disclosure section label="Sensitivity grid"><SensitivityTable assumptions={assumptions} minimumIrr={policy.buy.minimumIrr} /></Disclosure>}
+      {assumptions && model && <SensitivityTable assumptions={assumptions} minimumIrr={policy.buy.minimumIrr} />}
 
       <Disclosure section label="Scenario analysis">
         <Disclosure label="Scenario basis"><p>Uses operating income after vacancy and expenses. The modeled sale uses next-year NOI at the exit cap, less selling costs and loan payoff.</p></Disclosure>

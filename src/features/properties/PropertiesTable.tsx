@@ -79,13 +79,18 @@ export default function PropertiesTable({ properties, metrics, renderName, onAdd
             <li key={property.id} className="relative grid min-w-0 items-center gap-x-3 gap-y-2 py-3 xl:grid-cols-[minmax(0,1fr)_minmax(13rem,1.6fr)_auto]">
               <div className="min-w-0 pr-24 xl:pr-0">
                 {renderName(property)}
-                {asset && <p className="mt-1 text-xs text-muted-foreground">{asset.verdict.label}</p>}
+                {asset && <p className="mt-1 text-xs text-muted-foreground">
+                  {asset.verdict.label} · {asset.cashFlow === null ? "Rental cash flow needs evidence" : `${money(asset.cashFlow)}/mo estimated cash flow`}
+                </p>}
               </div>
-              <dl className="grid grid-cols-3 gap-2 text-sm tabular-nums">
-                <div><dt className="text-xs text-muted-foreground">Contractual rent</dt><dd className="font-semibold">{money(asset?.expectedRent)}<span className="text-xs font-normal text-muted-foreground"> / mo</span></dd></div>
-                <div><dt className="text-xs text-muted-foreground">Est. cash flow</dt><dd className="font-semibold">{money(asset?.cashFlow)}<span className="text-xs font-normal text-muted-foreground"> / mo</span></dd></div>
-                <div><dt className="text-xs text-muted-foreground">Est. DSCR</dt><dd className="font-semibold">{asset ? coverage(asset) : "—"}</dd></div>
-              </dl>
+              <div className="space-y-1">
+                <dl className="grid grid-cols-3 gap-2 text-sm tabular-nums">
+                  {asset?.expectedRent != null && <div><dt className="text-xs text-muted-foreground">Contractual rent</dt><dd className="font-semibold">{money(asset.expectedRent)}/mo</dd></div>}
+                  {asset?.cashFlow != null && <div><dt className="text-xs text-muted-foreground">Est. cash flow</dt><dd className="font-semibold">{money(asset.cashFlow)}/mo</dd></div>}
+                  {asset?.dscr != null && <div><dt className="text-xs text-muted-foreground">Est. DSCR</dt><dd className="font-semibold">{coverage(asset)}</dd></div>}
+                </dl>
+                {asset?.dscr == null && asset?.debtService !== 0 && <p className="text-xs text-muted-foreground">Coverage needs operating income and debt-service evidence.</p>}
+              </div>
               <div className="absolute right-0 top-2 flex xl:static">
                 <Button variant="ghost" size="icon" onClick={event => {
                   opener.current = event.currentTarget;

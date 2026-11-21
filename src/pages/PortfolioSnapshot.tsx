@@ -24,7 +24,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
-        <h1 className="view-title">Briefing</h1>
+        <h1 className="view-title">Add portfolio records to see what changed.</h1>
         <p className="text-muted-foreground">No properties yet. Add a property and its leases, operating costs, and financing to calculate the snapshot.</p>
         <Button onClick={onAddData}>Open Holdings</Button>
       </section>
@@ -98,12 +98,15 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
         <div className="min-w-0 space-y-6">
           <section className="editorial-section">
             <h2 className="text-lg font-semibold">What changed</h2>
-            <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
-            <dl className="space-y-2 tabular-nums">
-              <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange !== null && receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>
-              <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{occupancyChange === null ? "—" : signedPoints.format(occupancyChange) + " pp"}</dd></div>
-            </dl>
-            {(receiptChange === null || occupancyChange === null) && <p className="text-xs text-muted-foreground">A comparison requires a recorded basis for both months.</p>}
+            {receiptChange === null && occupancyChange === null ? <p className="text-sm text-muted-foreground">
+              {previous.receipts === null ? "No prior-period receipts on record." : "The current payment records do not support a comparison."}
+            </p> : <>
+              <p className="text-sm text-muted-foreground">Recorded payments · {metrics.month} compared with {previous.month}</p>
+              <dl className="space-y-2 tabular-nums">
+                {receiptChange !== null && <div className="flex justify-between gap-4"><dt>Rent receipts</dt><dd>{receiptChange > 0 && "+"}{money(receiptChange)}</dd></div>}
+                {occupancyChange !== null && <div className="flex justify-between gap-4"><dt>Economic occupancy</dt><dd>{signedPoints.format(occupancyChange)} pp</dd></div>}
+              </dl>
+            </>}
           </section>
 
           <section className="editorial-section">
@@ -176,7 +179,7 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 lg:grid-cols-4">
-        {tiles.map(tile => (
+        {tiles.filter(tile => tile.value !== "—").map(tile => (
           <div key={tile.label} className="border-t py-3">
             <dt className="text-sm text-muted-foreground">{tile.label}</dt>
             <dd className="text-2xl font-semibold tabular-nums">{tile.value}</dd>
@@ -185,6 +188,9 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
           </div>
         ))}
       </dl>
+      {tiles.some(tile => tile.value === "—") && <p className="text-xs text-muted-foreground">
+        Missing basis for {tiles.filter(tile => tile.value === "—").map(tile => tile.label.toLowerCase()).join(", ")}.
+      </p>}
 
       <details ref={wealthDetails} className="scroll-mt-4 space-y-4 border-y">
         <summary className="min-h-11 cursor-pointer py-3 text-base font-semibold">Wealth and equity</summary>
@@ -214,17 +220,21 @@ export default function PortfolioSnapshot({ metrics, onAddData, onReviewProperty
       </section>
 
       <Disclosure section label="Expense evidence">
-        {metrics.assets.map(asset => (
-          <details key={asset.property.id} className="border-t pt-2">
+        <p className="text-xs text-muted-foreground">Recorded expenses use the prior 12 months divided by 12. Zero estimates and missing categories are grouped.</p>
+        {metrics.assets.map(asset => {
+          const evidence = asset.expenseLines.filter(line => line.amount !== null && (line.amount !== 0 || line.basis === "Recorded"));
+          const omitted = asset.expenseLines.length - evidence.length;
+          return <details key={asset.property.id} className="border-t pt-2">
             <summary>{asset.property.alias}</summary>
-            <p className="mt-2 text-xs text-muted-foreground">Recorded expenses use the prior 12 months divided by 12. Missing categories are shown below.</p>
-            {asset.expenseLines.length ? <dl className="mt-2 space-y-1 text-sm">
-              {asset.expenseLines.map(line => <div className="flex justify-between gap-4" key={line.category}>
+            {evidence.length > 0 && <dl className="mt-2 space-y-1 text-sm">
+              {evidence.map(line => <div className="flex justify-between gap-4" key={line.category}>
                 <dt>{line.category === "pm" ? "Management" : line.category}</dt><dd>{money(line.amount)} · {line.basis}</dd>
               </div>)}
-            </dl> : <p className="text-sm text-muted-foreground">Expense records could not be loaded.</p>}
-          </details>
-        ))}
+            </dl>}
+            {omitted > 0 && <p className="mt-2 text-xs text-muted-foreground">{omitted} categories have a zero estimate or no recorded basis.</p>}
+            {!asset.expenseLines.length && <p className="mt-2 text-sm text-muted-foreground">Expense records could not be loaded.</p>}
+          </details>;
+        })}
       </Disclosure>
       <WealthBuildChart metrics={metrics} appreciationRatePct={appreciation} />
       <section className="editorial-section">

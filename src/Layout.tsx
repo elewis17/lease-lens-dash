@@ -3,7 +3,7 @@ import { useAuth } from "@/context/auth";
 import { rememberWorkspaceLocation } from "@/features/navigation/sessionState";
 import UserMenu from "@/components/ui/UserMenu";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FileText, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -11,7 +11,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user } = useAuth();
   const isDemo = /^\/demo(?:\/|$)/.test(location.pathname);
-  const inWorkspace = /^(?:\/demo)?\/(?:briefing|capital|underwrite|holdings|decisions)(?:\/|$)/.test(location.pathname);
 
   const { resolvedTheme, setTheme } = useTheme();
   const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
@@ -24,10 +23,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <span className="text-lg font-semibold tracking-tight">DealStack</span>
         </div>
         <div className="flex items-center gap-1 sm:gap-3">
-          {inWorkspace && <Button asChild size="icon" variant="ghost" className="lg:hidden">
-            <Link to={{ pathname: isDemo ? "/demo/decisions" : "/decisions", search: location.search, hash: location.hash }}
-              aria-label="Decision Log" title="Decision Log"><FileText /></Link>
-          </Button>}
           <Button type="button" size="icon" variant="ghost" onClick={() => setTheme(nextTheme)}
             aria-label={`Use ${nextTheme} theme`} title={`Use ${nextTheme} theme`}>
             {nextTheme === "dark" ? <Moon /> : <Sun />}

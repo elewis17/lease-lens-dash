@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/skeleton";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useTheme } from "next-themes";
@@ -17,7 +18,7 @@ export default function Login() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const retry = new URLSearchParams(search).get("retry") === "1";
-  if (loading) return <p className="p-6" role="status">Loading sign-in…</p>;
+  if (loading) return <section role="status" aria-label="Loading sign-in" className="mx-auto max-w-md space-y-4 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-32 w-full" /></section>;
   if (user && !retry) return <ReturnToWorkspace />;
 
   if (connectedReview) {

@@ -22,6 +22,8 @@ export function illustrativePortfolio(asOf = "2026-11-19") {
     ["Glen Iris Triplex", 3, 2, 4650, 12, 1320, 310000, 6.50, 25, 480000],
     ["Oak Grove SFR", 1, 1, 1950, 6, 640, 210000, 7.10, 27, 271000],
   ] as const;
+  const addresses = ["172 Monroe Drive", "840 North Avenue", "65 Ponce Place", "518 Glen Iris Drive", "204 Oak Grove Road"];
+  const tenants = ["Alex Rivera", "Maya Chen", "Jordan Miles", "Priya Shah", "Elena Cruz", "Sam Brooks", "Avery Reed", "Noah Walker", "Sofia Bennett", "Cameron Ellis"];
   const records = {
     properties: [] as SampleProperty[], units: [] as SampleUnit[], leases: [] as SampleLease[],
     mortgages: [] as SampleMortgage[], expenses: [] as NonNullable<PortfolioRecord["expenses"]>,
@@ -36,7 +38,7 @@ export function illustrativePortfolio(asOf = "2026-11-19") {
   for (const [index, [alias, units, occupied, rent, vacancy, opex, balance, rate, remaining, value]] of portfolio.entries()) {
     const propertyId = `illustrative-property-${index + 1}`;
     records.properties.push({
-      id: propertyId, name: alias, alias, address: "Illustrative record", property_value: value,
+      id: propertyId, name: alias, alias, address: addresses[index], property_value: value,
       type: units > 1 ? "Multi-Family" : "Single-Family", vacancy_pct: vacancy,
       rent_growth_rate: 2.5, opex_inflation_rate: 2, mgmt_pct: 0, maintenance_pct: 0, property_taxes: 0, insurance: 0,
     });
@@ -50,17 +52,18 @@ export function illustrativePortfolio(asOf = "2026-11-19") {
           monthly_rent: unitRent,
           status: "active", start_date: `${asOf.slice(0, 4)}-01-01`,
           end_date: index === 2 ? renewalDate : `${Number(asOf.slice(0, 4)) + 1}-12-31`,
-          tenant: { name: `Sample tenant ${i + 1}` },
+          tenant: { name: tenants[records.leases.length] },
         });
         records.payments.push({
           lease_id: `${unitId}-lease`, due_date: paymentDate, paid_date: paymentDate,
           amount_due: unitRent, paid_amount: unitRent * (1 - vacancy / 100),
         });
+
       }
     }
     const start = `${Number(asOf.slice(0, 4)) - (30 - remaining)}${asOf.slice(4)}`;
     records.mortgages.push({
-      id: `${propertyId}-loan`, property_id: propertyId, loan_name: "Illustrative fixed-rate loan",
+      id: `${propertyId}-loan`, property_id: propertyId, loan_name: `30-yr fixed ${rate.toFixed(2)}%`,
       principal: null, principal_original: null, current_balance: balance,
       term_months: 360, interest_rate: rate, start_date: start,
       monthly_payment: monthlyPayment(balance, rate / 100, remaining * 12),

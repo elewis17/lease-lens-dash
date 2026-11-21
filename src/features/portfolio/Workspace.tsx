@@ -113,7 +113,7 @@ export function Workspace({ userId, prefix = "", illustrative = false }: {
           </div>
         )}
         <ScrollRestoration ownerId={userId} />
-        <div key={pathnameForView} className="animate-fade-in">
+        <div key={pathnameForView.replace(/\/decisions\/[^/]+\/memo\/?$/, "/decisions")} className="animate-fade-in">
           {illustrative && <p className="mb-3 text-xs font-medium text-muted-foreground">Illustrative data · Demo portfolio</p>}
           <Outlet context={context} />
         </div>

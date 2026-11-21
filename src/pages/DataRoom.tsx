@@ -1,3 +1,4 @@
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { RenewalExposure } from "@/features/properties/RenewalExposure";
 import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { money, percent } from "@/domain/finance/format";
@@ -54,6 +55,13 @@ export default function DataRoom({
 }: DataRoomProps) {
   const [leaseSaved, setLeaseSaved] = useState(false);
   const { metrics, illustrative, householdMortgages, saveMortgageTreatment } = useWorkspace();
+  const flagged = metrics.assets.filter(asset => ["Distress", "Sell candidate"].includes(asset.verdict.label));
+  const count = filteredProperties.length;
+  const propertyCount = `${count} ${count === 1 ? "property" : "properties"}`;
+  const headline = !count ? "Add your first property to build the record."
+    : flagged.length === 1 ? `${flagged[0].property.alias} needs attention.`
+    : flagged.length ? `${flagged.length} of ${propertyCount} need attention.`
+    : `${propertyCount} on record. Review the evidence gaps.`;
   const allowCapture = !connectedReview && !illustrative;
   const escrowObject = useMemo(
     () => Object.fromEntries(escrowByProperty ?? new Map()),
@@ -63,12 +71,13 @@ export default function DataRoom({
   return (
     <div className="space-y-8 lg:space-y-10">
       <header className="space-y-2">
-        <h1 id="holdings-title" tabIndex={-1} className="text-[32px] font-semibold leading-[1.12] tracking-tight">Holdings</h1>
+        <h1 id="holdings-title" tabIndex={-1} className="view-title">{headline}</h1>
+        {flagged.length > 0 && <p className="text-sm text-muted-foreground">{propertyCount} on record · {flagged.map(asset => asset.property.alias).join(", ")}</p>}
         {illustrative && <p className="text-xs text-muted-foreground">Demo edits reset on reload.</p>}
         {filteredProperties.length > 0 && <dl aria-label="Holdings at a glance" className="holdings-totals grid grid-cols-1 gap-y-3 border-y py-4 min-[390px]:grid-cols-3">
-          <div><dt>Real estate equity</dt><dd>{money(metrics.equity)}</dd><small>Estimate</small></div>
-          <div><dt>Debt</dt><dd>{money(metrics.debt)}</dd><small>Recorded balances</small></div>
-          <div><dt>Physical occupancy</dt><dd>{percent(metrics.physicalOccupancy)}</dd><small>Contracted units</small></div>
+          <div><dt>Real estate equity</dt><dd><AnimatedNumber value={metrics.equity} format={money} /></dd><small>Estimate</small></div>
+          <div><dt>Debt</dt><dd><AnimatedNumber value={metrics.debt} format={money} /></dd><small>Recorded balances</small></div>
+          <div><dt>Physical occupancy</dt><dd><AnimatedNumber value={metrics.physicalOccupancy} format={percent} /></dd><small>Contracted units</small></div>
         </dl>}
       </header>
 

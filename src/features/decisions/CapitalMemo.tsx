@@ -14,7 +14,7 @@ export function CapitalMemo({ entry }: { entry: Entry & { payload: CapitalEntry 
     <div className="space-y-4">
       <div>
         <p className="text-sm text-muted-foreground">Decision memo · {new Date(entry.created_at).toLocaleDateString()}</p>
-        <h1 className="text-3xl font-semibold">{payload.title}</h1>
+        <h1 className="view-title">Decision to {payload.title.charAt(0).toLowerCase() + payload.title.slice(1)}.</h1>
       </div>
       <Card className="space-y-4 p-4">
         <h2 className="text-xl font-semibold">Why</h2>
@@ -23,12 +23,12 @@ export function CapitalMemo({ entry }: { entry: Entry & { payload: CapitalEntry 
         <dl className="grid grid-cols-2 gap-4 text-sm tabular-nums">
           {[
             ["Projected annualized cash change before costs", money(projection.annualCashChange)],
-            ["Actual annual cash change", money(latest.actualAnnualCashChange)],
+            ["Actual annual cash change", latest.actualAnnualCashChange === null ? "Pending" : money(latest.actualAnnualCashChange)],
             ["Upfront cost", money(projection.initialCost)],
             ["10-year cash change after costs", money(projection.tenYearCashChange)],
             ["10-year incremental real estate net worth", money(projection.tenYearWealthChange)],
             ["Change in DSCR", ratio(projection.coverageChange)],
-          ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>)}
+          ].filter(([, value]) => value !== "—").map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>)}
         </dl>
       </Card>
       <Card className="space-y-3 p-4">

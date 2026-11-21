@@ -3,7 +3,7 @@ import { useId } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -25,8 +25,9 @@ const objectiveBasis: Record<CapitalObjective, string> = {
   risk: "Change in debt-service coverage",
 };
 
-function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInputs, onSaleChange, paydownInputs, onPaydownChange }: {
+function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInputs, onSaleChange, paydownInputs, onPaydownChange, fit }: {
   row: CapitalOpportunity;
+  fit: string;
   objective: CapitalObjective;
   quote: RefinanceQuote;
   rentInputs: RentPlan;
@@ -72,7 +73,7 @@ function Opportunity({ row, objective, quote, rentInputs, onRentChange, saleInpu
             <span className="min-w-0">
               <span className="block text-sm font-medium">{row.title}</span>
               <span className="block text-xs capitalize text-muted-foreground">{stage}</span>
-              <span className="block text-xs text-muted-foreground">Confidence · Needs verification</span>
+              <span className="block text-xs text-muted-foreground">{fit}</span>
               {projection && <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs italic tabular-nums text-muted-foreground">
                 <span>Capital required {money(projection.closingCosts)}</span>
                 <span>First-year cash yield {percent("cashYield" in projection ? projection.cashYield : null)}</span>
@@ -273,7 +274,9 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
     setSavedObjective(next);
     navigate({ pathname, search: params.toString(), hash }, { replace: true, preventScrollReset: true });
   };
-  const [rentPlans, setRentPlans] = useSessionState<Record<string, RentPlan>>(sessionKey + ":rent-plans", {});
+  const { illustrative } = useWorkspace();
+  const demoVacancy = { "illustrative-property-4:vacancy": { rent: "325.5", expenses: "0", cost: "5000", start: "2" } };
+  const [rentPlans, setRentPlans] = useSessionState<Record<string, RentPlan>>(sessionKey + ":rent-plans", illustrative ? demoVacancy : {});
   const [paydownPlans, setPaydownPlans] = useSessionState<Record<string, PaydownPlan>>(sessionKey + ":paydowns", {});
   const [salePlans, setSalePlans] = useSessionState<Record<string, SalePlan>>(sessionKey + ":sale-plans", {});
   const changeRentPlan = (id: string, next: RentPlan) => setRentPlans({ ...rentPlans, [id]: next });
@@ -282,8 +285,8 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
   const rentResetOptions = assets.filter(asset => (asset.expectedRent ?? 0) > 0 && !rentPlans[asset.property.id + ":rent"]);
 
   return (
-    <Card className="min-w-0 space-y-4 p-4 sm:p-5">
-      <fieldset className="space-y-2">
+    <div className="min-w-0 space-y-4">
+      <CapitalAllocation actions={ranked} objective={objective} sessionKey={sessionKey} salePlans={salePlans} objectiveControl={<fieldset className="space-y-2">
         <legend className="text-sm font-medium">Rank by objective</legend>
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border bg-border sm:w-fit">
           {capitalObjectives.map(({ id, label }) => (
@@ -297,9 +300,17 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
             </label>
           ))}
         </div>
-      </fieldset>
-      <CapitalAllocation actions={ranked} objective={objective} sessionKey={sessionKey} salePlans={salePlans}>
+      </fieldset>}>{fit => <>
         <p className="text-sm text-muted-foreground">{objectiveBasis[objective]}</p>
+        {ranked.length
+          ? <ul aria-label="Capital opportunities">{ranked.map(row => (
+              <Opportunity key={row.id} row={row} objective={objective} quote={quote} fit={fit(row)}
+                rentInputs={rentPlans[row.id] ?? emptyRentPlan} onRentChange={next => changeRentPlan(row.id, next)}
+                saleInputs={salePlans[row.id] ?? emptySalePlan} onSaleChange={next => setSalePlans({ ...salePlans, [row.id]: next })}
+                paydownInputs={paydownPlans[row.id] ?? emptyPaydownPlan} onPaydownChange={next => setPaydownPlans({ ...paydownPlans, [row.id]: next })} />
+            ))}</ul>
+          : <p className="text-sm text-muted-foreground">The current record does not identify a refinance, vacancy, or sale review.</p>}
+        {!!(rentResetOptions.length || paydownOptions.length) && <Disclosure label="Model another action">
         {!!rentResetOptions.length && (
           <label className="flex flex-wrap items-center gap-2 text-sm">
             <span>Model a rent reset</span>
@@ -322,15 +333,8 @@ export function CapitalOpportunities({ assets, sessionKey, quote }: {
             </select>
           </label>
         )}
-        {ranked.length
-          ? <ul aria-label="Capital opportunities">{ranked.map(row => (
-              <Opportunity key={row.id} row={row} objective={objective} quote={quote}
-                rentInputs={rentPlans[row.id] ?? emptyRentPlan} onRentChange={next => changeRentPlan(row.id, next)}
-                saleInputs={salePlans[row.id] ?? emptySalePlan} onSaleChange={next => setSalePlans({ ...salePlans, [row.id]: next })}
-                paydownInputs={paydownPlans[row.id] ?? emptyPaydownPlan} onPaydownChange={next => setPaydownPlans({ ...paydownPlans, [row.id]: next })} />
-            ))}</ul>
-          : <p className="text-sm text-muted-foreground">The current record does not identify a refinance, vacancy, or sale review.</p>}
-      </CapitalAllocation>
-    </Card>
+        </Disclosure>}
+      </>}</CapitalAllocation>
+    </div>
   );
 }

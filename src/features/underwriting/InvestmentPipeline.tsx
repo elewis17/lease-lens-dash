@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { initialValues } from "./draft";
 type Deal = ReturnType<typeof currentDeals>[number];
 type Editor = { mode: "save" | "offer" | "pass"; deal?: Deal };
 
-export function InvestmentPipeline() {
+export function InvestmentPipeline({ actionContainer }: { actionContainer: HTMLElement | null }) {
   const { entries, dealAssumptions, pathTo, draft, openDeal, activeDealId, policyFor } = useWorkspace();
   const triggerRef = useRef<HTMLElement | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -21,10 +22,6 @@ export function InvestmentPipeline() {
   const [error, setError] = useState<string | null>(null);
   const deals = currentDeals(entries.entries);
   const active = deals.find(deal => deal.payload.dealId === activeDealId);
-  const activeMatchesDraft = !!(active && dealAssumptions && active.payload.propertyType === draft.propertyType &&
-    Object.entries(active.payload.assumptions).every(([key, value]) => dealAssumptions[key as keyof typeof dealAssumptions] === value));
-  const activePrice = activeMatchesDraft && active
-    ? modelComparison(active.payload.assumptions, policyFor(active.payload.propertyType)).price : null;
   const canSave = Boolean(dealAssumptions) && !entries.isError && !entries.isPending;
 
   const start = (next: Editor) => {
@@ -62,6 +59,10 @@ export function InvestmentPipeline() {
     }
   };
 
+  const saveDeal = <Button className="min-h-11" disabled={!canSave}
+    onClick={() => start({ mode: "save", deal: active })}>
+    {active ? "Save assumptions" : "Save deal"}
+  </Button>;
   const selected = deals.filter(deal => comparison.includes(deal.payload.dealId));
   return (
     <section className="space-y-4" aria-labelledby="pipeline-heading">
@@ -69,19 +70,10 @@ export function InvestmentPipeline() {
         <h2 id="pipeline-heading" tabIndex={-1} className="text-xl font-semibold">Pipeline</h2>
         <div className="flex flex-wrap gap-2">
           {active && <Button variant="ghost" onClick={() => openDeal(null, {})}>Start a new deal</Button>}
-          <Button className="min-h-11" variant="outline" disabled={entries.isError || entries.isPending}
-            onClick={() => start({ mode: "save", deal: active })}>
-            {active ? "Save assumptions" : "Add a deal"}
-          </Button>
+          {!actionContainer && saveDeal}
         </div>
       </div>
-      <div className="fixed inset-x-4 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 lg:hidden">
-        {activePrice !== null && active
-          ? <Button className="min-h-11 w-full" onClick={() => start({ mode: "offer", deal: active })}>Record offer at {money(activePrice)}</Button>
-          : <Button className="min-h-11 w-full" disabled={!canSave} onClick={() => start({ mode: "save", deal: active })}>
-              {active ? "Save assumptions" : "Save deal"}
-            </Button>}
-      </div>
+      {actionContainer && createPortal(saveDeal, actionContainer)}
       {entries.isError ? (
         <p role="alert">Could not load the pipeline. <button type="button" className="underline" onClick={() => void entries.refetch()}>Try again</button></p>
       ) : entries.isPending ? <p role="status">Loading pipeline…</p> : deals.length === 0 ? (
@@ -100,7 +92,7 @@ export function InvestmentPipeline() {
                   <h3 className="font-semibold">{payload.title}</h3>
                   <p className="text-xs text-muted-foreground">Assumptions updated {age === 0 ? "today" : age + " days ago"}</p>
                 </div>
-                <p className="text-sm">{decision ? (decision.action === "pass" ? "Passed" : "Offer recorded") + " · " + decision.reason : gates.verdict}</p>
+                <p className="text-sm">{decision ? (decision.action === "pass" ? "Declined" : "Offer recorded") + " · " + decision.reason : gates.verdict}</p>
                 {related && <Link className="text-sm underline" to={pathTo("/decisions/" + related.id + "/memo")}>Open decision memo</Link>}
                 <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums sm:grid-cols-3">
                   {[

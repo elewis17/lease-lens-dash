@@ -1,6 +1,6 @@
 import { useSessionState } from "@/features/navigation/sessionState";
 import { CapitalOpportunities } from "@/features/capital/CapitalOpportunities";
-import { VerdictExplanation } from "@/components/VerdictExplanation";
+import { useWorkspace } from "@/features/portfolio/useWorkspace";
 import { Button } from "@/components/ui/button";
 import { coverage, money } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
@@ -14,13 +14,14 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
   sessionKey: string;
   rentScenario: (increase: number) => PortfolioMetrics;
 }) {
-  const [termYears, setTermYears] = useSessionState(`${scenarios.sessionKey}:termYears`, "");
-  const [costPct, setCostPct] = useSessionState(`${scenarios.sessionKey}:costPct`, "");
+  const { illustrative } = useWorkspace();
+  const [termYears, setTermYears] = useSessionState(`${scenarios.sessionKey}:termYears`, illustrative ? "24" : "");
+  const [costPct, setCostPct] = useSessionState(`${scenarios.sessionKey}:costPct`, illustrative ? String(3500 / 195000 * 100) : "");
 
   if (!metrics.assets.length) {
     return (
       <section className="space-y-4">
-        <h1 className="view-title">Where should the next dollar go?</h1>
+        <h1 className="view-title">Add a property to compare capital opportunities.</h1>
         <p className="text-muted-foreground">Add records in Holdings to compare assets and model changes.</p>
         <Button onClick={onAddData}>Open Holdings</Button>
       </section>
@@ -35,11 +36,6 @@ export default function PortfolioDecisions({ metrics, onAddData, ...scenarios }:
 
   return (
     <section className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="view-title">Where should the next dollar go?</h1>
-        <VerdictExplanation {...metrics.verdict} />
-        {metrics.householdLoans.length > 0 && <p className="text-xs text-muted-foreground">Rental calculations exclude household mortgage principal and interest.</p>}
-      </header>
       <CapitalOpportunities assets={metrics.assets} sessionKey={scenarios.sessionKey}
         quote={{ rate: scenarios.marketRate, years: termYears, cost: costPct }} />
       <details className="border-y">

@@ -1,7 +1,9 @@
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { useState } from "react";
 import { money } from "@/domain/finance/format";
 import type { PortfolioMetrics } from "@/domain/finance/portfolio";
 import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
 import { Disclosure } from "@/components/ui/disclosure";
 
 export function RentWaterfall({ metrics }: { metrics: PortfolioMetrics }) {
@@ -45,11 +47,11 @@ export function RentWaterfall({ metrics }: { metrics: PortfolioMetrics }) {
           );
         })}
       </div>
-      <input type="range" className="h-8 w-full accent-[hsl(var(--ring))]" min={0} max={stages.length - 1} step={1}
-        aria-label="Inspect a rent waterfall step" aria-valuetext={active.title} value={selected}
-        onChange={event => setSelected(Number(event.target.value))} />
+      <Slider className="min-h-11" min={0} max={stages.length - 1} step={1}
+        thumbLabel="Inspect a rent waterfall step" thumbValueText={active.title} value={[selected]}
+        onValueChange={([step]) => setSelected(step)} />
       <p className="text-sm" aria-live="polite">
-        <span className="font-medium">{active.title} · {money(active.value)}/mo</span>
+        <span className="font-medium">{active.title} · <AnimatedNumber value={active.value} format={money} />/mo</span>
         {active.value === null && <span className="block text-xs text-muted-foreground">Required source missing.</span>}
       </p>
       <Disclosure label="Calculation basis">

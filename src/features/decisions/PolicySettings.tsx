@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -9,6 +9,14 @@ import { currentPolicies, entrySchema } from "./entries";
 const targets = ["Portfolio", ...propertyTypes] as const;
 type Target = typeof targets[number];
 const ruleLabels = { hold: "Hold", distress: "Distress", sell: "Sell candidate", refinance: "Refinance candidate", buy: "Buy gates", lender: "Lender floor" };
+const ruleBasis = {
+  hold: "Requires positive cash flow and adequate debt coverage.",
+  distress: "Flags cash shortfalls with inadequate debt coverage.",
+  sell: "Flags prolonged distress or weak coverage without a credible fix.",
+  refinance: "Requires coverage, positive cash flow, and enough rate spread.",
+  buy: "Requires both coverage and modelled return to clear their gates.",
+  lender: "Sets the minimum coverage for the walk-away price.",
+};
 const fieldLabels: Record<string, string> = {
   minimumDscr: "Minimum DSCR", dscrBelow: "DSCR below", cashFlowAbove: "Monthly cash flow above ($)",
   cashFlowBelow: "Monthly cash flow below ($)", distressQuarters: "Quarters of distress",
@@ -16,6 +24,7 @@ const fieldLabels: Record<string, string> = {
   minimumIrr: "Minimum IRR (%)",
 };
 export function PolicySettings({ store }: { store: ReturnType<typeof useWorkspaceEntries> }) {
+  const formId = useId();
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<Target>("Portfolio");
   const [preset, setPreset] = useState<Strategy | null>(null);
@@ -56,9 +65,9 @@ export function PolicySettings({ store }: { store: ReturnType<typeof useWorkspac
   return (
     <Sheet open={open} onOpenChange={next => { if (!pending) setOpen(next); }}>
       <SheetTrigger asChild><Button variant="outline" disabled={store.isPending || store.isError}>Policies</Button></SheetTrigger>
-      <SheetContent side="bottom" className="mx-auto flex max-h-[90dvh] max-w-2xl flex-col gap-3">
+      <SheetContent side="bottom" className="mx-auto flex max-h-[88dvh] max-w-2xl flex-col gap-3 rounded-t-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
         <header>
-          <SheetTitle>Threshold policies</SheetTitle>
+          <SheetTitle className="text-xl">Threshold policies</SheetTitle>
           <SheetDescription>Rules guide verdicts. Confirm changes to preserve them in the Decision Log.</SheetDescription>
         </header>
         <label className="text-sm">Applies to
@@ -72,10 +81,11 @@ export function PolicySettings({ store }: { store: ReturnType<typeof useWorkspac
             <Button key={name} aria-pressed={name === strategy} variant="outline" onClick={() => setPreset(name as Strategy)}>{name}</Button>
           ))}
         </div>
-        <form key={target + ":" + (preset ?? "saved")} onSubmit={submit} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-1">
+        <form id={formId} key={target + ":" + (preset ?? "saved")} onSubmit={submit} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-1">
           {Object.entries(fields).map(([group, rules]) => (
             <fieldset key={group} className="grid gap-2 border-t pt-2 sm:grid-cols-2">
               <legend className="text-sm font-medium">{ruleLabels[group as keyof ThresholdPolicy]}</legend>
+              <p className="text-xs text-muted-foreground sm:col-span-2">{ruleBasis[group as keyof ThresholdPolicy]}</p>
               {Object.entries(rules as Record<string, number>).map(([key, value]) => (
                 <label key={key} className="space-y-1 text-sm">
                   <span>{fieldLabels[key]}</span>
@@ -86,8 +96,11 @@ export function PolicySettings({ store }: { store: ReturnType<typeof useWorkspac
           ))}
           <label className="space-y-1 text-sm"><span>Reason for change</span><Input name="reason" required maxLength={2000} /></label>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <Button disabled={pending}>Confirm policy change</Button>
         </form>
+        <footer className="flex shrink-0 justify-end gap-2 border-t pt-3">
+          <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>Cancel</Button>
+          <Button type="submit" form={formId} disabled={pending}>{pending ? "Saving…" : "Save policies"}</Button>
+        </footer>
       </SheetContent>
     </Sheet>
   );
